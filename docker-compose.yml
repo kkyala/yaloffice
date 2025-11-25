@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  # Backend (Node/Express) - Primary service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - FRONTEND_URL=http://localhost:5173
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash-live-001}
+      - GEMINI_VOICE=${GEMINI_VOICE:-Zephyr}
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    volumes:
+      - ./avatar_output:/app/avatar_output
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (Vite React)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:3000
+      - VITE_WS_URL=ws://backend:3000
+      - VITE_LIVEKIT_URL=${LIVEKIT_URL}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Avatar Generator (Wav2Lip) - Requires NVIDIA GPU
+  avatar:
+    build:
+      context: ./avatar
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - AVATAR_OUTPUT_DIR=/app/avatar_output
+      - AVATAR_FACE_SOURCE=/app/assets/ai_interviewer.jpg
+    volumes:
+      - ./assets:/app/assets
+      - ./avatar_output:/app/avatar_output
+      - ./avatar/models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    profiles:
+      - avatar
+
+  # Optional: Self-hosted LiveKit
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /livekit.yaml
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/livekit.yaml
+    profiles:
+      - self-hosted
+
+volumes:
+  avatar_output:

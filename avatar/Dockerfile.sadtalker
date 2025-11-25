@@ -1,0 +1,46 @@
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libgl1-mesa-glx \
+    git \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone SadTalker
+RUN git clone https://github.com/OpenTalker/SadTalker.git /app/SadTalker
+
+# Install SadTalker dependencies
+WORKDIR /app/SadTalker
+RUN pip install -r requirements.txt
+RUN pip install gfpgan
+
+# Download pretrained models
+RUN mkdir -p checkpoints
+# Models will be auto-downloaded on first run, or manually download:
+# bash scripts/download_models.sh
+
+# Create output directory
+RUN mkdir -p /app/avatar_output
+
+# Copy assets
+COPY assets /app/assets
+
+WORKDIR /app
+
+# Environment variables
+ENV SADTALKER_DIR=/app/SadTalker
+ENV SADTALKER_CHECKPOINT_DIR=/app/SadTalker/checkpoints
+ENV SADTALKER_CONFIG_DIR=/app/SadTalker/src/config
+ENV AVATAR_OUTPUT_DIR=/app/avatar_output
+ENV AVATAR_FACE_SOURCE=/app/assets/ai_interviewer.jpg
+ENV AVATAR_RENDERER=sadtalker
+
+EXPOSE 8001
+
+CMD ["python", "-m", "http.server", "8001", "--directory", "/app/avatar_output"]

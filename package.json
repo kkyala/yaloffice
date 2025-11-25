@@ -1,0 +1,29 @@
+{
+  "name": "yaal-office-ai-recruitment",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "An AI-powered platform for recruitment.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.19.0",
+    "@livekit/components-react": "^2.9.16",
+    "@livekit/components-styles": "^1.2.0",
+    "@supabase/supabase-js": "^2.57.4",
+    "livekit-client": "^2.16.0",
+    "livekit-server-sdk": "^2.14.2",
+    "mammoth": "^1.11.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}

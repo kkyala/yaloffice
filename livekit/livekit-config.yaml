@@ -1,0 +1,9 @@
+keys:
+  devkey: 7b783c52a32944b2b1d4e76f59cb03ea
+
+rtc:
+  udp_port: 7880
+  tcp_port: 7881
+
+logging:
+  level: info

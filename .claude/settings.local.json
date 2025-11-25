@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "Bash(test:*)",
+      "Bash(del \"src\\pages\\GeminiLiveInterviewScreen.tsx\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Yāl Office",
+  "description": "An AI-powered platform to streamline the recruitment process for employers, agents, and recruiters.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
