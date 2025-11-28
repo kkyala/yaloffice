@@ -68,7 +68,7 @@ const SetupInterviewModal = ({ candidateName, application, onSave, onCancel }) =
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content" style={{maxWidth: '500px'}}>
+            <div className="modal-content" style={{ maxWidth: '500px' }}>
                 <div className="modal-header"><h2>Setup AI Interview for {candidateName}</h2></div>
                 <div className="modal-body">
                     <div className="form-group"><label>Number of Questions</label><input type="number" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))} /></div>
@@ -114,6 +114,74 @@ const SetupInterviewModal = ({ candidateName, application, onSave, onCancel }) =
     );
 };
 
+// Interview Report Modal Component
+const InterviewReportModal = ({ application, onClose }) => {
+    const { candidateName, jobTitle, aiScore, interview_config } = application;
+    const transcript = interview_config?.transcript || 'No transcript available.';
+    const interviewType = interview_config?.interviewType || 'audio';
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" style={{ maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>Interview Report: {candidateName}</h2>
+                    <button className="modal-close-btn" onClick={onClose} style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '1.5rem',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)'
+                    }}>×</button>
+                </div>
+                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                            <strong>Position:</strong> {jobTitle}
+                        </p>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                            <strong>Interview Type:</strong> {
+                                interviewType === 'livekit' ? 'AI Avatar (Tavus)' :
+                                    interviewType === 'video' ? 'Video (Gemini)' : 'Audio (Gemini)'
+                            }
+                        </p>
+                        {aiScore !== null && (
+                            <div style={{
+                                display: 'inline-block',
+                                background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))',
+                                color: 'white',
+                                padding: '0.75rem 1.5rem',
+                                borderRadius: '12px',
+                                fontSize: '1.25rem',
+                                fontWeight: '700',
+                                marginTop: '0.5rem'
+                            }}>
+                                AI Score: {aiScore.toFixed(1)}/10
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Interview Transcript</h3>
+                        <div style={{
+                            background: 'var(--light-bg)',
+                            padding: '1rem',
+                            borderRadius: 'var(--border-radius-sm)',
+                            whiteSpace: 'pre-wrap',
+                            fontSize: '0.9rem',
+                            lineHeight: '1.6',
+                            color: 'var(--text-primary)'
+                        }}>
+                            {transcript}
+                        </div>
+                    </div>
+                </div>
+                <div className="modal-footer">
+                    <button className="btn btn-secondary" onClick={onClose}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Application Card Component
 type ApplicationCardProps = {
     application: EnrichedApplication;
@@ -135,7 +203,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
         }
         if (interviewStatus === 'assessment_pending' || interviewStatus === 'pending') {
             return (
-                <span style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>Assessment Pending</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Assessment Pending</span>
             );
         }
         if (interviewStatus === 'assessment_completed' || interviewStatus === 'started') {
@@ -159,9 +227,9 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
             {aiScore !== null && (<div className="candidate-card-score">{aiScore.toFixed(1)}/10</div>)}
             <h4>{candidateName}</h4>
             <p>{jobTitle}</p>
-            <p style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem'}}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                 {interviewType === 'livekit' ? 'AI Avatar Interview (Tavus)' :
-                 interviewType === 'video' ? 'Video Interview (Gemini)' : 'Audio Interview (Gemini)'}
+                    interviewType === 'video' ? 'Video Interview (Gemini)' : 'Audio Interview (Gemini)'}
             </p>
             <div className="candidate-card-footer">
                 {renderActionButton()}
@@ -216,6 +284,8 @@ export default function CandidatesScreen({
     const [view, setView] = useState('pipeline');
     const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
     const [appForSetup, setAppForSetup] = useState<EnrichedApplication | null>(null);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [appForReport, setAppForReport] = useState<EnrichedApplication | null>(null);
 
     const jobsForFilter = useMemo(() => {
         let filteredJobs = jobsData;
@@ -227,7 +297,7 @@ export default function CandidatesScreen({
         const jobsWithCandidates = new Set(candidatesData.map(c => c.jobId));
         return filteredJobs.filter(job => jobsWithCandidates.has(job.id));
     }, [jobsData, currentUser, candidatesData]);
-    
+
     // The 'candidates' table now serves as the applications list. This logic processes it for display.
     const enrichedList: EnrichedApplication[] = useMemo(() => {
         const jobsMap = new Map(jobsData.map(j => [j.id, j]));
@@ -259,7 +329,7 @@ export default function CandidatesScreen({
             return acc;
         }, {} as Record<string, EnrichedApplication[]>);
     }, [enrichedList]);
-    
+
     const selectedJobTitle = pipelineJobFilter !== 'all' ? jobsData.find(j => j.id === parseInt(pipelineJobFilter as string, 10))?.title : 'All Jobs';
     const canAddCandidates = currentUser?.role !== 'Employer';
 
@@ -278,7 +348,7 @@ export default function CandidatesScreen({
             onUpdateApplicationStatus(applicationId, newStatus);
         }
     };
-    
+
     const handleSaveAndExit = (candidateData) => { onSaveCandidate(candidateData); setView('pipeline'); };
     const handleOpenSetupModal = (app: EnrichedApplication) => { setAppForSetup(app); setIsSetupModalOpen(true); };
     const handleCloseSetupModal = () => { setIsSetupModalOpen(false); setAppForSetup(null); };
@@ -314,10 +384,8 @@ export default function CandidatesScreen({
     };
 
     const handleViewResults = (app: EnrichedApplication) => {
-        if (onNavigate) {
-            const parentPage = currentUser?.role === 'Employer' ? 'recruitment' : 'candidates';
-            onNavigate('interview-report', parentPage, { candidateId: app.candidate_id, applicationId: app.id });
-        }
+        setAppForReport(app);
+        setIsReportModalOpen(true);
     };
 
     if (view === 'add' && canAddCandidates) {
@@ -351,11 +419,17 @@ export default function CandidatesScreen({
                 ))}
             </div>
             {isSetupModalOpen && appForSetup && (
-                <SetupInterviewModal 
+                <SetupInterviewModal
                     application={appForSetup}
                     candidateName={appForSetup.candidateName}
                     onSave={handleSaveInterviewConfig}
                     onCancel={handleCloseSetupModal}
+                />
+            )}
+            {isReportModalOpen && appForReport && (
+                <InterviewReportModal
+                    application={appForReport}
+                    onClose={() => setIsReportModalOpen(false)}
                 />
             )}
         </>
