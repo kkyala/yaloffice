@@ -71,7 +71,7 @@ function createGeminiConnection(
   console.log(`[Gemini] Session data for ${sessionId}:`, session ? 'found' : 'not found');
 
   // Use the live-capable model
-  const model = 'gemini-2.0-flash-live-001';
+  const model = 'gemini-2.0-flash-exp';
 
   const url = `${GEMINI_LIVE_URL}?key=${apiKey}`;
   console.log(`[Gemini] Creating WebSocket connection to Gemini for session ${sessionId}`);
@@ -95,23 +95,23 @@ function createGeminiConnection(
       setup: {
         model: `models/${model}`,
         generationConfig: {
-          responseModalities: ['AUDIO', 'TEXT'], // Include both audio and text for transcripts
+          responseModalities: ['AUDIO'], // Must be an array
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: process.env.GEMINI_VOICE || 'Puck'
+                voiceName: "Aoede" // Good default voice
               }
             }
           }
         },
         systemInstruction: {
           parts: [{ text: INTERVIEW_SYSTEM_PROMPT }]
-        },
-        tools: []
+        }
       }
     };
 
     console.log(`[Gemini] Sending setup for session ${sessionId}, model: ${model}`);
+    console.log(`[Gemini] Setup message: ${JSON.stringify(setupMessage, null, 2)}`);
     ws.send(JSON.stringify(setupMessage));
 
     // Send initial prompt after setup - always send to start interaction
@@ -162,6 +162,7 @@ function createGeminiConnection(
       // Handle different message types from Gemini
       if (message.serverContent) {
         const content = message.serverContent;
+        console.log(`[Gemini] Full serverContent:`, JSON.stringify(content, null, 2));
         console.log(`[Gemini] Server content - turnComplete: ${content.turnComplete}, hasParts: ${!!content.modelTurn?.parts}`);
 
         // Handle transcript
@@ -333,7 +334,7 @@ export function setupGeminiProxyWS(wss: WebSocketServer): void {
           const audioMessage = {
             realtimeInput: {
               mediaChunks: [{
-                mimeType: 'audio/pcm;rate=16000;channels=1',
+                mimeType: 'audio/pcm;rate=16000',
                 data: data.toString('base64')
               }]
             }
@@ -348,7 +349,7 @@ export function setupGeminiProxyWS(wss: WebSocketServer): void {
             const audioMessage = {
               realtimeInput: {
                 mediaChunks: [{
-                  mimeType: 'audio/pcm;rate=16000;channels=1',
+                  mimeType: 'audio/pcm;rate=16000',
                   data: message.data
                 }]
               }
@@ -374,6 +375,9 @@ export function setupGeminiProxyWS(wss: WebSocketServer): void {
               }
             };
             geminiWs.send(JSON.stringify(endMessage));
+          } else if (message.type === 'keepalive') {
+            // Keepalive ping - just log it, no need to forward to Gemini
+            console.log(`[Proxy] Received keepalive ping for session ${sessionId}`);
           }
         }
       } catch (err) {

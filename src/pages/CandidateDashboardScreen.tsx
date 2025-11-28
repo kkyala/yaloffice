@@ -1,5 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
+import styles from './CandidateDashboardScreen.module.css';
 import { SearchIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Icons';
 
 // Define types for props to ensure data consistency
@@ -9,6 +10,9 @@ type CandidateApplication = {
     user_id: string;
     status: string;
     interview_config?: any;
+    // Enriched fields for UI
+    jobTitle?: string;
+    company?: string;
 };
 
 type Job = {
@@ -56,6 +60,16 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
             });
     }, [candidatesData, jobsData, currentUser]);
 
+    // Separate scheduled interview applications from others
+    const scheduledApps = myApplications.filter(app => {
+        const status = app.interview_config?.interviewStatus;
+        return status && ['pending', 'assessment_pending', 'assessment_completed', 'started'].includes(status);
+    });
+    const otherApps = myApplications.filter(app => !scheduledApps.includes(app));
+    // Import CSS module for card styling
+    // (Assumes src/pages/CandidateDashboardScreen.module.css exists)
+
+
     // 2. Filter & Sort
     const processedApplications = useMemo(() => {
         let data = [...myApplications];
@@ -63,9 +77,9 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
         // Search
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
-            data = data.filter(app => 
-                app.jobTitle.toLowerCase().includes(lowerTerm) || 
-                app.company.toLowerCase().includes(lowerTerm) ||
+            data = data.filter(app =>
+                (app.jobTitle && app.jobTitle.toLowerCase().includes(lowerTerm)) ||
+                (app.company && app.company.toLowerCase().includes(lowerTerm)) ||
                 app.status.toLowerCase().includes(lowerTerm)
             );
         }
@@ -73,8 +87,8 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
         // Sort
         if (sortConfig.key) {
             data.sort((a, b) => {
-                const aValue = a[sortConfig.key];
-                const bValue = b[sortConfig.key];
+                const aValue = a[sortConfig.key as keyof CandidateApplication];
+                const bValue = b[sortConfig.key as keyof CandidateApplication];
 
                 if (aValue < bValue) {
                     return sortConfig.direction === 'asc' ? -1 : 1;
@@ -108,27 +122,27 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
         setSortConfig({ key, direction });
     };
 
-    const handleTakeInterview = (app: any) => {
+    const handleTakeInterview = (app: CandidateApplication) => {
         onNavigate('interview', 'dashboard', { candidateId: app.id, applicationId: app.id });
     };
-    
-    const handleStartAssessment = (app: any) => {
+
+    const handleStartAssessment = (app: CandidateApplication) => {
         onNavigate('pre-interview-assessment', 'dashboard', { candidateId: app.id, applicationId: app.id });
     };
-    
-    const handleViewReport = (app: any) => {
+
+    const handleViewReport = (app: CandidateApplication) => {
         onNavigate('interview-report', 'dashboard', { candidateId: app.id, applicationId: app.id });
     };
 
-    const renderActionButton = (app: any) => {
+    const renderActionButton = (app: CandidateApplication) => {
         if (!['Applied', 'Sourced', 'Screening', 'Interviewing'].includes(app.status)) {
             return null;
         }
 
         const interviewStatus = app.interview_config?.interviewStatus;
-        
+
         if (app.status === 'Screening' && !interviewStatus) {
-            return <span style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>Awaiting Interview Setup</span>;
+            return <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Awaiting Interview Setup</span>;
         }
 
         if (interviewStatus === 'assessment_pending' || interviewStatus === 'pending') {
@@ -138,23 +152,15 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
                 </button>
             );
         }
-        
-        if (interviewStatus === 'assessment_completed') {
+
+        if (interviewStatus === 'assessment_completed' || interviewStatus === 'started') {
             return (
                 <button className="btn btn-primary btn-sm" onClick={() => handleTakeInterview(app)}>
-                    Start AI Interview
+                    {interviewStatus === 'assessment_completed' ? 'Start AI Interview' : 'Continue Interview'}
                 </button>
             );
         }
 
-        if (interviewStatus === 'started') {
-            return (
-                <button className="btn btn-primary btn-sm" onClick={() => handleTakeInterview(app)}>
-                    Continue Interview
-                </button>
-            );
-        }
-        
         if (interviewStatus === 'finished') {
             return (
                 <button className="btn btn-secondary btn-sm" onClick={() => handleViewReport(app)}>
@@ -162,10 +168,27 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
                 </button>
             );
         }
-        
+
         return null;
     };
 
+    // ApplicationCard component – defined inside the component to access renderActionButton
+    const ApplicationCard = ({ app }: { app: CandidateApplication }) => {
+        return (
+            <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                    <h3 className={styles.jobTitle}>{app.jobTitle}</h3>
+                    <span className={`status-badge status-${app.status?.toLowerCase().replace(/\s+/g, '-')}`}>{app.status}</span>
+                </div>
+                <p className={styles.company}>{app.company}</p>
+                <div className={styles.actions}>
+                    {renderActionButton(app)}
+                </div>
+            </div>
+        );
+    };
+
+    // Sorting UI is no longer needed for the card layout, keep function for potential future use
     const renderSortIcon = (key: string) => {
         if (sortConfig.key !== key) return null;
         return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
@@ -173,88 +196,45 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
 
     return (
         <>
+            {/* Header */}
             <header className="page-header">
                 <h1>My Applications</h1>
             </header>
 
-            <div className="table-controls" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="search-bar" style={{ position: 'relative', width: '300px' }}>
-                    <input 
-                        type="text" 
-                        placeholder="Search by job or company..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ paddingLeft: '2.5rem', width: '100%' }}
-                    />
-                    <div style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }}>
-                        <SearchIcon style={{ width: '16px', height: '16px' }} />
-                    </div>
-                </div>
-                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                    Showing {currentItems.length} of {processedApplications.length} applications
-                </div>
+            {/* Search Bar */}
+            <div className="search-bar" style={{ marginBottom: '1rem', position: 'relative', width: '100%', maxWidth: '400px' }}>
+                <input
+                    type="text"
+                    placeholder="Search by job, company, or status..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem 2.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--surface-color)' }}
+                />
+                <SearchIcon style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
             </div>
 
-            <div className="table-container">
-                <table className="jobs-table">
-                    <thead>
-                        <tr>
-                            <th onClick={() => handleSort('jobTitle')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                Job Title {renderSortIcon('jobTitle')}
-                            </th>
-                            <th onClick={() => handleSort('company')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                Company {renderSortIcon('company')}
-                            </th>
-                            <th onClick={() => handleSort('status')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                Status {renderSortIcon('status')}
-                            </th>
-                            <th style={{ textAlign: 'right' }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {currentItems.length > 0 ? currentItems.map(app => (
-                            <tr key={app.id}>
-                                <td>{app.jobTitle}</td>
-                                <td>{app.company}</td>
-                                <td>
-                                    <span className={`status-badge status-${app.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                                        {app.status}
-                                    </span>
-                                </td>
-                                <td style={{ textAlign: 'right' }}>
-                                    {renderActionButton(app)}
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan={4} style={{ textAlign: 'center', padding: '3rem' }}>
-                                    {searchTerm ? 'No applications match your search.' : 'You have not applied for any jobs yet. Visit the "Find Jobs" page to get started.'}
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-                
-                {totalPages > 1 && (
-                    <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                        <button 
-                            className="btn btn-secondary btn-sm" 
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                        >
-                            <ChevronLeftIcon style={{ width: '16px', height: '16px' }} /> Previous
-                        </button>
-                        <span style={{ fontSize: '0.9rem' }}>Page {currentPage} of {totalPages}</span>
-                        <button 
-                            className="btn btn-secondary btn-sm" 
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                        >
-                            Next <ChevronRightIcon style={{ width: '16px', height: '16px' }} />
-                        </button>
+            {/* Scheduled Interviews Section */}
+            {scheduledApps.length > 0 && (
+                <section style={{ marginBottom: '2rem' }}>
+                    <h2 style={{ marginBottom: '1rem' }}>Scheduled Interviews</h2>
+                    <div className={styles.applicationsGrid}>
+                        {scheduledApps.map(app => (
+                            <ApplicationCard key={app.id} app={app} />
+                        ))}
                     </div>
-                )}
-            </div>
+                </section>
+            )}
+
+            {/* All Other Applications Section */}
+            <section>
+                <h2 style={{ marginBottom: '1rem' }}>All Applications</h2>
+                <div className={styles.applicationsGrid}>
+                    {otherApps.map(app => (
+                        <ApplicationCard key={app.id} app={app} />
+                    ))}
+                </div>
+            </section>
         </>
     );
 }
+

@@ -30,9 +30,9 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
 
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
-            data = data.filter(job => 
-                job.title.toLowerCase().includes(lowerTerm) || 
-                job.employer.toLowerCase().includes(lowerTerm) || 
+            data = data.filter(job =>
+                job.title.toLowerCase().includes(lowerTerm) ||
+                job.employer.toLowerCase().includes(lowerTerm) ||
                 job.location.toLowerCase().includes(lowerTerm)
             );
         }
@@ -90,21 +90,27 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                 <h1>Find Jobs</h1>
             </header>
 
-            <div className="table-controls" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="search-bar" style={{ position: 'relative', width: '300px' }}>
-                    <input 
-                        type="text" 
-                        placeholder="Search jobs, companies, locations..." 
+            <div className="table-controls" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="search-bar glass-panel" style={{ position: 'relative', width: '350px', padding: '0', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden' }}>
+                    <input
+                        type="text"
+                        placeholder="Search jobs, companies, locations..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ paddingLeft: '2.5rem', width: '100%' }}
+                        style={{
+                            paddingLeft: '2.75rem',
+                            width: '100%',
+                            border: 'none',
+                            background: 'transparent',
+                            height: '46px'
+                        }}
                     />
-                    <div style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }}>
-                        <SearchIcon style={{ width: '16px', height: '16px' }} />
+                    <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-color)' }}>
+                        <SearchIcon style={{ width: '18px', height: '18px' }} />
                     </div>
                 </div>
-                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                    Showing {currentItems.length} of {processedJobs.length} jobs
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                    Showing <strong style={{ color: 'var(--text-primary)' }}>{currentItems.length}</strong> of {processedJobs.length} jobs
                 </div>
             </div>
 
@@ -126,18 +132,23 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                     </thead>
                     <tbody>
                         {currentItems.length > 0 ? currentItems.map(job => (
-                            <tr key={job.id}>
+                            <tr key={job.id} className="animate-fade-in">
                                 <td>
-                                    <strong>{job.title}</strong>
-                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{job.employer}</p>
+                                    <strong style={{ fontSize: '1.05rem', color: 'var(--primary-dark-color)' }}>{job.title}</strong>
+                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{job.employer}</p>
                                 </td>
-                                <td>{job.location}</td>
-                                <td>{`${formatCurrency(job.salaryMin)} - ${formatCurrency(job.salaryMax)}`}</td>
+                                <td>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--light-bg)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem' }}>
+                                        {job.location}
+                                    </span>
+                                </td>
+                                <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{`${formatCurrency(job.salaryMin)} - ${formatCurrency(job.salaryMax)}`}</td>
                                 <td style={{ textAlign: 'right' }}>
                                     <button
-                                        className="btn btn-primary"
+                                        className={`btn ${appliedJobIds.has(job.id) ? 'btn-secondary' : 'btn-primary'}`}
                                         onClick={() => onStartApplication(job)}
                                         disabled={appliedJobIds.has(job.id)}
+                                        style={{ minWidth: '120px' }}
                                     >
                                         {appliedJobIds.has(job.id) ? 'Applied' : 'Apply Now'}
                                     </button>
@@ -155,16 +166,16 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
 
                 {totalPages > 1 && (
                     <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                        <button 
-                            className="btn btn-secondary btn-sm" 
+                        <button
+                            className="btn btn-secondary btn-sm"
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
                         >
                             <ChevronLeftIcon style={{ width: '16px', height: '16px' }} /> Previous
                         </button>
                         <span style={{ fontSize: '0.9rem' }}>Page {currentPage} of {totalPages}</span>
-                        <button 
-                            className="btn btn-secondary btn-sm" 
+                        <button
+                            className="btn btn-secondary btn-sm"
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages}
                         >

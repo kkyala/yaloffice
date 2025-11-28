@@ -20,7 +20,7 @@ const wss = new WebSocketServer({ server, path: '/ws/gemini-proxy' });
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' })); // Increased for audio/video data
