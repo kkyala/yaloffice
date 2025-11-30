@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { geminiLLMService } from '../services/geminiLLM.js';
-import { interviewStore } from '../services/interviewStore.js';
+import { interviewStore, InterviewSession } from '../services/interviewStore.js';
+import { auditLogger } from '../services/auditLogger.js';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.post('/start', async (req, res) => {
     const sessionId = uuidv4();
 
     // Create interview session
-    const session = {
+    const session: InterviewSession = {
       id: sessionId,
       roomName,
       jobTitle,
@@ -33,13 +34,11 @@ router.post('/start', async (req, res) => {
       candidateId,
       candidateName,
       customQuestions,
-      status: 'active' as const,
+      status: 'active',
       startedAt: new Date().toISOString(),
-      transcript: [] as Array<{ role: string; content: string; timestamp: string }>,
+      transcript: [],
       currentQuestionIndex: 0
     };
-
-    interviewStore.set(sessionId, session);
 
     // Generate initial greeting from LLM
     const initialPrompt = `Begin: "role":"${jobTitle}", "questionCount":${questionCount}, "difficulty":"${difficulty}", "custom": ${JSON.stringify(customQuestions)}`;
@@ -55,6 +54,18 @@ router.post('/start', async (req, res) => {
       role: 'interviewer',
       content: greeting,
       timestamp: new Date().toISOString()
+    });
+
+    // Save to DB
+    await interviewStore.set(sessionId, session);
+
+    // Audit Log
+    await auditLogger.log({
+      userId: candidateId || 'anonymous',
+      action: 'interview_started',
+      resourceType: 'interview',
+      resourceId: sessionId,
+      details: { jobTitle, roomName, candidateName }
     });
 
     res.json({
@@ -78,7 +89,7 @@ router.post('/stop', async (req, res) => {
   try {
     const { sessionId } = req.body;
 
-    const session = interviewStore.get(sessionId);
+    const session = await interviewStore.get(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
@@ -96,6 +107,20 @@ router.post('/stop', async (req, res) => {
       session.jobTitle
     );
 
+    session.analysis = analysis;
+
+    // Save updates to DB
+    await interviewStore.set(sessionId, session);
+
+    // Audit Log
+    await auditLogger.log({
+      userId: session.candidateId || 'anonymous',
+      action: 'interview_completed',
+      resourceType: 'interview',
+      resourceId: sessionId,
+      details: { analysisSummary: analysis.summary }
+    });
+
     res.json({
       success: true,
       sessionId,
@@ -104,7 +129,9 @@ router.post('/stop', async (req, res) => {
     });
 
     // Clean up session after response (keep for a while for potential retries)
-    setTimeout(() => interviewStore.delete(sessionId), 300000); // 5 minutes
+    // In DB mode, we might want to keep it longer or archive it. 
+    // For now, we won't delete it immediately to allow review.
+    // setTimeout(async () => await interviewStore.delete(sessionId), 300000); 
   } catch (error) {
     console.error('Error stopping interview:', error);
     res.status(500).json({ error: 'Failed to stop interview' });
@@ -119,7 +146,7 @@ router.post('/respond', async (req, res) => {
   try {
     const { sessionId, candidateResponse } = req.body;
 
-    const session = interviewStore.get(sessionId);
+    const session = await interviewStore.get(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
@@ -147,6 +174,9 @@ router.post('/respond', async (req, res) => {
 
     session.currentQuestionIndex++;
 
+    // Save updates to DB
+    await interviewStore.set(sessionId, session);
+
     res.json({
       success: true,
       response: interviewerResponse,
@@ -163,21 +193,26 @@ router.post('/respond', async (req, res) => {
  * GET /api/interview/status/:sessionId
  * Get current interview session status
  */
-router.get('/status/:sessionId', (req, res) => {
-  const session = interviewStore.get(req.params.sessionId);
+router.get('/status/:sessionId', async (req, res) => {
+  try {
+    const session = await interviewStore.get(req.params.sessionId);
 
-  if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    res.json({
+      sessionId: session.id,
+      status: session.status,
+      currentQuestionIndex: session.currentQuestionIndex,
+      questionCount: session.questionCount,
+      startedAt: session.startedAt,
+      transcriptLength: session.transcript.length
+    });
+  } catch (error) {
+    console.error('Error getting status:', error);
+    res.status(500).json({ error: 'Failed to get status' });
   }
-
-  res.json({
-    sessionId: session.id,
-    status: session.status,
-    currentQuestionIndex: session.currentQuestionIndex,
-    questionCount: session.questionCount,
-    startedAt: session.startedAt,
-    transcriptLength: session.transcript.length
-  });
 });
 
 export default router;

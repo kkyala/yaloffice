@@ -9,6 +9,12 @@ import interviewRouter from './routes/interview.js';
 import avatarRouter from './routes/avatar.js';
 import roomsRouter from './routes/rooms.js';
 import aiRouter from './routes/ai.js';
+import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
+import jobsRouter from './routes/jobs.js';
+import candidatesRouter from './routes/candidates.js';
+import placementsRouter from './routes/placements.js';
+import resumesRouter from './routes/resumes.js';
 import { setupGeminiProxyWS } from './services/geminiProxy.js';
 import { roomLifecycleManager } from './services/roomLifecycleManager.js';
 
@@ -36,6 +42,12 @@ app.use('/api/interview', interviewRouter);
 app.use('/api/avatar', avatarRouter);
 app.use('/api/rooms', roomsRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/jobs', jobsRouter);
+app.use('/api/candidates', candidatesRouter);
+app.use('/api/placements', placementsRouter);
+app.use('/api/resumes', resumesRouter);
 
 // Serve avatar videos
 app.use('/avatar_output', express.static('avatar_output'));

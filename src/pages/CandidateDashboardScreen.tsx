@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import styles from './CandidateDashboardScreen.module.css';
+
 import { SearchIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Icons';
 
 // Define types for props to ensure data consistency
@@ -172,27 +172,30 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
         return null;
     };
 
-    // ApplicationCard component – defined inside the component to access renderActionButton
-    const ApplicationCard = ({ app }: { app: CandidateApplication }) => {
-        return (
-            <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                    <h3 className={styles.jobTitle}>{app.jobTitle}</h3>
-                    <span className={`status-badge status-${app.status?.toLowerCase().replace(/\s+/g, '-')}`}>{app.status}</span>
-                </div>
-                <p className={styles.company}>{app.company}</p>
-                <div className={styles.actions}>
-                    {renderActionButton(app)}
-                </div>
-            </div>
-        );
-    };
 
-    // Sorting UI is no longer needed for the card layout, keep function for potential future use
+
+    // Sorting UI
     const renderSortIcon = (key: string) => {
         if (sortConfig.key !== key) return null;
         return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
     };
+
+    const renderApplicationRow = (app: CandidateApplication) => (
+        <tr key={app.id} className="animate-fade-in">
+            <td>
+                <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{app.jobTitle}</strong>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0' }}>{app.company}</p>
+            </td>
+            <td>
+                <span className={`status-badge status-${app.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}>
+                    {app.status}
+                </span>
+            </td>
+            <td style={{ textAlign: 'right' }}>
+                {renderActionButton(app)}
+            </td>
+        </tr>
+    );
 
     return (
         <>
@@ -202,36 +205,54 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
             </header>
 
             {/* Search Bar */}
-            <div className="search-bar" style={{ marginBottom: '1rem', position: 'relative', width: '100%', maxWidth: '400px' }}>
+            <div className="search-bar" style={{ marginBottom: '1.5rem', position: 'relative', width: '100%', maxWidth: '400px' }}>
                 <input
                     type="text"
                     placeholder="Search by job, company, or status..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem 2.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--surface-color)' }}
+                    style={{ width: '100%', padding: '0.5rem 2.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--surface-color)', fontSize: '0.9rem' }}
                 />
-                <SearchIcon style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <SearchIcon style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', width: '16px' }} />
             </div>
 
             {/* Scheduled Interviews Section */}
             {scheduledApps.length > 0 && (
                 <section style={{ marginBottom: '2rem' }}>
-                    <h2 style={{ marginBottom: '1rem' }}>Scheduled Interviews</h2>
-                    <div className={styles.applicationsGrid}>
-                        {scheduledApps.map(app => (
-                            <ApplicationCard key={app.id} app={app} />
-                        ))}
+                    <h2 style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>Scheduled Interviews</h2>
+                    <div className="table-container">
+                        <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
+                            <thead>
+                                <tr>
+                                    <th onClick={() => handleSort('jobTitle')} style={{ cursor: 'pointer' }}>Job Title {renderSortIcon('jobTitle')}</th>
+                                    <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {renderSortIcon('status')}</th>
+                                    <th style={{ textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {scheduledApps.map(renderApplicationRow)}
+                            </tbody>
+                        </table>
                     </div>
                 </section>
             )}
 
             {/* All Other Applications Section */}
             <section>
-                <h2 style={{ marginBottom: '1rem' }}>All Applications</h2>
-                <div className={styles.applicationsGrid}>
-                    {otherApps.map(app => (
-                        <ApplicationCard key={app.id} app={app} />
-                    ))}
+                <h2 style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>All Applications</h2>
+                <div className="table-container">
+                    <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
+                        <thead>
+                            <tr>
+                                <th onClick={() => handleSort('jobTitle')} style={{ cursor: 'pointer' }}>Job Title {renderSortIcon('jobTitle')}</th>
+                                <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {renderSortIcon('status')}</th>
+                                <th style={{ textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {otherApps.map(renderApplicationRow)}
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </>

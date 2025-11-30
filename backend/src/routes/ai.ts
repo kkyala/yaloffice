@@ -10,8 +10,61 @@
 
 import { Router, Request, Response } from 'express';
 import { aiService } from '../services/aiService.js';
+import { auditLogger } from '../services/auditLogger.js';
+import { supabase } from '../services/supabaseService.js';
 
 const router = Router();
+// ... (existing code)
+
+/**
+ * POST /api/ai/screening/report
+ * Generate screening report
+ */
+router.post('/screening/report', async (req: Request, res: Response) => {
+  try {
+    const { transcript, candidateName, applicationId } = req.body;
+    if (!transcript || !candidateName) return res.status(400).json({ error: 'Missing transcript or candidateName' });
+
+    const report = await aiService.generateScreeningReport(transcript, candidateName);
+
+    // If applicationId is provided, save the report to the candidate's application
+    if (applicationId) {
+      // Fetch existing config
+      const { data: candidate, error: fetchError } = await supabase
+        .from('candidates')
+        .select('interview_config')
+        .eq('id', applicationId)
+        .single();
+
+      if (!fetchError && candidate) {
+        const newConfig = {
+          ...(candidate.interview_config || {}),
+          screeningStatus: 'completed',
+          screeningReport: report
+        };
+
+        await supabase
+          .from('candidates')
+          .update({ interview_config: newConfig })
+          .eq('id', applicationId);
+      }
+    }
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'screening_report_generated',
+      resourceType: 'screening_report',
+      details: { candidate: candidateName, score: report.score }
+    });
+
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    console.error('[AI Routes] Screening report error:', error);
+    res.status(500).json({ error: 'Failed to generate report', message: error.message });
+  }
+});
+
+
 
 // ========================================================================================
 // RESUME ENDPOINTS
@@ -20,12 +73,6 @@ const router = Router();
 /**
  * POST /api/ai/resume/parse
  * Parse resume document (PDF, Word, Image) into structured data
- *
- * Body:
- * {
- *   fileBase64: string,  // Base64 encoded file
- *   mimeType: string     // MIME type (application/pdf, image/png, etc.)
- * }
  */
 router.post('/resume/parse', async (req: Request, res: Response) => {
   try {
@@ -38,6 +85,18 @@ router.post('/resume/parse', async (req: Request, res: Response) => {
     }
 
     const resumeData = await aiService.parseResumeDocument(fileBase64, mimeType);
+
+    // Audit Log
+    await auditLogger.log({
+      userId: resumeData.personalInfo?.email || 'anonymous',
+      action: 'resume_parsed',
+      resourceType: 'resume',
+      details: {
+        name: resumeData.personalInfo?.name,
+        email: resumeData.personalInfo?.email,
+        mimeType
+      }
+    });
 
     res.json({
       success: true,
@@ -55,12 +114,6 @@ router.post('/resume/parse', async (req: Request, res: Response) => {
 /**
  * POST /api/ai/resume/screen
  * Screen resume against job description
- *
- * Body:
- * {
- *   resumeText: string,
- *   jobDescription: string
- * }
  */
 router.post('/resume/screen', async (req: Request, res: Response) => {
   try {
@@ -73,6 +126,16 @@ router.post('/resume/screen', async (req: Request, res: Response) => {
     }
 
     const screeningResult = await aiService.screenResume(resumeText, jobDescription);
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'resume_screened',
+      resourceType: 'resume_screening',
+      details: {
+        matchScore: screeningResult.matchScore,
+        summary: screeningResult.summary.substring(0, 100) + '...'
+      }
+    });
 
     res.json({
       success: true,
@@ -94,12 +157,6 @@ router.post('/resume/screen', async (req: Request, res: Response) => {
 /**
  * POST /api/ai/interview/score
  * Score interview response
- *
- * Body:
- * {
- *   question: string,
- *   response: string
- * }
  */
 router.post('/interview/score', async (req: Request, res: Response) => {
   try {
@@ -112,6 +169,16 @@ router.post('/interview/score', async (req: Request, res: Response) => {
     }
 
     const score = await aiService.scoreResponse(question, response);
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'response_scored',
+      resourceType: 'interview_response',
+      details: {
+        question: question.substring(0, 50) + '...',
+        score: score.score
+      }
+    });
 
     res.json({
       success: true,
@@ -129,11 +196,6 @@ router.post('/interview/score', async (req: Request, res: Response) => {
 /**
  * POST /api/ai/interview/summary
  * Generate interview summary from transcript
- *
- * Body:
- * {
- *   transcript: string
- * }
  */
 router.post('/interview/summary', async (req: Request, res: Response) => {
   try {
@@ -146,6 +208,13 @@ router.post('/interview/summary', async (req: Request, res: Response) => {
     }
 
     const summary = await aiService.generateInterviewSummary(transcript);
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'interview_summarized',
+      resourceType: 'interview_summary',
+      details: { summaryLength: summary.length }
+    });
 
     res.json({
       success: true,
@@ -167,13 +236,6 @@ router.post('/interview/summary', async (req: Request, res: Response) => {
 /**
  * POST /api/ai/video/analyze
  * Analyze video content
- *
- * Body:
- * {
- *   videoBase64: string,
- *   mimeType: string,
- *   analysisPrompt: string
- * }
  */
 router.post('/video/analyze', async (req: Request, res: Response) => {
   try {
@@ -186,6 +248,13 @@ router.post('/video/analyze', async (req: Request, res: Response) => {
     }
 
     const analysis = await aiService.analyzeVideo(videoBase64, mimeType, analysisPrompt);
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'video_analyzed',
+      resourceType: 'video',
+      details: { mimeType, prompt: analysisPrompt }
+    });
 
     res.json({
       success: true,
@@ -207,12 +276,6 @@ router.post('/video/analyze', async (req: Request, res: Response) => {
 /**
  * POST /api/ai/generate/json
  * Generate structured JSON content
- *
- * Body:
- * {
- *   prompt: string,
- *   expectedFields: string[]
- * }
  */
 router.post('/generate/json', async (req: Request, res: Response) => {
   try {
@@ -226,6 +289,13 @@ router.post('/generate/json', async (req: Request, res: Response) => {
 
     const content = await aiService.generateJsonContent(prompt, expectedFields);
 
+    // Audit Log
+    await auditLogger.log({
+      action: 'json_generated',
+      resourceType: 'content_generation',
+      details: { prompt: prompt.substring(0, 50) + '...', fields: expectedFields }
+    });
+
     res.json({
       success: true,
       data: content
@@ -236,6 +306,53 @@ router.post('/generate/json', async (req: Request, res: Response) => {
       error: 'Failed to generate JSON content',
       message: error.message
     });
+  }
+});
+
+// ========================================================================================
+// SCREENING ENDPOINTS
+// ========================================================================================
+
+/**
+ * POST /api/ai/screening/start
+ * Start screening session
+ */
+router.post('/screening/start', async (req: Request, res: Response) => {
+  try {
+    const { resumeText, candidateName } = req.body;
+    if (!resumeText || !candidateName) return res.status(400).json({ error: 'Missing resumeText or candidateName' });
+
+    const result = await aiService.startScreening(resumeText, candidateName);
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'screening_started',
+      resourceType: 'screening',
+      details: { candidate: candidateName }
+    });
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[AI Routes] Screening start error:', error);
+    res.status(500).json({ error: 'Failed to start screening', message: error.message });
+  }
+});
+
+/**
+ * POST /api/ai/screening/chat
+ * Chat screening
+ */
+router.post('/screening/chat', async (req: Request, res: Response) => {
+  try {
+    const { history, userResponse } = req.body;
+    if (!history || !userResponse) return res.status(400).json({ error: 'Missing history or userResponse' });
+
+    const result = await aiService.chatScreening(history, userResponse);
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[AI Routes] Screening chat error:', error);
+    res.status(500).json({ error: 'Failed to chat', message: error.message });
   }
 });
 

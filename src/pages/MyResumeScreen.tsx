@@ -9,7 +9,7 @@ const fileToBase64 = (file: File): Promise<string> => {
         reader.readAsDataURL(file);
         reader.onload = () => {
             if (typeof reader.result === 'string') {
-                const base64 = reader.result.split(',')[1]; 
+                const base64 = reader.result.split(',')[1];
                 resolve(base64);
             } else {
                 reject(new Error('Failed to convert file to base64'));
@@ -22,15 +22,15 @@ const fileToBase64 = (file: File): Promise<string> => {
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric', 
-        month: 'short', 
+        year: 'numeric',
+        month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
     });
 };
 
-export default function MyResumeScreen({ currentUser, onSaveResume, resumeList = [] }) {
+export default function MyResumeScreen({ currentUser, onSaveResume, resumeList = [], onNavigate }) {
     const [file, setFile] = useState<File | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -168,16 +168,16 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
     };
 
     const renderExperience = () => (
-        formData.experience.map((exp, index) => (
+        formData.experience.map((exp: any, index: number) => (
             <div key={index} className="resume-item">
                 <div className="form-grid-2-col">
-                    <div className="form-group"><label>Company</label><input type="text" value={exp.company} onChange={(e) => { const list = [...formData.experience]; list[index].company = e.target.value; setFormData({...formData, experience: list}); }} /></div>
-                    <div className="form-group"><label>Role</label><input type="text" value={exp.role} onChange={(e) => { const list = [...formData.experience]; list[index].role = e.target.value; setFormData({...formData, experience: list}); }} /></div>
-                    <div className="form-group"><label>Start Date</label><input type="text" value={exp.startDate} onChange={(e) => { const list = [...formData.experience]; list[index].startDate = e.target.value; setFormData({...formData, experience: list}); }} /></div>
-                    <div className="form-group"><label>End Date</label><input type="text" value={exp.endDate} onChange={(e) => { const list = [...formData.experience]; list[index].endDate = e.target.value; setFormData({...formData, experience: list}); }} /></div>
-                    <div className="form-group grid-col-span-2"><label>Description</label><textarea rows={3} value={exp.description} onChange={(e) => { const list = [...formData.experience]; list[index].description = e.target.value; setFormData({...formData, experience: list}); }} /></div>
+                    <div className="form-group"><label>Company</label><input type="text" value={exp.company} onChange={(e) => { const list = [...formData.experience]; list[index].company = e.target.value; setFormData({ ...formData, experience: list }); }} /></div>
+                    <div className="form-group"><label>Role</label><input type="text" value={exp.role} onChange={(e) => { const list = [...formData.experience]; list[index].role = e.target.value; setFormData({ ...formData, experience: list }); }} /></div>
+                    <div className="form-group"><label>Start Date</label><input type="text" value={exp.startDate} onChange={(e) => { const list = [...formData.experience]; list[index].startDate = e.target.value; setFormData({ ...formData, experience: list }); }} /></div>
+                    <div className="form-group"><label>End Date</label><input type="text" value={exp.endDate} onChange={(e) => { const list = [...formData.experience]; list[index].endDate = e.target.value; setFormData({ ...formData, experience: list }); }} /></div>
+                    <div className="form-group grid-col-span-2"><label>Description</label><textarea rows={3} value={exp.description} onChange={(e) => { const list = [...formData.experience]; list[index].description = e.target.value; setFormData({ ...formData, experience: list }); }} /></div>
                 </div>
-                <button className="btn btn-sm btn-secondary" onClick={() => { const list = [...formData.experience]; list.splice(index, 1); setFormData({...formData, experience: list}); }}>Remove</button>
+                <button className="btn btn-sm btn-secondary" onClick={() => { const list = [...formData.experience]; list.splice(index, 1); setFormData({ ...formData, experience: list }); }}>Remove</button>
             </div>
         ))
     );
@@ -189,9 +189,9 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                 <div className="header-actions">
                     {editMode ? (
                         <>
-                            <button className="btn btn-secondary" onClick={() => { 
-                                setEditMode(false); 
-                                if(resumeList.length > 0) {
+                            <button className="btn btn-secondary" onClick={() => {
+                                setEditMode(false);
+                                if (resumeList.length > 0) {
                                     const current = resumeList.find(r => r.id === selectedVersionId) || resumeList[0];
                                     setParsedData(current.parsed_data);
                                 }
@@ -208,19 +208,19 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
             </header>
 
             <div className="resume-screen-container" style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
-                
+
                 <div className="resume-sidebar">
-                    <div 
+                    <div
                         className={`upload-zone ${isDragging ? 'dragging' : ''}`}
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
-                        style={{ 
-                            border: '2px dashed var(--border-color)', 
-                            borderRadius: '8px', 
-                            padding: '2rem', 
-                            textAlign: 'center', 
+                        style={{
+                            border: '2px dashed var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '2rem',
+                            textAlign: 'center',
                             cursor: 'pointer',
                             backgroundColor: isDragging ? 'var(--primary-light-color)' : 'var(--light-bg)',
                             marginBottom: '2rem'
@@ -229,42 +229,57 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                         <UploadCloudIcon style={{ width: '48px', height: '48px', color: 'var(--primary-color)', marginBottom: '1rem' }} />
                         <h3>Upload Resume</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                            Drag & drop or click to upload<br/>
+                            Drag & drop or click to upload<br />
                             (PDF, DOC, DOCX, JPG, PNG)
                         </p>
 
                         {/** ⭐ UPDATED ACCEPT TYPES */}
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])} 
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
                             accept=".pdf,.doc,.docx,image/*"
-                            style={{ display: 'none' }} 
+                            style={{ display: 'none' }}
                         />
                     </div>
-                    
+
                     {isAnalyzing && (
                         <div className="analysis-status" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
                             <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
                             <p>AI is analyzing your document...</p>
                         </div>
                     )}
-                    
+
                     {error && <div className="login-error" style={{ marginBottom: '1rem' }}>{error}</div>}
-                    {successMessage && <div className="success-message" style={{ marginBottom: '1rem' }}>{successMessage}</div>}
+
+                    {successMessage && (
+                        <div className="success-message" style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', padding: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <CheckCircleIcon style={{ width: '24px', height: '24px' }} />
+                                <span>{successMessage}</span>
+                            </div>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => onNavigate('screening-session', 'dashboard')}
+                                style={{ width: '100%' }}
+                            >
+                                Proceed to AI Screening
+                            </button>
+                        </div>
+                    )}
 
                     <div className="resume-history">
                         <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Version History</h3>
                         {resumeList.length > 0 ? (
                             <div className="history-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {resumeList.map(resume => (
-                                    <div 
-                                        key={resume.id} 
+                                    <div
+                                        key={resume.id}
                                         className={`history-item ${selectedVersionId === resume.id ? 'active' : ''}`}
                                         onClick={() => handleVersionSelect(resume)}
-                                        style={{ 
-                                            padding: '0.75rem', 
-                                            borderRadius: 'var(--border-radius)', 
+                                        style={{
+                                            padding: '0.75rem',
+                                            borderRadius: 'var(--border-radius)',
                                             border: selectedVersionId === resume.id ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
                                             backgroundColor: selectedVersionId === resume.id ? 'var(--primary-light-color)' : 'var(--surface-color)',
                                             cursor: 'pointer',
@@ -291,35 +306,35 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                 <div className="resume-content">
                     {editMode ? (
                         <div className="form-panel">
-                            
+
                             <div className="form-section">
                                 <h3 className="form-section-header">Personal Information</h3>
                                 <div className="form-grid-2-col">
-                                    <div className="form-group"><label>Full Name</label><input type="text" value={formData.personalInfo.name} onChange={(e) => setFormData({...formData, personalInfo: {...formData.personalInfo, name: e.target.value}})} /></div>
-                                    <div className="form-group"><label>Email</label><input type="email" value={formData.personalInfo.email} onChange={(e) => setFormData({...formData, personalInfo: {...formData.personalInfo, email: e.target.value}})} /></div>
-                                    <div className="form-group"><label>Phone</label><input type="tel" value={formData.personalInfo.phone} onChange={(e) => setFormData({...formData, personalInfo: {...formData.personalInfo, phone: e.target.value}})} /></div>
-                                    <div className="form-group"><label>LinkedIn</label><input type="url" value={formData.personalInfo.linkedin} onChange={(e) => setFormData({...formData, personalInfo: {...formData.personalInfo, linkedin: e.target.value}})} /></div>
-                                    <div className="form-group"><label>City</label><input type="text" value={formData.personalInfo.city} onChange={(e) => setFormData({...formData, personalInfo: {...formData.personalInfo, city: e.target.value}})} /></div>
-                                    <div className="form-group"><label>State</label><input type="text" value={formData.personalInfo.state} onChange={(e) => setFormData({...formData, personalInfo: {...formData.personalInfo, state: e.target.value}})} /></div>
+                                    <div className="form-group"><label>Full Name</label><input type="text" value={formData.personalInfo.name} onChange={(e) => setFormData({ ...formData, personalInfo: { ...formData.personalInfo, name: e.target.value } })} /></div>
+                                    <div className="form-group"><label>Email</label><input type="email" value={formData.personalInfo.email} onChange={(e) => setFormData({ ...formData, personalInfo: { ...formData.personalInfo, email: e.target.value } })} /></div>
+                                    <div className="form-group"><label>Phone</label><input type="tel" value={formData.personalInfo.phone} onChange={(e) => setFormData({ ...formData, personalInfo: { ...formData.personalInfo, phone: e.target.value } })} /></div>
+                                    <div className="form-group"><label>LinkedIn</label><input type="url" value={formData.personalInfo.linkedin} onChange={(e) => setFormData({ ...formData, personalInfo: { ...formData.personalInfo, linkedin: e.target.value } })} /></div>
+                                    <div className="form-group"><label>City</label><input type="text" value={formData.personalInfo.city} onChange={(e) => setFormData({ ...formData, personalInfo: { ...formData.personalInfo, city: e.target.value } })} /></div>
+                                    <div className="form-group"><label>State</label><input type="text" value={formData.personalInfo.state} onChange={(e) => setFormData({ ...formData, personalInfo: { ...formData.personalInfo, state: e.target.value } })} /></div>
                                 </div>
                             </div>
 
                             <div className="form-section">
                                 <h3 className="form-section-header">Professional Summary</h3>
-                                <div className="form-group"><textarea rows={4} value={formData.summary} onChange={(e) => setFormData({...formData, summary: e.target.value})} /></div>
+                                <div className="form-group"><textarea rows={4} value={formData.summary} onChange={(e) => setFormData({ ...formData, summary: e.target.value })} /></div>
                             </div>
 
                             <div className="form-section">
-                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
-                                    <h3 className="form-section-header" style={{marginBottom: 0}}>Work Experience</h3>
-                                    <button className="btn btn-sm btn-secondary" onClick={() => setFormData({...formData, experience: [...formData.experience, {company: '', role: '', startDate: '', endDate: '', description: ''}]})}>Add</button>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                    <h3 className="form-section-header" style={{ marginBottom: 0 }}>Work Experience</h3>
+                                    <button className="btn btn-sm btn-secondary" onClick={() => setFormData({ ...formData, experience: [...formData.experience, { company: '', role: '', startDate: '', endDate: '', description: '' }] })}>Add</button>
                                 </div>
                                 {renderExperience()}
                             </div>
 
                             <div className="form-section">
                                 <h3 className="form-section-header">Skills</h3>
-                                <div className="form-group"><textarea rows={3} value={formData.skills.join(', ')} onChange={(e) => setFormData({...formData, skills: e.target.value.split(',').map(s => s.trim())})} placeholder="Comma separated skills" /></div>
+                                <div className="form-group"><textarea rows={3} value={formData.skills.join(', ')} onChange={(e) => setFormData({ ...formData, skills: e.target.value.split(',').map(s => s.trim()) })} placeholder="Comma separated skills" /></div>
                             </div>
                         </div>
                     ) : (
@@ -344,7 +359,7 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                                     {formData.experience.length > 0 && (
                                         <div className="preview-section" style={{ marginBottom: '2rem' }}>
                                             <h4>Experience</h4>
-                                            {formData.experience.map((exp, i) => (
+                                            {formData.experience.map((exp: any, i: number) => (
                                                 <div key={i} style={{ marginBottom: '1rem' }}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                                         <strong>{exp.role}</strong>
@@ -360,7 +375,7 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                                     {formData.education.length > 0 && (
                                         <div className="preview-section" style={{ marginBottom: '2rem' }}>
                                             <h4>Education</h4>
-                                            {formData.education.map((edu, i) => (
+                                            {formData.education.map((edu: any, i: number) => (
                                                 <div key={i} style={{ marginBottom: '0.5rem' }}>
                                                     <strong>{edu.institution}</strong> - {edu.degree} <span>({edu.year})</span>
                                                 </div>
@@ -372,7 +387,7 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                                         <div className="preview-section">
                                             <h4>Skills</h4>
                                             <div className="skills-tags">
-                                                {formData.skills.map((skill, i) => (
+                                                {formData.skills.map((skill: any, i: number) => (
                                                     <span key={i} className="tag">{skill}</span>
                                                 ))}
                                             </div>

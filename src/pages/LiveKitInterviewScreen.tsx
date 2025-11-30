@@ -49,11 +49,13 @@ type LiveKitInterviewScreenProps = {
     currentUser: any;
     interviewingCandidate: Candidate | null;
     currentApplicationId: number | null;
-    onSaveInterviewResults: (applicationId: number, score: number, transcript: string) => Promise<void>;
+    onSaveInterviewResults: (applicationId: number, score: number, transcript: string, analysis?: any) => Promise<void>;
     onStartInterviewSession: (applicationId: number) => Promise<{ success: boolean }>;
     onNavigate: (page: string, parent: string, context?: any) => void;
     jobsData?: any[];
 };
+
+
 
 type InterviewState = 'setup' | 'connecting' | 'active' | 'analyzing' | 'finished';
 
@@ -1197,7 +1199,8 @@ export default function LiveKitInterviewScreen({
                 await onSaveInterviewResults(
                     currentApplicationId,
                     result.analysis?.score || 5.0,
-                    transcriptText
+                    transcriptText,
+                    result.analysis
                 );
             }
 

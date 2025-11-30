@@ -51,12 +51,15 @@ Behaviours:
 /**
  * Create a connection to Gemini Live API
  */
-function createGeminiConnection(
+/**
+ * Create a connection to Gemini Live API
+ */
+async function createGeminiConnection(
   sessionId: string,
   onMessage: (msg: GeminiMessage) => void,
   onError: (err: Error) => void,
   onClose: () => void
-): WebSocket | null {
+): Promise<WebSocket | null> {
   console.log(`[Gemini] 🔍 createGeminiConnection called for session ${sessionId}`);
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -67,7 +70,7 @@ function createGeminiConnection(
   }
   console.log(`[Gemini] ✅ API key found for session ${sessionId}`);
 
-  const session = interviewStore.get(sessionId);
+  const session = await interviewStore.get(sessionId);
   console.log(`[Gemini] Session data for ${sessionId}:`, session ? 'found' : 'not found');
 
   // Use the live-capable model
@@ -253,46 +256,48 @@ export function setupGeminiProxyWS(wss: WebSocketServer): void {
     // audioBuffers.set(clientWs, []);
 
     // Create Gemini connection for this client
-    const geminiWs = createGeminiConnection(
-      sessionId,
-      // On Gemini message -> forward to client
-      async (msg) => {
-        if (clientWs.readyState === WebSocket.OPEN) {
-          // TEMPORARILY DISABLED: Avatar generation
-          // if (msg.type === 'audio' && msg.audio?.data) {
-          //   const audioBuffer = Buffer.from(msg.audio.data, 'base64');
-          //   const buffers = audioBuffers.get(clientWs) || [];
-          //   buffers.push(audioBuffer);
-          //   audioBuffers.set(clientWs, buffers);
-          // }
+    (async () => {
+      const geminiWs = await createGeminiConnection(
+        sessionId,
+        // On Gemini message -> forward to client
+        async (msg) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            // TEMPORARILY DISABLED: Avatar generation
+            // if (msg.type === 'audio' && msg.audio?.data) {
+            //   const audioBuffer = Buffer.from(msg.audio.data, 'base64');
+            //   const buffers = audioBuffers.get(clientWs) || [];
+            //   buffers.push(audioBuffer);
+            //   audioBuffers.set(clientWs, buffers);
+            // }
 
-          // Forward message to client
-          clientWs.send(JSON.stringify(msg));
+            // Forward message to client
+            clientWs.send(JSON.stringify(msg));
+          }
+        },
+        // On error
+        (err) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(JSON.stringify({
+              type: 'error',
+              error: { message: err.message, code: 'GEMINI_ERROR' }
+            }));
+          }
+        },
+        // On close
+        () => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(JSON.stringify({ type: 'gemini_closed' }));
+          }
         }
-      },
-      // On error
-      (err) => {
-        if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(JSON.stringify({
-            type: 'error',
-            error: { message: err.message, code: 'GEMINI_ERROR' }
-          }));
-        }
-      },
-      // On close
-      () => {
-        if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(JSON.stringify({ type: 'gemini_closed' }));
-        }
+      );
+
+      if (geminiWs) {
+        geminiConnections.set(clientWs, geminiWs);
+        console.log(`[Proxy] ✅ Gemini WebSocket stored for session ${sessionId}, readyState: ${geminiWs.readyState}`);
+      } else {
+        console.error(`[Proxy] ❌ geminiWs is null/undefined for session ${sessionId} - connection failed!`);
       }
-    );
-
-    if (geminiWs) {
-      geminiConnections.set(clientWs, geminiWs);
-      console.log(`[Proxy] ✅ Gemini WebSocket stored for session ${sessionId}, readyState: ${geminiWs.readyState}`);
-    } else {
-      console.error(`[Proxy] ❌ geminiWs is null/undefined for session ${sessionId} - connection failed!`);
-    }
+    })();
 
     // Handle messages from client (audio frames or text)
     let audioFrameCount = 0;

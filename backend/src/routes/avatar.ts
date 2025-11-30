@@ -6,6 +6,7 @@
 
 import { Router } from 'express';
 import { avatarService } from '../services/avatarService.js';
+import { auditLogger } from '../services/auditLogger.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -37,6 +38,16 @@ router.post('/generate', async (req, res) => {
     } else {
       return res.status(400).json({ error: 'audioPath or audioBase64 required' });
     }
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'avatar_generated',
+      resourceType: 'avatar_video',
+      details: {
+        source: audioBase64 ? 'base64' : 'file',
+        faceImage: faceImage ? 'custom' : 'default'
+      }
+    });
 
     res.json({
       success: true,

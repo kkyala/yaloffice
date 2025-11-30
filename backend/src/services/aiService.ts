@@ -315,6 +315,96 @@ class AIService {
 
     return JSON.parse(jsonText);
   }
+
+  /**
+   * Start screening session
+   */
+  async startScreening(resumeText: string, candidateName: string): Promise<{ greeting: string; firstQuestion: string }> {
+    this.initialize();
+    if (!this.genAI) throw new Error('AI Service not initialized');
+
+    const prompt = `You are an AI recruiter named 'Yal'. You are screening a candidate named ${candidateName}.
+    Their resume content is: "${resumeText.substring(0, 3000)}..."
+    
+    Generate a professional but friendly greeting and the FIRST screening question to verify their background.
+    Return JSON: { "greeting": "...", "firstQuestion": "..." }`;
+
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const result = await model.generateContent(prompt);
+    let jsonText = (await result.response).text().trim();
+
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
+    }
+
+    return JSON.parse(jsonText);
+  }
+
+  /**
+   * Chat screening
+   */
+  async chatScreening(history: { role: string; content: string }[], userResponse: string): Promise<{ aiResponse: string; isComplete: boolean }> {
+    this.initialize();
+    if (!this.genAI) throw new Error('AI Service not initialized');
+
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+    // Convert history to Gemini format
+    const chatHistory = history.map(h => ({
+      role: h.role === 'ai' ? 'model' : 'user',
+      parts: [{ text: h.content }]
+    }));
+
+    const chat = model.startChat({
+      history: chatHistory
+    });
+
+    const prompt = `User response: "${userResponse}".
+    If this answers the previous question, acknowledge it and ask the next relevant question based on the resume.
+    If the screening is complete (after 3-4 questions), say "Thank you for your time. We will review your profile." and set isComplete to true.
+    Return JSON: { "aiResponse": "...", "isComplete": boolean }`;
+
+    const result = await chat.sendMessage(prompt);
+    let jsonText = result.response.text().trim();
+
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
+    }
+
+    return JSON.parse(jsonText);
+  }
+
+  /**
+   * Generate screening report
+   */
+  async generateScreeningReport(transcript: string, candidateName: string): Promise<any> {
+    this.initialize();
+    if (!this.genAI) throw new Error('AI Service not initialized');
+
+    const prompt = `Generate a screening report for candidate ${candidateName} based on this screening session transcript:
+    
+    "${transcript}"
+    
+    Provide a JSON object with:
+    - summary: Executive summary of the candidate's fit.
+    - skillsAssessment: Analysis of technical and soft skills mentioned.
+    - keyStrengths: List of key strengths.
+    - areasForImprovement: List of potential concerns.
+    - recommendation: "Proceed to Interview" or "Do Not Proceed" (with reasoning).
+    - score: Overall score (0-100).
+    
+    Return JSON only.`;
+
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const result = await model.generateContent(prompt);
+    let jsonText = (await result.response).text().trim();
+
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
+    }
+
+    return JSON.parse(jsonText);
+  }
 }
 
 export const aiService = new AIService();

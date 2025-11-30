@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from './supabaseClient';
+import { api } from './services/api';
 import { roleConfig } from './config/roleConfig';
 
 // Components
@@ -42,24 +42,25 @@ export default function App() {
     const [interviewingContext, setInterviewingContext] = useState<{ applicationId: number | null; candidateId: number | null } | null>(null);
     const [pipelineJobFilter, setPipelineJobFilter] = useState<string>('all');
 
-    const currentRoleConfig = useMemo(() => (currentUser ? roleConfig[currentUser.role] : null), [currentUser]);
+    const currentRoleConfig = useMemo(() => {
+        if (!currentUser || !currentUser.role) return null;
+        // Handle case sensitivity (e.g. 'employer' vs 'Employer')
+        const roleKey = Object.keys(roleConfig).find(key => key.toLowerCase() === currentUser.role.toLowerCase());
+        return roleKey ? roleConfig[roleKey] : null;
+    }, [currentUser]);
 
     const handleError = (error: any, context?: string) => {
         console.error(`Error ${context || ''}:`, error);
     };
 
     const refetchCandidates = useCallback(async () => {
-        const { data: { session: authSession } } = await supabase.auth.getSession();
+        const { data: { session: authSession } } = await api.getSession();
         if (!authSession?.user) {
             setCandidatesData([]);
             return;
         }
 
-        const { data: userProfile, error: profileError } = await supabase
-            .from('users')
-            .select('id, role, name')
-            .eq('id', authSession.user.id)
-            .single();
+        const { data: userProfile, error: profileError } = await api.get(`/users/${authSession.user.id}`);
 
         if (profileError || !userProfile) {
             handleError(profileError || new Error('User profile not found'), 'getting user role for refetch');
@@ -68,14 +69,11 @@ export default function App() {
         }
 
         if (userProfile.role === 'Candidate') {
-            const { data, error } = await supabase.from('candidates').select('*').eq('user_id', userProfile.id);
+            const { data, error } = await api.get(`/candidates?user_id=${userProfile.id}`);
             if (error) handleError(error, 'refetching candidate applications');
             else setCandidatesData(data || []);
         } else if (userProfile.role === 'Employer') {
-            const { data: employerJobsData, error: jobsError } = await supabase
-                .from('jobs')
-                .select('id')
-                .eq('employer', userProfile.name);
+            const { data: employerJobsData, error: jobsError } = await api.get(`/jobs?employer=${userProfile.name}`);
 
             if (jobsError) {
                 handleError(jobsError, `refetching employer's job IDs for ${userProfile.name}`);
@@ -83,51 +81,53 @@ export default function App() {
                 return;
             }
 
-            const employerJobIds = employerJobsData.map(job => job.id);
+            const employerJobIds = employerJobsData.map((job: any) => job.id);
 
             if (employerJobIds.length === 0) {
                 setCandidatesData([]);
                 return;
             }
 
-            const { data, error } = await supabase
-                .from('candidates')
-                .select('*')
-                .in('jobId', employerJobIds);
+            // Need to fetch candidates for these jobs. API supports array of jobIds?
+            // Let's loop for now or update API. Updated API to support array.
+            // But for simplicity let's just fetch all candidates and filter client side if API doesn't support complex query yet
+            // Actually I updated candidates API to support jobId array.
+            // But passing array in query param is tricky. Let's fetch all candidates for now as fallback or improve API.
+            // Let's use the API I wrote: query = query.in('jobId', jobId)
+            // But passing array in GET param: ?jobId=1&jobId=2
+
+            const queryString = employerJobIds.map((id: number) => `jobId=${id}`).join('&');
+            const { data, error } = await api.get(`/candidates?${queryString}`);
 
             if (error) handleError(error, `refetching candidate applications for employer ${userProfile.name}`);
             else setCandidatesData(data || []);
         }
         else {
-            const { data, error } = await supabase.from('candidates').select('*');
+            const { data, error } = await api.get('/candidates');
             if (error) handleError(error, 'refetching all candidates');
             else setCandidatesData(data || []);
         }
     }, []);
 
     const refetchUsers = async () => {
-        const { data, error } = await supabase.from('users').select('*');
+        const { data, error } = await api.get('/users');
         if (error) handleError(error, 'refetching users');
         else setUsersData(data || []);
     };
     const refetchJobs = async () => {
-        const { data, error } = await supabase.from('jobs').select('*');
+        const { data, error } = await api.get('/jobs');
         if (error) handleError(error, 'refetching jobs');
         else setJobsData(data || []);
     };
     const refetchPlacements = async () => {
-        const { data, error } = await supabase.from('placements').select('*');
+        const { data, error } = await api.get('/placements');
         if (error) handleError(error, 'refetching placements');
         else setPlacementsData(data || []);
     };
-    
+
     const refetchResume = async (userId: string) => {
-        const { data, error } = await supabase
-            .from('resumes')
-            .select('*')
-            .eq('user_id', userId)
-            .order('version', { ascending: false });
-            
+        const { data, error } = await api.get(`/resumes/${userId}`);
+
         if (error) handleError(error, 'fetching resumes');
         else setResumeList(data || []);
     };
@@ -139,8 +139,7 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        api.getSession().then(({ data: { session } }) => {
             setSession(session);
             if (!session) {
                 setCurrentUser(null);
@@ -148,7 +147,8 @@ export default function App() {
                 setCurrentPage('');
             }
         });
-        return () => subscription?.unsubscribe && subscription.unsubscribe();
+        // No subscription for now, we rely on manual updates or polling if needed
+        // Or we could implement a simple event emitter in api service
     }, []);
 
     useEffect(() => {
@@ -161,36 +161,27 @@ export default function App() {
 
         const loadInitialData = async () => {
             setIsLoading(true);
-            const { data: userProfile, error: profileError } = await supabase
-                .from('users').select('*').eq('id', session.user.id).single();
+            const { data: userProfile, error: profileError } = await api.get(`/users/${session.user.id}`);
 
             if (!isMounted) return;
 
             let finalUserProfile = userProfile;
 
-            if (profileError && profileError.code === 'PGRST116') {
-                console.warn('User profile not found. Attempting to create one from auth metadata.');
-                const { user_metadata } = session.user;
-                if (user_metadata && user_metadata.name && user_metadata.role) {
-                    const { data: newlyCreatedProfile, error: insertError } = await supabase.from('users').insert({
-                        id: session.user.id,
-                        email: session.user.email,
-                        name: user_metadata.name,
-                        role: user_metadata.role,
-                        mobile: user_metadata.mobile,
-                        status: user_metadata.status || 'Active',
-                    }).select().single();
-                    if (insertError) { handleError(insertError, 'recreating user profile from metadata'); await supabase.auth.signOut(); return; }
-                    finalUserProfile = newlyCreatedProfile;
-                    console.log('Successfully created missing user profile.');
-                } else {
-                    handleError(new Error('User profile is missing and there is no metadata to recreate it.'), 'fetching user profile');
-                    await supabase.auth.signOut();
-                    return;
-                }
-            } else if (profileError) {
-                handleError(profileError, 'fetching user profile');
-                await supabase.auth.signOut();
+            if (profileError || !userProfile) {
+                // Profile not found logic
+                // Since we are using custom API, we might need to handle this differently.
+                // For now, if profile missing, we try to create it if we have metadata
+                // But session.user might not have metadata if it came from our custom login
+                // Let's assume login returns profile or we create it on signup
+
+                console.warn('User profile not found.');
+                // Try to create if we have info (e.g. from signup response)
+                // But here we just have session. 
+                // If profile is missing, we might need to logout or redirect to a "complete profile" page
+                // For now, logout
+                handleError(new Error('User profile not found'), 'fetching user profile');
+                await api.logout();
+                setSession(null);
                 return;
             }
 
@@ -207,9 +198,15 @@ export default function App() {
                 refetchCandidates(),
                 refetchPlacements()
             ];
-            
+
             if (finalUserProfile.role === 'Candidate') {
-                promises.push(refetchResume(finalUserProfile.id));
+                await refetchResume(finalUserProfile.id);
+                // Redirect to resume if profile is incomplete (no mobile or no resume)
+                // Only redirect if we are NOT already on the resume page to avoid loops
+                if ((!finalUserProfile.mobile || !finalUserProfile.name) && currentPage !== 'my-resume') {
+                    setCurrentPage('my-resume');
+                    setActiveParent('my-resume');
+                }
             }
 
             await Promise.all(promises);
@@ -222,25 +219,47 @@ export default function App() {
         loadInitialData();
 
         return () => { isMounted = false; };
-    }, [session, refetchCandidates, currentPage]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session, refetchCandidates]); // Removed currentPage to prevent re-running on navigation
 
     const handleLogin = async ({ email, password }: { email: string; password: string; }) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await api.login({ email, password });
         return { success: !error, error: error ? getErrorMessage(error) : null };
     };
     const handleSignup = async ({ email, password, fullName, role, mobileNumber }: { email: string; password: string; fullName: string; role: string; mobileNumber: string; }) => {
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({ email, password, options: { data: { name: fullName, role: role, mobile: mobileNumber, status: 'Active' } } });
+        const { data: authData, error: signUpError } = await api.signup({ email, password, options: { data: { name: fullName, role: role, mobile: mobileNumber, status: 'Active' } } });
         if (signUpError) {
             if ((signUpError as any).message && (signUpError as any).message.includes('unique constraint')) return { success: false, error: 'A user with this email already exists.' };
             handleError(signUpError, 'signing up user');
             return { success: false, error: getErrorMessage(signUpError) };
         }
         if (!authData.user) return { success: false, error: 'Sign up succeeded but no user data was returned. Please try logging in.' };
-        const { error: profileError } = await supabase.from('users').insert({ id: authData.user.id, email: authData.user.email, name: fullName, role: role, mobile: mobileNumber, status: 'Active' });
-        if (profileError) { handleError(profileError, 'creating user profile after signup'); console.warn(`User ${authData.user.id} signed up but profile creation failed. It will be retried on next login.`); }
-        return { success: true };
+
+        // Create profile
+        const { error: profileError } = await api.post('/users', { id: authData.user.id, email: authData.user.email, name: fullName, role: role, mobile: mobileNumber, status: 'Active' });
+        if (profileError) {
+            handleError(profileError, 'creating user profile after signup');
+            console.warn(`User ${authData.user.id} signed up but profile creation failed. It will be retried on next login.`);
+        }
+
+        // Auto-login if session is returned (Email confirmation disabled)
+        if (authData.session) {
+            setSession(authData.session);
+            // Fetch profile again to be sure or construct it
+            const { data: userProfile } = await api.get(`/users/${authData.user.id}`);
+            setCurrentUser(userProfile || { id: authData.user.id, email: authData.user.email, name: fullName, role: role, mobile: mobileNumber, status: 'Active' });
+
+            // Set initial page
+            const initialPage = roleConfig[role]?.defaultPage || 'dashboard';
+            setCurrentPage(initialPage);
+            setActiveParent(initialPage);
+
+            return { success: true, autoLogin: true };
+        }
+
+        return { success: true, autoLogin: false };
     };
-    const handleLogout = async () => { await supabase.auth.signOut(); setCurrentUser(null); setCurrentPage(''); };
+    const handleLogout = async () => { await api.logout(); setCurrentUser(null); setCurrentPage(''); };
 
     const handleNavigate = useCallback((page: string, parent: string, context: { applicationId?: number; candidateId?: number } = {}) => {
         setCurrentPage(page);
@@ -251,7 +270,7 @@ export default function App() {
 
     const handleUpdateUserProfile = async (profileData: any) => {
         if (!currentUser) return { success: false, error: 'User not logged in.' };
-        const { data, error } = await supabase.from('users').update(profileData).eq('id', currentUser.id).select().single();
+        const { data, error } = await api.put(`/users/${currentUser.id}`, profileData);
         if (error) { handleError(error, 'updating user profile'); return { success: false, error: getErrorMessage(error) }; }
         setCurrentUser(data);
         await refetchUsers();
@@ -259,52 +278,31 @@ export default function App() {
     };
     const handleSaveAIConfig = async (config: any) => {
         if (!currentUser) return { success: false, error: 'No user is currently logged in.' };
-        const { data, error } = await supabase.from('users').update({ ai_config: config }).eq('id', currentUser.id).select().single();
+        const { data, error } = await api.put(`/users/${currentUser.id}`, { ai_config: config });
         if (error) { handleError(error, 'saving AI configuration'); return { success: false, error: getErrorMessage(error) }; }
         setCurrentUser(data);
         await refetchUsers();
         return { success: true };
     };
-    
+
     const handleSaveResume = async (resumeData: any) => {
         if (!currentUser) return { success: false, error: 'User not logged in.' };
-        
+
         try {
-            const { count, error: countError } = await supabase
-                .from('resumes')
-                .select('id', { count: 'exact', head: true })
-                .eq('user_id', currentUser.id);
-                
-            if (countError) throw countError;
-            const nextVersion = (count || 0) + 1;
+            const { data, error } = await api.post('/resumes', { user_id: currentUser.id, parsed_data: resumeData });
 
-            await supabase
-                .from('resumes')
-                .update({ is_current: false })
-                .eq('user_id', currentUser.id);
+            if (error) throw error;
 
-            const { data: newResume, error: insertError } = await supabase
-                .from('resumes')
-                .insert({
-                    user_id: currentUser.id,
-                    version: nextVersion,
-                    parsed_data: resumeData,
-                    is_current: true,
-                })
-                .select()
-                .single();
-
-            if (insertError) throw insertError;
-
+            // Always update profile with resume data
             const updates: any = {};
-            if (!currentUser.name && resumeData.personalInfo?.name) updates.name = resumeData.personalInfo.name;
-            if (!currentUser.mobile && resumeData.personalInfo?.phone) updates.mobile = resumeData.personalInfo.phone;
-            if (!currentUser.city && resumeData.personalInfo?.city) updates.city = resumeData.personalInfo.city;
-            if (!currentUser.state && resumeData.personalInfo?.state) updates.state = resumeData.personalInfo.state;
-            if (!currentUser.linkedin_url && resumeData.personalInfo?.linkedin) updates.linkedin_url = resumeData.personalInfo.linkedin;
-            
+            if (resumeData.personalInfo?.name) updates.name = resumeData.personalInfo.name;
+            if (resumeData.personalInfo?.phone) updates.mobile = resumeData.personalInfo.phone;
+            if (resumeData.personalInfo?.city) updates.city = resumeData.personalInfo.city;
+            if (resumeData.personalInfo?.state) updates.state = resumeData.personalInfo.state;
+            if (resumeData.personalInfo?.linkedin) updates.linkedin_url = resumeData.personalInfo.linkedin;
+
             if (Object.keys(updates).length > 0) {
-                await supabase.from('users').update(updates).eq('id', currentUser.id);
+                await api.put(`/users/${currentUser.id}`, updates);
                 await refetchUsers();
             }
 
@@ -317,40 +315,46 @@ export default function App() {
         }
     };
 
-    const handleSaveInterviewResults = async (applicationId: number, score: number, transcript: string) => {
-        const { data: appData, error: fetchError } = await supabase.from('candidates').select('interview_config').eq('id', applicationId).single();
+    const handleSaveInterviewResults = async (applicationId: number, score: number, transcript: string, analysis?: any) => {
+        const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching candidate for interview save'); return; }
-        const newConfig = { ...(appData.interview_config || {}), interviewStatus: 'finished', aiScore: score, transcript };
-        const { error } = await supabase.from('candidates').update({ interview_config: newConfig }).eq('id', applicationId);
+        const newConfig = {
+            ...(appData.interview_config || {}),
+            interviewStatus: 'finished',
+            aiScore: score,
+            transcript,
+            analysis
+        };
+        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) handleError(error, 'saving interview results'); else await refetchCandidates();
     };
     const handleSaveAssessmentResults = async (applicationId: number, assessmentData: any) => {
-        const { data: appData, error: fetchError } = await supabase.from('candidates').select('interview_config').eq('id', applicationId).single();
+        const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching candidate for assessment save'); return { success: false }; }
         const newConfig = { ...(appData.interview_config || {}), interviewStatus: 'assessment_completed', assessmentData };
-        const { error } = await supabase.from('candidates').update({ interview_config: newConfig }).eq('id', applicationId);
+        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) { handleError(error, 'saving assessment results'); return { success: false }; }
         await refetchCandidates();
         return { success: true };
     };
     const handleUpdateApplicationStatus = async (applicationId: number, newStatus: string) => {
-        const { error } = await supabase.from('candidates').update({ status: newStatus }).eq('id', applicationId);
+        const { error } = await api.put(`/candidates/${applicationId}`, { status: newStatus });
         if (error) handleError(error, 'updating application status'); else await refetchCandidates();
     };
     const handleScheduleInterview = async (applicationId: number, config: any) => {
-        const { data: appData, error: fetchError } = await supabase.from('candidates').select('interview_config').eq('id', applicationId).single();
+        const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching app for schedule'); return { success: false }; }
         const newConfig = { ...(appData.interview_config || {}), ...config, scheduledAt: new Date().toISOString() }; // Add scheduledAt
-        const { error } = await supabase.from('candidates').update({ interview_config: newConfig }).eq('id', applicationId);
+        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) { handleError(error, 'scheduling interview'); return { success: false }; }
         await refetchCandidates();
         return { success: true };
     };
     const handleStartInterviewSession = async (applicationId: number) => {
-        const { data: appData, error: fetchError } = await supabase.from('candidates').select('interview_config').eq('id', applicationId).single();
+        const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching app for interview start'); return { success: false }; }
         const newConfig = { ...(appData.interview_config || {}), interviewStatus: 'started' };
-        const { error } = await supabase.from('candidates').update({ interview_config: newConfig }).eq('id', applicationId);
+        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) { handleError(error, 'starting interview session'); return { success: false }; }
         await refetchCandidates();
         return { success: true };
@@ -358,14 +362,20 @@ export default function App() {
     const handleApplyForJob = async (job: any, profileData: any) => {
         if (!currentUser) return { success: false, error: 'User not logged in' };
         const userProfilePayload = { name: profileData.name, mobile: profileData.mobile_number, city: profileData.city, state: profileData.state, linkedin_url: profileData.linkedin_url, work_authorization: profileData.work_authorization };
-        const { error: userUpdateError } = await supabase.from('users').update(userProfilePayload).eq('id', currentUser.id);
+        const { error: userUpdateError } = await api.put(`/users/${currentUser.id}`, userProfilePayload);
         if (userUpdateError) return { success: false, error: getErrorMessage(userUpdateError) };
         await refetchUsers();
-        const { data: existingApp, error: appCheckError } = await supabase.from('candidates').select('id').eq('user_id', currentUser.id).eq('jobId', job.id).maybeSingle();
+
+        // Check for existing application
+        // API needs to support filtering by user_id and jobId
+        // Using the query string support I added earlier
+        const { data: existingApps, error: appCheckError } = await api.get(`/candidates?user_id=${currentUser.id}&jobId=${job.id}`);
+
         if (appCheckError) return { success: false, error: getErrorMessage(appCheckError) };
-        if (existingApp) return { success: false, error: 'You have already applied for this job.' };
+        if (existingApps && existingApps.length > 0) return { success: false, error: 'You have already applied for this job.' };
+
         const applicationPayload = { jobId: job.id, name: profileData.name, dob: profileData.dob, role: job.title, status: 'Applied', resumeSummary: profileData.summary, source: profileData.source, user_id: currentUser.id };
-        const { error: appError } = await supabase.from('candidates').insert([applicationPayload]);
+        const { error: appError } = await api.post('/candidates', applicationPayload);
         if (appError) return { success: false, error: getErrorMessage(appError) };
         await refetchCandidates();
         return { success: true };
@@ -380,14 +390,14 @@ export default function App() {
             let response: any;
             if (isUpdate) {
                 const { id, ...updateFields } = payload;
-                response = await supabase.from('jobs').update(updateFields).eq('id', id).select().single();
+                response = await api.put(`/jobs/${id}`, updateFields);
             } else {
                 const { id, ...insertFields } = payload;
-                response = await supabase.from('jobs').insert([insertFields]).select().single();
+                response = await api.post('/jobs', insertFields);
             }
 
             if (response.error) {
-                if (response.error.code === '23505') return { success: false, error: 'Internal ID collision occurred. Please try again.' };
+                if (response.error.message && response.error.message.includes('unique constraint')) return { success: false, error: 'Internal ID collision occurred. Please try again.' };
                 handleError(response.error, 'saving job');
                 return { success: false, error: getErrorMessage(response.error) };
             }
@@ -406,7 +416,7 @@ export default function App() {
     };
 
     const handlePublishJob = async (jobId: number) => {
-        const { error } = await supabase.from('jobs').update({ status: 'Active' }).eq('id', jobId);
+        const { error } = await api.put(`/jobs/${jobId}`, { status: 'Active' });
         if (error) handleError(error, 'publishing job'); else await refetchJobs();
     };
 
@@ -438,7 +448,7 @@ export default function App() {
     const interviewingCandidate = interviewingContext?.candidateId ? candidatesData.find(c => c.id === interviewingContext.candidateId) : null;
     const currentApplicationId = interviewingContext?.applicationId ?? null;
     const jobToEditForPage = (currentPage === 'employer-edit-job') ? selectedJob : null;
-    
+
     // Determine which interview component to use based on interviewType
     const getInterviewComponent = () => {
         const interviewType = interviewingCandidate?.interview_config?.interviewType;
@@ -456,28 +466,28 @@ export default function App() {
     return (
         <AIProvider>
             <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-                <Sidebar 
-                    user={currentUser} 
-                    navItems={currentRoleConfig?.navItems || []} 
-                    currentPage={currentPage} 
-                    activeParent={activeParent} 
-                    onNavigate={handleNavigate} 
-                    isMobile={isMobile} 
-                    isOpen={isSidebarOpen} 
-                    isCollapsed={isSidebarCollapsed} 
-                    onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-                    onNavigateToDashboard={() => currentRoleConfig?.defaultPage && handleNavigate(currentRoleConfig.defaultPage, currentRoleConfig.defaultPage)} 
+                <Sidebar
+                    user={currentUser}
+                    navItems={currentRoleConfig?.navItems || []}
+                    currentPage={currentPage}
+                    activeParent={activeParent}
+                    onNavigate={handleNavigate}
+                    isMobile={isMobile}
+                    isOpen={isSidebarOpen}
+                    isCollapsed={isSidebarCollapsed}
+                    onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    onNavigateToDashboard={() => currentRoleConfig?.defaultPage && handleNavigate(currentRoleConfig.defaultPage, currentRoleConfig.defaultPage)}
                 />
                 <div className="main-content">
-                    <TopHeader 
-                        user={currentUser} 
-                        onLogout={handleLogout} 
-                        onProfileClick={(tab = 'profile') => setProfileModalTab(tab)} 
-                        currentPage={currentPage} 
-                        navItems={currentRoleConfig?.navItems || []} 
-                        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-                        isMobile={isMobile} 
-                        onNavigateToDashboard={() => currentRoleConfig?.defaultPage && handleNavigate(currentRoleConfig.defaultPage, currentRoleConfig.defaultPage)} 
+                    <TopHeader
+                        user={currentUser}
+                        onLogout={handleLogout}
+                        onProfileClick={(tab = 'profile') => setProfileModalTab(tab)}
+                        currentPage={currentPage}
+                        navItems={currentRoleConfig?.navItems || []}
+                        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        isMobile={isMobile}
+                        onNavigateToDashboard={() => currentRoleConfig?.defaultPage && handleNavigate(currentRoleConfig.defaultPage, currentRoleConfig.defaultPage)}
                         onNavigate={handleNavigate}
                         candidatesData={candidatesData}
                         jobsData={jobsData}
@@ -500,7 +510,7 @@ export default function App() {
                                 onClearAllCandidates={handleClearAllCandidates} onSendJobToCandidate={handleSendJobToCandidate} onPipelineJobFilterChange={setPipelineJobFilter}
                                 onCreateNewJob={handleCreateNewJob} onCancelJobAction={handleCancelJobAction} onEditJob={handleEditJob} onPublishJob={handlePublishJob}
                                 onViewJob={(job: any) => { setSelectedJob(job); setJobScreenView('detail'); }} onStartApplication={(job: any) => { setSelectedJob(job); handleNavigate('apply-for-job', 'find-jobs'); }}
-                                onMoveCandidates={handleMoveCandidatesToPipeline} onSaveAIConfig={handleSaveAIConfig} onUpdateUserProfile={handleUpdateUserProfile} 
+                                onMoveCandidates={handleMoveCandidatesToPipeline} onSaveAIConfig={handleSaveAIConfig} onUpdateUserProfile={handleUpdateUserProfile}
                                 onSaveResume={handleSaveResume} resumeList={resumeList}
                                 jobToEdit={jobToEditForPage}
                             />
@@ -508,15 +518,15 @@ export default function App() {
                     </main>
                 </div>
                 {profileModalTab && (
-                    <ProfileModal 
-                        user={currentUser} 
+                    <ProfileModal
+                        user={currentUser}
                         initialTab={profileModalTab}
-                        onClose={() => setProfileModalTab(null)} 
-                        onChangeUsername={async (newName) => handleUpdateUserProfile({ name: newName })} 
+                        onClose={() => setProfileModalTab(null)}
+                        onChangeUsername={async (newName) => handleUpdateUserProfile({ name: newName })}
                         onChangePassword={async (newPassword) => {
-                            const { error } = await supabase.auth.updateUser({ password: newPassword });
+                            const { error } = await api.put(`/users/${currentUser.id}`, { password: newPassword });
                             return { success: !error, error: error ? getErrorMessage(error) : undefined };
-                        }} 
+                        }}
                     />
                 )}
             </div>

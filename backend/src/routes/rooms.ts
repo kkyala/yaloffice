@@ -8,6 +8,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AccessToken } from 'livekit-server-sdk';
 import { roomRegistry } from '../services/roomRegistry.js';
+import { auditLogger } from '../services/auditLogger.js';
 
 const router = Router();
 
@@ -75,6 +76,15 @@ router.post('/create', async (req, res) => {
       applicationId,
       candidateName,
       ttlSeconds
+    });
+
+    // Audit Log
+    await auditLogger.log({
+      userId: candidateName || 'system',
+      action: 'room_created',
+      resourceType: 'room',
+      resourceId: finalRoomName,
+      details: { sessionId, jobId, applicationId }
     });
 
     // Generate access token for the candidate
@@ -212,6 +222,14 @@ router.delete('/:roomName', async (req, res) => {
 
     // Remove from registry
     await roomRegistry.deleteRoom(roomName);
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'room_deleted',
+      resourceType: 'room',
+      resourceId: roomName,
+      details: { deletedBy: 'api' }
+    });
 
     res.json({
       success: true,

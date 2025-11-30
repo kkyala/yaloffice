@@ -174,7 +174,51 @@ const InterviewReportModal = ({ application, onClose }) => {
                         </div>
                     </div>
                 </div>
-                <div className="modal-footer">
+                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <a href={`http://localhost:8000/api/candidates/${application.id}/report/interview`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
+                    <button className="btn btn-secondary" onClick={onClose}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Screening Report Modal
+const ScreeningReportModal = ({ application, onClose }) => {
+    const { candidateName, interview_config } = application;
+    const report = interview_config?.screeningReport || {};
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>Screening Report: {candidateName}</h2>
+                    <button className="modal-close-btn" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+                </div>
+                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong>Score:</strong>
+                        <span style={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--primary-color)' }}>{report.score}/100</span>
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <strong>Summary:</strong>
+                        <p style={{ marginTop: '0.5rem', lineHeight: '1.5' }}>{report.summary}</p>
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <strong>Recommendation:</strong>
+                        <p style={{ marginTop: '0.5rem', fontWeight: '500' }}>{report.recommendation}</p>
+                    </div>
+                    {report.keyStrengths && (
+                        <div style={{ marginBottom: '1rem' }}>
+                            <strong>Key Strengths:</strong>
+                            <ul style={{ paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+                                {report.keyStrengths.map((s, i) => <li key={i}>{s}</li>)}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <a href={`http://localhost:8000/api/candidates/${application.id}/report/screening`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
                     <button className="btn btn-secondary" onClick={onClose}>Close</button>
                 </div>
             </div>
@@ -188,15 +232,30 @@ type ApplicationCardProps = {
     onDragStart: (e: React.DragEvent, applicationId: number) => void;
     onScheduleInterview: (app: EnrichedApplication) => void;
     onViewResults: (app: EnrichedApplication) => void;
-    onStartInterview: (app: EnrichedApplication) => void; // New prop for starting interviews directly
+    onStartInterview: (app: EnrichedApplication) => void;
+    onViewScreeningReport: (app: EnrichedApplication) => void; // New prop
+    onUpdateStatus: (id: number, status: string) => void;
 };
-const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragStart, onScheduleInterview, onViewResults, onStartInterview }) => {
+const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragStart, onScheduleInterview, onViewResults, onStartInterview, onViewScreeningReport, onUpdateStatus }) => {
     const { id, candidateName, jobTitle, aiScore, status } = application;
     const interviewStatus = application.interview_config?.interviewStatus;
-    const interviewType = application.interview_config?.interviewType || 'audio'; // Default to audio
+    const interviewType = application.interview_config?.interviewType || 'audio';
+    const screeningStatus = application.interview_config?.screeningStatus;
 
     const renderActionButton = () => {
-        if (status === 'Screening' && !interviewStatus) {
+        if (status === 'Screening') {
+            if (screeningStatus === 'completed') {
+                return (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => onViewScreeningReport(application)}>Report</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Schedule</button>
+                    </div>
+                );
+            } else {
+                return <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Screening Pending</span>;
+            }
+        }
+        if (status === 'Interviewing' && !interviewStatus) {
             return (
                 <button className="btn btn-secondary btn-sm" onClick={() => onScheduleInterview(application)}>Setup Interview</button>
             );
@@ -215,7 +274,17 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
         }
         if (interviewStatus === 'finished') {
             return (
-                <button className="btn btn-secondary btn-sm" onClick={() => onViewResults(application)}>View Report</button>
+                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => onViewResults(application)}>View Report</button>
+                    {status === 'Interviewing' && (
+                        <button className="btn btn-primary btn-sm" onClick={() => onUpdateStatus(id, 'Offer')}>Move to Offer</button>
+                    )}
+                </div>
+            );
+        }
+        if (status === 'Offer') {
+            return (
+                <button className="btn btn-primary btn-sm" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }} onClick={() => onUpdateStatus(id, 'Hired')}>Mark as Hired</button>
             );
         }
         return null;
@@ -247,9 +316,11 @@ type PipelineColumnProps = {
     onDragStart: (e: React.DragEvent, applicationId: number) => void;
     onScheduleInterview: (app: EnrichedApplication) => void;
     onViewResults: (app: EnrichedApplication) => void;
-    onStartInterview: (app: EnrichedApplication) => void; // New prop for starting interviews directly
+    onStartInterview: (app: EnrichedApplication) => void;
+    onViewScreeningReport: (app: EnrichedApplication) => void; // New prop
+    onUpdateStatus: (id: number, status: string) => void;
 };
-const PipelineColumn: React.FC<PipelineColumnProps> = ({ title, applications, onDragOver, onDrop, onDragStart, onScheduleInterview, onViewResults, onStartInterview }) => {
+const PipelineColumn: React.FC<PipelineColumnProps> = ({ title, applications, onDragOver, onDrop, onDragStart, onScheduleInterview, onViewResults, onStartInterview, onViewScreeningReport, onUpdateStatus }) => {
     return (
         <div className="pipeline-column" onDragOver={onDragOver} onDrop={(e) => onDrop(e, title)}>
             <div className="pipeline-column-header" data-status={title}><h3>{title}</h3><span className="candidate-count">{applications.length}</span></div>
@@ -262,6 +333,8 @@ const PipelineColumn: React.FC<PipelineColumnProps> = ({ title, applications, on
                         onScheduleInterview={onScheduleInterview}
                         onViewResults={onViewResults}
                         onStartInterview={onStartInterview}
+                        onViewScreeningReport={onViewScreeningReport}
+                        onUpdateStatus={onUpdateStatus}
                     />
                 ))}
             </div>
@@ -279,13 +352,15 @@ export default function CandidatesScreen({
     onSaveCandidate,
     onPipelineJobFilterChange,
     onNavigate,
-    onStartInterviewSession, // Added onStartInterviewSession
+    onStartInterviewSession,
 }: CandidatesScreenProps & { onStartInterviewSession: (applicationId: number) => Promise<{ success: boolean }> }) {
     const [view, setView] = useState('pipeline');
     const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
     const [appForSetup, setAppForSetup] = useState<EnrichedApplication | null>(null);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [appForReport, setAppForReport] = useState<EnrichedApplication | null>(null);
+    const [isScreeningReportOpen, setIsScreeningReportOpen] = useState(false); // New state
+    const [appForScreeningReport, setAppForScreeningReport] = useState<EnrichedApplication | null>(null); // New state
 
     const jobsForFilter = useMemo(() => {
         let filteredJobs = jobsData;
@@ -293,12 +368,10 @@ export default function CandidatesScreen({
             filteredJobs = jobsData.filter(job => job.employer === currentUser.name);
         }
 
-        // Filter these jobs to only include those that have at least one candidate application
         const jobsWithCandidates = new Set(candidatesData.map(c => c.jobId));
         return filteredJobs.filter(job => jobsWithCandidates.has(job.id));
     }, [jobsData, currentUser, candidatesData]);
 
-    // The 'candidates' table now serves as the applications list. This logic processes it for display.
     const enrichedList: EnrichedApplication[] = useMemo(() => {
         const jobsMap = new Map(jobsData.map(j => [j.id, j]));
         const employerJobIds = currentUser?.role === 'Employer' ? new Set(jobsForFilter.map(job => job.id)) : null;
@@ -312,7 +385,7 @@ export default function CandidatesScreen({
 
             return {
                 id: candidateApp.id,
-                candidate_id: candidateApp.id, // The candidate record ID is the application ID now
+                candidate_id: candidateApp.id,
                 job_id: candidateApp.jobId,
                 status: candidateApp.status,
                 interview_config: candidateApp.interview_config,
@@ -368,11 +441,9 @@ export default function CandidatesScreen({
             console.error("Interview config not found for application:", app.id);
             return;
         }
-        // Call the parent handler to update session status
         const result = await onStartInterviewSession(app.id);
         if (result.success) {
-            // Determine page based on interview type
-            let page = 'interview'; // default audio
+            let page = 'interview';
             if (app.interview_config.interviewType === 'livekit' || app.interview_config.interviewType === 'tavus') {
                 page = 'livekit-interview';
             } else if (app.interview_config.interviewType === 'video') {
@@ -386,6 +457,11 @@ export default function CandidatesScreen({
     const handleViewResults = (app: EnrichedApplication) => {
         setAppForReport(app);
         setIsReportModalOpen(true);
+    };
+
+    const handleViewScreeningReport = (app: EnrichedApplication) => {
+        setAppForScreeningReport(app);
+        setIsScreeningReportOpen(true);
     };
 
     if (view === 'add' && canAddCandidates) {
@@ -414,7 +490,9 @@ export default function CandidatesScreen({
                         onDragStart={handleDragStart}
                         onScheduleInterview={handleOpenSetupModal}
                         onViewResults={handleViewResults}
-                        onStartInterview={handleStartInterview} // Pass the new handler
+                        onStartInterview={handleStartInterview}
+                        onViewScreeningReport={handleViewScreeningReport}
+                        onUpdateStatus={onUpdateApplicationStatus}
                     />
                 ))}
             </div>
@@ -430,6 +508,12 @@ export default function CandidatesScreen({
                 <InterviewReportModal
                     application={appForReport}
                     onClose={() => setIsReportModalOpen(false)}
+                />
+            )}
+            {isScreeningReportOpen && appForScreeningReport && (
+                <ScreeningReportModal
+                    application={appForScreeningReport}
+                    onClose={() => setIsScreeningReportOpen(false)}
                 />
             )}
         </>

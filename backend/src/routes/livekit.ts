@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AccessToken } from 'livekit-server-sdk';
+import { auditLogger } from '../services/auditLogger.js';
 
 const router = Router();
 
@@ -43,6 +44,15 @@ router.post('/token', async (req, res) => {
 
     console.log(`[LiveKit] Token generated for ${identity} in room ${roomName}`);
     console.log(`[LiveKit] URL: ${process.env.LIVEKIT_URL}`);
+
+    // Audit Log
+    await auditLogger.log({
+      userId: identity,
+      action: 'livekit_token_generated',
+      resourceType: 'room_session',
+      resourceId: roomName,
+      details: { participantMetadata }
+    });
 
     res.json({
       token: jwt,

@@ -10,6 +10,12 @@ type Candidate = {
     interview_config?: {
         aiScore?: number;
         transcript?: string;
+        analysis?: {
+            score: number;
+            summary: string;
+            strengths: string[];
+            improvements: string[];
+        };
     };
 };
 
@@ -29,7 +35,7 @@ type AIInterviewReportScreenProps = {
 const ScoreDisplay = ({ score }: { score?: number | null }) => {
     const percentage = score ? (score / 10) * 100 : 0;
     const color = `hsl(${percentage}, 70%, 45%)`; // Red to green gradient
-    
+
     return (
         <div className="score-display" style={{ textAlign: 'center' }}>
             <div className="score-circle-track" style={{ position: 'relative', width: '120px', height: '120px', margin: '0 auto', borderRadius: '50%', background: 'var(--light-bg)', display: 'grid', placeItems: 'center' }}>
@@ -60,6 +66,7 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
     const interviewData = interviewingCandidate?.interview_config;
     const transcript = interviewData?.transcript || '';
     const score = interviewData?.aiScore;
+    const savedAnalysis = interviewData?.analysis;
 
     const handleGenerateSummary = async () => {
         if (!transcript || !isReady) return;
@@ -78,14 +85,16 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
             setIsLoadingSummary(false);
         }
     };
-    
-    // Auto-generate summary on load if not already generated
+
+    // Use saved summary if available, otherwise generate
     useEffect(() => {
-        if (transcript && isReady && !summary) {
+        if (savedAnalysis?.summary) {
+            setSummary(savedAnalysis.summary);
+        } else if (transcript && isReady && !summary) {
             handleGenerateSummary();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [transcript, isReady]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [transcript, isReady, savedAnalysis]);
 
     const handleBack = () => {
         if (currentUser?.role === 'Candidate') {
@@ -107,7 +116,7 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
             </div>
         );
     }
-    
+
     // Simple markdown to HTML renderer for summary
     const renderSummary = (markdown) => {
         if (!markdown) return null;
@@ -123,6 +132,7 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
             <header className="page-header">
                 <h1>AI Interview Report</h1>
                 <div className="header-actions">
+                    <a href={`http://localhost:8000/api/candidates/${interviewingCandidate.id}/report/interview`} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ marginRight: '1rem' }}>Download PDF</a>
                     <button className="btn btn-secondary" onClick={handleBack}>Back to Pipeline</button>
                 </div>
             </header>
@@ -131,15 +141,15 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
                     <div className="dashboard-widget">
                         <h3>Candidate</h3>
                         <div className="candidate-info-card" style={{ textAlign: 'center' }}>
-                             <img src={`https://i.pravatar.cc/80?u=${interviewingCandidate.name}`} alt={interviewingCandidate.name} style={{ borderRadius: '50%', marginBottom: '1rem' }} />
-                             <h4>{interviewingCandidate.name}</h4>
-                             <p style={{ color: 'var(--text-secondary)' }}>Applied for {jobTitle}</p>
+                            <img src={`https://i.pravatar.cc/80?u=${interviewingCandidate.name}`} alt={interviewingCandidate.name} style={{ borderRadius: '50%', marginBottom: '1rem' }} />
+                            <h4>{interviewingCandidate.name}</h4>
+                            <p style={{ color: 'var(--text-secondary)' }}>Applied for {jobTitle}</p>
                         </div>
                     </div>
-                     <div className="dashboard-widget">
+                    <div className="dashboard-widget">
                         <ScoreDisplay score={score} />
-                     </div>
-                     <div className="dashboard-widget">
+                    </div>
+                    <div className="dashboard-widget">
                         <h3>AI Analysis</h3>
                         {summaryError && <p className="error-message" style={{ color: 'var(--error-color)' }}>{summaryError}</p>}
                         {isLoadingSummary && !summary ? (
@@ -147,14 +157,14 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
                         ) : summary ? (
                             <div className="summary-content" dangerouslySetInnerHTML={{ __html: renderSummary(summary) }}></div>
                         ) : (
-                             <button className="btn btn-primary btn-full" onClick={handleGenerateSummary} disabled={isLoadingSummary || !transcript}>
+                            <button className="btn btn-primary btn-full" onClick={handleGenerateSummary} disabled={isLoadingSummary || !transcript}>
                                 {isLoadingSummary ? 'Generating...' : 'Generate with AI'}
                             </button>
                         )}
-                     </div>
+                    </div>
                 </div>
                 <div className="report-main-content">
-                    <div className="dashboard-widget" style={{ height: 'calc(100vh - 200px)'}}>
+                    <div className="dashboard-widget" style={{ height: 'calc(100vh - 200px)' }}>
                         <h3>Interview Transcript</h3>
                         <div className="transcript-container" style={{ overflowY: 'auto', height: 'calc(100% - 40px)', paddingRight: '1rem' }}>
                             {transcript ? transcript.split('\n\n').map((line, index) => {

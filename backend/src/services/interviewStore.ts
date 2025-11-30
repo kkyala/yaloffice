@@ -1,8 +1,5 @@
-/**
- * In-memory interview session store
- *
- * For production, replace with Redis or database storage
- */
+import { supabase } from './supabaseService.js';
+import { auditLogger } from './auditLogger.js';
 
 export interface InterviewSession {
   id: string;
@@ -31,26 +28,117 @@ export interface InterviewSession {
 }
 
 class InterviewStore {
-  private sessions: Map<string, InterviewSession> = new Map();
+  async set(sessionId: string, session: InterviewSession): Promise<void> {
+    const { error } = await supabase
+      .from('interviews')
+      .upsert({
+        id: sessionId,
+        room_name: session.roomName,
+        job_title: session.jobTitle,
+        candidate_id: session.candidateId,
+        candidate_name: session.candidateName,
+        status: session.status,
+        question_count: session.questionCount,
+        current_question_index: session.currentQuestionIndex,
+        difficulty: session.difficulty,
+        custom_questions: session.customQuestions,
+        transcript: session.transcript,
+        analysis: session.analysis,
+        started_at: session.startedAt,
+        ended_at: session.endedAt
+      });
 
-  set(sessionId: string, session: InterviewSession): void {
-    this.sessions.set(sessionId, session);
+    if (error) {
+      console.error('Error saving interview session:', error);
+      throw error;
+    }
   }
 
-  get(sessionId: string): InterviewSession | undefined {
-    return this.sessions.get(sessionId);
+  async get(sessionId: string): Promise<InterviewSession | undefined> {
+    const { data, error } = await supabase
+      .from('interviews')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    if (error || !data) return undefined;
+
+    return {
+      id: data.id,
+      roomName: data.room_name,
+      jobTitle: data.job_title,
+      candidateId: data.candidate_id,
+      candidateName: data.candidate_name,
+      status: data.status,
+      questionCount: data.question_count,
+      currentQuestionIndex: data.current_question_index,
+      difficulty: data.difficulty,
+      customQuestions: data.custom_questions,
+      transcript: data.transcript,
+      analysis: data.analysis,
+      startedAt: data.started_at,
+      endedAt: data.ended_at
+    };
   }
 
-  delete(sessionId: string): boolean {
-    return this.sessions.delete(sessionId);
+  async delete(sessionId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('interviews')
+      .delete()
+      .eq('id', sessionId);
+
+    return !error;
   }
 
-  getAll(): InterviewSession[] {
-    return Array.from(this.sessions.values());
+  async getAll(): Promise<InterviewSession[]> {
+    const { data, error } = await supabase
+      .from('interviews')
+      .select('*');
+
+    if (error || !data) return [];
+
+    return data.map(d => ({
+      id: d.id,
+      roomName: d.room_name,
+      jobTitle: d.job_title,
+      candidateId: d.candidate_id,
+      candidateName: d.candidate_name,
+      status: d.status,
+      questionCount: d.question_count,
+      currentQuestionIndex: d.current_question_index,
+      difficulty: d.difficulty,
+      customQuestions: d.custom_questions,
+      transcript: d.transcript,
+      analysis: d.analysis,
+      startedAt: d.started_at,
+      endedAt: d.ended_at
+    }));
   }
 
-  getActive(): InterviewSession[] {
-    return this.getAll().filter(s => s.status === 'active');
+  async getActive(): Promise<InterviewSession[]> {
+    const { data, error } = await supabase
+      .from('interviews')
+      .select('*')
+      .eq('status', 'active');
+
+    if (error || !data) return [];
+
+    return data.map(d => ({
+      id: d.id,
+      roomName: d.room_name,
+      jobTitle: d.job_title,
+      candidateId: d.candidate_id,
+      candidateName: d.candidate_name,
+      status: d.status,
+      questionCount: d.question_count,
+      currentQuestionIndex: d.current_question_index,
+      difficulty: d.difficulty,
+      customQuestions: d.custom_questions,
+      transcript: d.transcript,
+      analysis: d.analysis,
+      startedAt: d.started_at,
+      endedAt: d.ended_at
+    }));
   }
 }
 

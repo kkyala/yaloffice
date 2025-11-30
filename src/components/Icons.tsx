@@ -2,15 +2,15 @@
 import React from 'react';
 
 const Icon = (props) => (
-    <svg 
-        xmlns="http://www.w3.org/2000/svg" 
-        width="24" 
-        height="24" 
-        viewBox="0 0 24 24" 
-        fill="none" 
-        stroke="currentColor" 
-        strokeWidth="2" 
-        strokeLinecap="round" 
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
         strokeLinejoin="round"
         {...props}
     />
@@ -28,14 +28,14 @@ const Icon = (props) => (
 // );
 
 export const YaalOfficeLogo = (props) => (
-  <img
-    src="https://storage.googleapis.com/yalimages/ChatGPT%20Image%20Nov%2019%2C%202025%2C%2007_09_42%20AM.png"
-    alt="Yāl Office Logo"
-    width="70"
-    height="70"
-    style={{ objectFit: 'contain' }}
-    {...props}
-  />
+    <img
+        src="https://storage.googleapis.com/yalimages/ChatGPT%20Image%20Nov%2019%2C%202025%2C%2007_09_42%20AM.png"
+        alt="Yāl Office Logo"
+        width="70"
+        height="70"
+        style={{ objectFit: 'contain' }}
+        {...props}
+    />
 );
 
 export const DashboardIcon = (props) => (
@@ -68,7 +68,7 @@ export const JobsIcon = (props) => (
 );
 
 export const CandidatesIcon = (props) => (
-     <Icon {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></Icon>
+    <Icon {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></Icon>
 );
 
 export const InterviewIcon = (props) => (
@@ -157,11 +157,25 @@ export const ChatIcon = (props) => (
 
 export const AudioWaveIcon = (props) => (
     <Icon {...props}>
-        <path d="M2 10v4"/>
-        <path d="M6 7v10"/>
-        <path d="M10 4v16"/>
-        <path d="M14 7v10"/>
-        <path d="M18 10v4"/>
+        <path d="M2 10v4" />
+        <path d="M6 7v10" />
+        <path d="M10 4v16" />
+        <path d="M14 7v10" />
+        <path d="M18 10v4" />
+    </Icon>
+);
+
+export const StopCircleIcon = (props) => (
+    <Icon {...props}>
+        <circle cx="12" cy="12" r="10"></circle>
+        <rect x="9" y="9" width="6" height="6"></rect>
+    </Icon>
+);
+
+export const Volume2Icon = (props) => (
+    <Icon {...props}>
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
     </Icon>
 );
 
@@ -223,9 +237,9 @@ export const GlassdoorIcon = (props) => (
 
 export const GoogleIcon = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
-        <path fill="#4285F4" d="M21.35 11.1H12v2.8h5.35c-0.25 1.3-1.05 2.35-2.25 3.15v2.6h3.65c2.15-2 3.4-4.9 3.4-8.15 0-0.8-0.1-1.55-0.25-2.3z"/>
-        <path fill="#34A853" d="M12 21c2.7 0 4.95-0.9 6.6-2.45l-3.65-2.6c-0.9 0.6-2.05 0.95-3.4 0.95-2.6 0-4.8-1.75-5.6-4.1H2.9v2.6C4.55 18.4 8 21 12 21z"/>
-        <path fill="#FBBC05" d="M6.4 12.85c-0.2-0.6-0.3-1.25-0.3-1.9s0.1-1.3 0.3-1.9V6.45H2.9c-1.35 2.7-1.35 5.8 0 8.5l3.5-2.1z"/>
-        <path fill="#EA4335" d="M12 5.45c1.45 0 2.75 0.5 3.8 1.5l2.85-2.85C16.95 2.55 14.7 1.5 12 1.5 8 1.5 4.55 4.1 2.9 7.45l3.5 2.1c0.8-2.35 3-4.1 5.6-4.1z"/>
+        <path fill="#4285F4" d="M21.35 11.1H12v2.8h5.35c-0.25 1.3-1.05 2.35-2.25 3.15v2.6h3.65c2.15-2 3.4-4.9 3.4-8.15 0-0.8-0.1-1.55-0.25-2.3z" />
+        <path fill="#34A853" d="M12 21c2.7 0 4.95-0.9 6.6-2.45l-3.65-2.6c-0.9 0.6-2.05 0.95-3.4 0.95-2.6 0-4.8-1.75-5.6-4.1H2.9v2.6C4.55 18.4 8 21 12 21z" />
+        <path fill="#FBBC05" d="M6.4 12.85c-0.2-0.6-0.3-1.25-0.3-1.9s0.1-1.3 0.3-1.9V6.45H2.9c-1.35 2.7-1.35 5.8 0 8.5l3.5-2.1z" />
+        <path fill="#EA4335" d="M12 5.45c1.45 0 2.75 0.5 3.8 1.5l2.85-2.85C16.95 2.55 14.7 1.5 12 1.5 8 1.5 4.55 4.1 2.9 7.45l3.5 2.1c0.8-2.35 3-4.1 5.6-4.1z" />
     </svg>
 );

@@ -1,11 +1,6 @@
-
 export const config = {
-    supabase: {
-        // IMPORTANT: Replace with your Supabase URL
-        url: 'https://wytbpnbzaxzjcksdceuz.supabase.co',
-        // IMPORTANT: Replace with your Supabase Anon Key
-        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5dGJwbmJ6YXh6amNrc2RjZXV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzNjE3MDgsImV4cCI6MjA3ODkzNzcwOH0.ld9iwVtv1-6NpTi82Q0Dkc-fiaZhBTOUX4BTv8JbAPw',
-    },
+
+    apiBaseUrl: 'http://localhost:8000/api',
     ai: {
         activeProvider: 'google',
 

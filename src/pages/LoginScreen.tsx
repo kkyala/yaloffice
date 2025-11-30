@@ -33,7 +33,11 @@ export default function LoginScreen({ onLogin, onSignup }) {
             }
             const result = await onSignup({ email: trimmedEmail, password, fullName: fullName.trim(), role, mobileNumber: mobile.trim() });
             if (result && result.success) {
-                // After successful signup, switch to the login view and show a success message.
+                if (result.autoLogin) {
+                    // App.tsx will handle redirection by updating state, causing this component to unmount.
+                    return;
+                }
+                // After successful signup (without auto-login), switch to the login view and show a success message.
                 setIsSigningUp(false);
                 setSuccessMessage('Sign up successful! Please check your email for a confirmation link before logging in.');
                 // Clear form fields for a clean login experience

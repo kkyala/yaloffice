@@ -115,7 +115,7 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
             </div>
 
             <div className="table-container">
-                <table className="jobs-table">
+                <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
                     <thead>
                         <tr>
                             <th onClick={() => handleSort('title')} style={{ cursor: 'pointer', userSelect: 'none' }}>
@@ -134,11 +134,11 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                         {currentItems.length > 0 ? currentItems.map(job => (
                             <tr key={job.id} className="animate-fade-in">
                                 <td>
-                                    <strong style={{ fontSize: '1.05rem', color: 'var(--primary-dark-color)' }}>{job.title}</strong>
-                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{job.employer}</p>
+                                    <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{job.title}</strong>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0' }}>{job.employer}</p>
                                 </td>
                                 <td>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--light-bg)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--light-bg)', padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.8rem' }}>
                                         {job.location}
                                     </span>
                                 </td>

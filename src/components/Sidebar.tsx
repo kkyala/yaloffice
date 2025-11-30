@@ -22,8 +22,8 @@ type SidebarProps = {
     onNavigateToDashboard: () => void;
 };
 
-const NavLink = ({ item, isActive, onClick }) => (
-    <a 
+const NavLink = ({ item, isActive, onClick }: { item: NavItem, isActive: boolean, onClick: () => void }) => (
+    <a
         href="#"
         className={isActive ? 'active' : ''}
         onClick={(e) => { e.preventDefault(); onClick(); }}
@@ -37,8 +37,10 @@ const NavLink = ({ item, isActive, onClick }) => (
 export default function Sidebar({ user, navItems = [], currentPage, activeParent, onNavigate, isMobile, isOpen, isCollapsed, onToggleCollapse, onNavigateToDashboard }: SidebarProps) {
     // Initialize open parents, ensuring 'Recruit' is always open for Employers.
     const [openParents, setOpenParents] = useState<Set<string>>(() => {
-        const initialOpen = new Set([activeParent]);
-        if (user?.role === 'Employer') {
+        const initialOpen = new Set<string>();
+        if (activeParent) initialOpen.add(activeParent);
+
+        if (user?.role?.toLowerCase() === 'employer') {
             initialOpen.add('recruitment');
         }
         return initialOpen;
@@ -54,10 +56,10 @@ export default function Sidebar({ user, navItems = [], currentPage, activeParent
 
     const handleParentClick = (page: string) => {
         // For Employers, the 'Recruit' menu cannot be collapsed. This makes it permanently open.
-        if (user?.role === 'Employer' && page === 'recruitment') {
+        if (user?.role?.toLowerCase() === 'employer' && page === 'recruitment') {
             return;
         }
-        
+
         // Standard toggle logic for all other menus.
         setOpenParents(prev => {
             const newSet = new Set(prev);
@@ -72,14 +74,14 @@ export default function Sidebar({ user, navItems = [], currentPage, activeParent
             return newSet;
         });
     };
-    
+
     const effectiveCollapsed = isCollapsed && !isMobile;
     const sidebarClasses = ['sidebar', isMobile ? 'mobile' : '', isOpen ? 'open' : '', effectiveCollapsed ? 'collapsed' : ''].join(' ');
 
     return (
         <aside className={sidebarClasses}>
             <div className="sidebar-header" onClick={onNavigateToDashboard} style={{ cursor: 'pointer' }}>
-                <YaalOfficeLogo className="logo-icon"/>
+                <YaalOfficeLogo className="logo-icon" />
                 <div className="sidebar-header-text">
                     <h1>Yāl Office</h1>
                     <p>AI Recruitment</p>
@@ -91,12 +93,12 @@ export default function Sidebar({ user, navItems = [], currentPage, activeParent
                         if (item.isGroupTitle) {
                             return <li key={`group-${index}`} className="nav-group-title"><span>{item.name}</span></li>;
                         }
-                        
+
                         if (item.children) {
                             const isParentActive = activeParent === item.page;
                             return (
                                 <li key={item.page}>
-                                    <NavLink 
+                                    <NavLink
                                         item={item}
                                         isActive={isParentActive}
                                         onClick={() => handleParentClick(item.page)}
@@ -120,7 +122,7 @@ export default function Sidebar({ user, navItems = [], currentPage, activeParent
 
                         return (
                             <li key={item.page}>
-                                <NavLink 
+                                <NavLink
                                     item={item}
                                     isActive={currentPage === item.page}
                                     onClick={() => onNavigate(item.page, item.page)}
@@ -131,7 +133,7 @@ export default function Sidebar({ user, navItems = [], currentPage, activeParent
                 </ul>
             </nav>
             <div className="sidebar-footer">
-                 <button className="collapse-btn" onClick={onToggleCollapse} aria-label="Collapse sidebar">
+                <button className="collapse-btn" onClick={onToggleCollapse} aria-label="Collapse sidebar">
                     <ChevronLeftIcon />
                 </button>
             </div>

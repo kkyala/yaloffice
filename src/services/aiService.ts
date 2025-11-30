@@ -305,4 +305,48 @@ export const aiService = {
     createChatSession,
     generateText,
     generateTextStream,
+
+    // Screening
+    startScreening,
+    chatScreening,
 };
+
+/**
+ * Start screening session - proxied to backend
+ */
+async function startScreening(resumeText: string, candidateName: string): Promise<{ greeting: string; firstQuestion: string }> {
+    const API_BASE = getApiBase();
+    const response = await fetch(`${API_BASE}/api/ai/screening/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeText, candidateName })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to start screening');
+    }
+
+    const result = await response.json();
+    return result.data;
+}
+
+/**
+ * Chat screening - proxied to backend
+ */
+async function chatScreening(history: { role: string; content: string }[], userResponse: string): Promise<{ aiResponse: string; isComplete: boolean }> {
+    const API_BASE = getApiBase();
+    const response = await fetch(`${API_BASE}/api/ai/screening/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history, userResponse })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to chat');
+    }
+
+    const result = await response.json();
+    return result.data;
+}

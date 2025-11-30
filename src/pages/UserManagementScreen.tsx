@@ -26,17 +26,17 @@ export default function UserManagementScreen({ usersData, onSaveUser }) {
 
     return (
         <>
-             <header className="page-header">
+            <header className="page-header">
                 <h1>User Management</h1>
-                 <div className="header-actions">
+                <div className="header-actions">
                     {/* Add User button removed to enforce user creation via signup flow */}
-                 </div>
-             </header>
-             <p style={{marginBottom: '1.5rem', color: 'var(--text-secondary)'}}>
+                </div>
+            </header>
+            <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
                 New users must be created through the public "Sign Up" page. You can edit existing user roles and information here.
-             </p>
-             <div className="table-container">
-                <table className="jobs-table">
+            </p>
+            <div className="table-container">
+                <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
                     <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>{usersData.map((user) => (
                         <tr key={user.id}>

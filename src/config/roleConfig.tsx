@@ -34,6 +34,7 @@ import MyResumeScreen from '../pages/MyResumeScreen';
 import CalendarScreen from '../pages/CalendarScreen';
 import AIVideoInterviewScreen from '../pages/AIVideoInterviewScreen'; // NEW: Video Interview Screen
 import LiveKitInterviewScreen from '../pages/LiveKitInterviewScreen'; // Tavus + LiveKit Interview
+import ScreeningSessionScreen from '../pages/ScreeningSessionScreen'; // NEW: Audio Screening
 
 // A placeholder for pages that are mentioned but not fully implemented
 const PlaceholderScreen = ({ pageName }) => (
@@ -50,9 +51,9 @@ export const roleConfig = {
             { name: 'Dashboard', page: 'recruitment-dashboard', icon: <DashboardIcon /> },
             { name: 'AI Platform', page: 'ai-platform', icon: <ChatIcon /> },
             { name: 'Calendar', page: 'calendar', icon: <CalendarIcon /> },
-            { 
-                name: 'Recruit', 
-                page: 'recruitment', 
+            {
+                name: 'Recruit',
+                page: 'recruitment',
                 icon: <RecruitmentIcon />,
                 children: [
                     { name: 'List of Jobs', page: 'employer-jobs-list', icon: <JobsIcon /> },
@@ -99,6 +100,7 @@ export const roleConfig = {
             'calendar': CalendarScreen,
             'apply-for-job': JobApplicationScreen,
             'pre-interview-assessment': PreInterviewAssessmentScreen,
+            'screening-session': ScreeningSessionScreen, // NEW
             interview: AIInterviewScreen, // Existing audio interview
             'ai-video-interview': AIVideoInterviewScreen, // Gemini Video interview
             'livekit-interview': LiveKitInterviewScreen, // Tavus + LiveKit interview
