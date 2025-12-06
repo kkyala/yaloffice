@@ -54,8 +54,12 @@ Behaviours:
 /**
  * Create a connection to Gemini Live API
  */
+/**
+ * Create a connection to Gemini Live API
+ */
 async function createGeminiConnection(
   sessionId: string,
+  systemInstruction: string,
   onMessage: (msg: GeminiMessage) => void,
   onError: (err: Error) => void,
   onClose: () => void
@@ -68,23 +72,16 @@ async function createGeminiConnection(
     onError(new Error('GEMINI_API_KEY not configured'));
     return null;
   }
-  console.log(`[Gemini] ✅ API key found for session ${sessionId}`);
-
-  const session = await interviewStore.get(sessionId);
-  console.log(`[Gemini] Session data for ${sessionId}:`, session ? 'found' : 'not found');
 
   // Use the live-capable model
   const model = 'gemini-2.0-flash-exp';
-
   const url = `${GEMINI_LIVE_URL}?key=${apiKey}`;
-  console.log(`[Gemini] Creating WebSocket connection to Gemini for session ${sessionId}`);
 
   let ws: WebSocket;
   try {
     ws = new WebSocket(url);
-    console.log(`[Gemini] ✅ WebSocket object created for session ${sessionId}, readyState: ${ws.readyState}`);
   } catch (err: any) {
-    console.error(`[Gemini] ❌ Failed to create WebSocket for session ${sessionId}:`, err.message);
+    console.error(`[Gemini] ❌ Failed to create WebSocket:`, err.message);
     onError(err);
     return null;
   }
@@ -93,131 +90,58 @@ async function createGeminiConnection(
     console.log(`[Gemini] Connected for session ${sessionId}`);
 
     // Send initial setup message
-    // Note: responseModalities must be array for Live API
     const setupMessage = {
       setup: {
         model: `models/${model}`,
         generationConfig: {
-          responseModalities: ['AUDIO'], // Must be an array
+          responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: "Aoede" // Good default voice
+                voiceName: "Aoede"
               }
             }
           }
         },
         systemInstruction: {
-          parts: [{ text: INTERVIEW_SYSTEM_PROMPT }]
+          parts: [{ text: systemInstruction }]
         }
       }
     };
 
-    console.log(`[Gemini] Sending setup for session ${sessionId}, model: ${model}`);
-    console.log(`[Gemini] Setup message: ${JSON.stringify(setupMessage, null, 2)}`);
+    console.log(`[Gemini] Sending setup for session ${sessionId}`);
     ws.send(JSON.stringify(setupMessage));
 
-    // Send initial prompt after setup - always send to start interaction
+    // Send initial prompt to kickstart conversation
     setTimeout(() => {
-      if (session) {
-        const initialPrompt = {
-          clientContent: {
-            turns: [{
-              role: 'user',
-              parts: [{
-                text: `Begin: "role":"${session.jobTitle}", "questionCount":${session.questionCount}, "difficulty":"${session.difficulty}", "custom": ${JSON.stringify(session.customQuestions || [])}`
-              }]
-            }],
-            turnComplete: true
-          }
-        };
-        console.log(`[Gemini] Sending initial prompt for session ${sessionId}`);
-        ws.send(JSON.stringify(initialPrompt));
-      } else {
-        // Send generic start if no session context
-        const startMsg = {
-          clientContent: {
-            turns: [{
-              role: 'user',
-              parts: [{ text: 'Hello, please begin the interview.' }]
-            }],
-            turnComplete: true
-          }
-        };
-        console.log(`[Gemini] Sending generic start for session ${sessionId}`);
-        ws.send(JSON.stringify(startMsg));
-      }
-    }, 300);
+      const startMsg = {
+        clientContent: {
+          turns: [{
+            role: 'user',
+            parts: [{ text: 'Hello, I am ready for the interview.' }]
+          }],
+          turnComplete: true
+        }
+      };
+      ws.send(JSON.stringify(startMsg));
+    }, 500);
   });
 
   ws.on('message', (data) => {
     try {
       const message = JSON.parse(data.toString());
-
-      // Log all messages for debugging
-      console.log(`[Gemini] Received message type:`, Object.keys(message).join(', '));
-
-      // Handle setup complete
-      if (message.setupComplete) {
-        console.log(`[Gemini] Setup complete for session ${sessionId}`);
-      }
-
-      // Handle different message types from Gemini
       if (message.serverContent) {
         const content = message.serverContent;
-        console.log(`[Gemini] Full serverContent:`, JSON.stringify(content, null, 2));
-        console.log(`[Gemini] Server content - turnComplete: ${content.turnComplete}, hasParts: ${!!content.modelTurn?.parts}`);
-
-        // Handle transcript
         if (content.modelTurn?.parts) {
           for (const part of content.modelTurn.parts) {
             if (part.inlineData?.mimeType?.startsWith('audio/')) {
-              console.log(`[Gemini] Audio chunk received - size: ${part.inlineData.data.length} bytes`);
-              onMessage({
-                type: 'audio',
-                audio: {
-                  data: part.inlineData.data,
-                  mimeType: part.inlineData.mimeType
-                }
-              });
+              onMessage({ type: 'audio', audio: { data: part.inlineData.data, mimeType: part.inlineData.mimeType } });
             }
             if (part.text) {
-              console.log(`[Gemini] Text received: "${part.text.substring(0, 50)}..."`);
-              onMessage({
-                type: 'transcript',
-                transcript: {
-                  text: part.text,
-                  isFinal: content.turnComplete || false,
-                  speaker: 'model'
-                }
-              });
+              onMessage({ type: 'transcript', transcript: { text: part.text, isFinal: content.turnComplete || false, speaker: 'model' } });
             }
           }
         }
-
-        // Handle input transcript (what user said)
-        if (content.inputTranscript) {
-          console.log(`[Gemini] User transcript: "${content.inputTranscript}"`);
-          onMessage({
-            type: 'transcript',
-            transcript: {
-              text: content.inputTranscript,
-              isFinal: true,
-              speaker: 'user'
-            }
-          });
-        }
-      }
-
-      if (message.error) {
-        console.error(`[Gemini] Error:`, message.error);
-        onMessage({
-          type: 'error',
-          error: {
-            message: message.error.message || 'Unknown error',
-            code: message.error.code || 'UNKNOWN'
-          }
-        });
       }
     } catch (err) {
       console.error('[Gemini] Failed to parse message:', err);
@@ -225,14 +149,11 @@ async function createGeminiConnection(
   });
 
   ws.on('error', (err) => {
-    console.error(`[Gemini] WebSocket error for session ${sessionId}:`, err);
+    console.error(`[Gemini] WebSocket error:`, err);
     onError(err);
   });
 
-  ws.on('close', (code, reason) => {
-    console.log(`[Gemini] Connection closed for session ${sessionId}, code: ${code}, reason: ${reason?.toString() || 'none'}`);
-    onClose();
-  });
+  ws.on('close', () => onClose());
 
   return ws;
 }
@@ -241,10 +162,7 @@ async function createGeminiConnection(
  * Setup WebSocket server for Gemini Live proxy
  */
 export function setupGeminiProxyWS(wss: WebSocketServer): void {
-  // Map of client connections to Gemini connections
   const geminiConnections = new Map<WebSocket, WebSocket>();
-  // TEMPORARILY DISABLED: Buffer to collect audio chunks for avatar generation
-  // const audioBuffers = new Map<WebSocket, Buffer[]>();
 
   wss.on('connection', (clientWs, req) => {
     const url = new URL(req.url || '', `http://${req.headers.host}`);
@@ -252,158 +170,72 @@ export function setupGeminiProxyWS(wss: WebSocketServer): void {
 
     console.log(`[Proxy] Client connected for session ${sessionId}`);
 
-    // TEMPORARILY DISABLED: Initialize audio buffer for this client
-    // audioBuffers.set(clientWs, []);
+    let geminiWs: WebSocket | null = null;
 
-    // Create Gemini connection for this client
-    (async () => {
-      const geminiWs = await createGeminiConnection(
-        sessionId,
-        // On Gemini message -> forward to client
-        async (msg) => {
-          if (clientWs.readyState === WebSocket.OPEN) {
-            // TEMPORARILY DISABLED: Avatar generation
-            // if (msg.type === 'audio' && msg.audio?.data) {
-            //   const audioBuffer = Buffer.from(msg.audio.data, 'base64');
-            //   const buffers = audioBuffers.get(clientWs) || [];
-            //   buffers.push(audioBuffer);
-            //   audioBuffers.set(clientWs, buffers);
-            // }
+    clientWs.on('message', async (data) => {
+      // Check if it's a config message (JSON)
+      if (!Buffer.isBuffer(data)) {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === 'start' && msg.config) {
+            console.log(`[Proxy] Received start command for session ${sessionId}`);
 
-            // Forward message to client
-            clientWs.send(JSON.stringify(msg));
+            // Initialize Gemini Connection
+            geminiWs = await createGeminiConnection(
+              sessionId,
+              msg.config.systemInstruction || INTERVIEW_SYSTEM_PROMPT,
+              (geminiMsg) => {
+                if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(geminiMsg));
+              },
+              (err) => {
+                if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'error', error: { message: err.message } }));
+              },
+              () => {
+                if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'gemini_closed' }));
+              }
+            );
+
+            if (geminiWs) {
+              geminiConnections.set(clientWs, geminiWs);
+            }
+            return;
           }
-        },
-        // On error
-        (err) => {
-          if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(JSON.stringify({
-              type: 'error',
-              error: { message: err.message, code: 'GEMINI_ERROR' }
-            }));
-          }
-        },
-        // On close
-        () => {
-          if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(JSON.stringify({ type: 'gemini_closed' }));
-          }
+        } catch (e) {
+          // Not a JSON start message, treat as normal data
         }
-      );
-
-      if (geminiWs) {
-        geminiConnections.set(clientWs, geminiWs);
-        console.log(`[Proxy] ✅ Gemini WebSocket stored for session ${sessionId}, readyState: ${geminiWs.readyState}`);
-      } else {
-        console.error(`[Proxy] ❌ geminiWs is null/undefined for session ${sessionId} - connection failed!`);
-      }
-    })();
-
-    // Handle messages from client (audio frames or text)
-    let audioFrameCount = 0;
-    let lastAudioLog = Date.now();
-    let firstMessage = true;
-
-    clientWs.on('message', (data) => {
-      // Log first message to diagnose issue
-      if (firstMessage) {
-        const length = Buffer.isBuffer(data) ? data.length : (data instanceof ArrayBuffer ? data.byteLength : 'unknown');
-        console.log(`[Proxy] 🔍 First message received - type: ${typeof data}, isBuffer: ${Buffer.isBuffer(data)}, isArrayBuffer: ${data instanceof ArrayBuffer}, length: ${length}`);
-        firstMessage = false;
       }
 
-      const geminiWs = geminiConnections.get(clientWs);
-      if (!geminiWs) {
-        console.log(`[Proxy] ❌ Cannot send audio - No Gemini WebSocket found in map for session ${sessionId}`);
-        return;
-      }
-      if (geminiWs.readyState !== WebSocket.OPEN) {
-        console.log(`[Proxy] ❌ Cannot send audio - Gemini WebSocket not OPEN for session ${sessionId}, readyState: ${geminiWs.readyState}`);
-        return;
-      }
-
-      try {
-        // Check if binary (audio) or JSON (control message)
-        // WebSocket 'ws' library returns Buffer for binary data
+      // Forward other messages (audio/text) to Gemini if connected
+      if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
         if (Buffer.isBuffer(data)) {
-          audioFrameCount++;
-          const now = Date.now();
-
-          // Log every 2 seconds
-          if (now - lastAudioLog > 2000) {
-            console.log(`[Proxy] ✅ Forwarding audio to Gemini - frames: ${audioFrameCount}, bytes: ${data.length}`);
-            lastAudioLog = now;
-          }
-
-          // Binary audio data - send as realtime input
-          const audioMessage = {
+          // Audio Data
+          geminiWs.send(JSON.stringify({
             realtimeInput: {
               mediaChunks: [{
                 mimeType: 'audio/pcm;rate=16000',
                 data: data.toString('base64')
               }]
             }
-          };
-          geminiWs.send(JSON.stringify(audioMessage));
+          }));
         } else {
-          // JSON control message
-          const message = JSON.parse(data.toString());
-
-          if (message.type === 'audio') {
-            // Audio data in JSON format
-            const audioMessage = {
-              realtimeInput: {
-                mediaChunks: [{
-                  mimeType: 'audio/pcm;rate=16000',
-                  data: message.data
-                }]
-              }
-            };
-            geminiWs.send(JSON.stringify(audioMessage));
-          } else if (message.type === 'text') {
-            // Text input
-            const textMessage = {
+          // JSON Data
+          const msg = JSON.parse(data.toString());
+          if (msg.type === 'text') {
+            geminiWs.send(JSON.stringify({
               clientContent: {
-                turns: [{
-                  role: 'user',
-                  parts: [{ text: message.text }]
-                }],
+                turns: [{ role: 'user', parts: [{ text: msg.text }] }],
                 turnComplete: true
               }
-            };
-            geminiWs.send(JSON.stringify(textMessage));
-          } else if (message.type === 'end_turn') {
-            // Signal end of user turn
-            const endMessage = {
-              clientContent: {
-                turnComplete: true
-              }
-            };
-            geminiWs.send(JSON.stringify(endMessage));
-          } else if (message.type === 'keepalive') {
-            // Keepalive ping - just log it, no need to forward to Gemini
-            console.log(`[Proxy] Received keepalive ping for session ${sessionId}`);
+            }));
           }
         }
-      } catch (err) {
-        console.error('[Proxy] Error processing client message:', err);
       }
     });
 
-    // Handle client disconnect
     clientWs.on('close', () => {
       console.log(`[Proxy] Client disconnected for session ${sessionId}`);
-      const geminiWs = geminiConnections.get(clientWs);
-      if (geminiWs) {
-        geminiWs.close();
-        geminiConnections.delete(clientWs);
-      }
-      // TEMPORARILY DISABLED: Clean up audio buffer
-      // audioBuffers.delete(clientWs);
-    });
-
-    clientWs.on('error', (err) => {
-      console.error(`[Proxy] Client WebSocket error:`, err);
+      if (geminiWs) geminiWs.close();
+      geminiConnections.delete(clientWs);
     });
   });
 }

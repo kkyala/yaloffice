@@ -1,0 +1,23 @@
+John Doe
+Software Engineer
+Email: john.doe@example.com
+Phone: 123-456-7890
+
+Summary:
+Experienced Software Engineer with expertise in React, Node.js, and TypeScript. Passionate about building scalable web applications.
+
+Skills:
+- JavaScript, TypeScript, Python
+- React, Node.js, Express
+- SQL, PostgreSQL, MongoDB
+- Git, Docker, AWS
+
+Experience:
+Software Engineer at Tech Corp (2020 - Present)
+- Developed and maintained full-stack web applications using React and Node.js.
+- Improved application performance by 20%.
+- Collaborated with cross-functional teams to define requirements and deliver features.
+
+Education:
+Bachelor of Science in Computer Science
+University of Technology (2016 - 2020)

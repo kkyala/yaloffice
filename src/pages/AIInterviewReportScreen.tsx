@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useAI } from '../context/AIProvider';
 import { aiService } from '../services/aiService';
+import { config } from '../config/appConfig';
 
 // Type definitions to match what's passed from App.tsx
 type Candidate = {
@@ -132,7 +133,7 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
             <header className="page-header">
                 <h1>AI Interview Report</h1>
                 <div className="header-actions">
-                    <a href={`http://localhost:8000/api/candidates/${interviewingCandidate.id}/report/interview`} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ marginRight: '1rem' }}>Download PDF</a>
+                    <a href={`${config.apiBaseUrl}/candidates/${interviewingCandidate.id}/report/interview`} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ marginRight: '1rem' }}>Download PDF</a>
                     <button className="btn btn-secondary" onClick={handleBack}>Back to Pipeline</button>
                 </div>
             </header>

@@ -84,6 +84,18 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
     }
 
+    const [screeningStatus, setScreeningStatus] = useState<{ completed: boolean }>({ completed: false });
+
+    useEffect(() => {
+        if (currentUser?.id) {
+            // Check screening status
+            fetch(`/api/interview/screening-status/${currentUser.id}`)
+                .then(res => res.json())
+                .then(data => setScreeningStatus(data))
+                .catch(err => console.error('Failed to check screening status:', err));
+        }
+    }, [currentUser]);
+
     return (
         <>
             <header className="page-header">
@@ -146,7 +158,19 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                                 <td style={{ textAlign: 'right' }}>
                                     <button
                                         className={`btn ${appliedJobIds.has(job.id) ? 'btn-secondary' : 'btn-primary'}`}
-                                        onClick={() => onStartApplication(job)}
+                                        onClick={() => {
+                                            if (appliedJobIds.has(job.id)) return;
+
+                                            // Job-specific screening logic
+                                            if (job.screening_enabled) {
+                                                const confirmApply = window.confirm(
+                                                    "This job requires an AI Screening Interview. You will need to complete this screening before your application is reviewed by the employer.\n\nDo you want to proceed?"
+                                                );
+                                                if (!confirmApply) return;
+                                            }
+
+                                            onStartApplication(job);
+                                        }}
                                         disabled={appliedJobIds.has(job.id)}
                                         style={{ minWidth: '120px' }}
                                     >

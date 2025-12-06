@@ -135,7 +135,7 @@ const AIInterviewerParticipant = ({
 
     React.useEffect(() => {
         if (avatarVideoUrl && videoRef.current) {
-            videoRef.current.src = `http://localhost:8000${avatarVideoUrl}`;
+            videoRef.current.src = avatarVideoUrl;
             videoRef.current.play().catch(err => console.error('Error playing avatar video:', err));
         }
     }, [avatarVideoUrl]);
@@ -486,22 +486,9 @@ const ConversationRoom = ({
         { speaker: 'interviewer', text: initialGreeting, timestamp: new Date().toISOString(), isFinal: true }
     ]);
     const [isMicEnabled, setIsMicEnabled] = useState(true);
-    // Load persisted transcript on mount
-    useEffect(() => {
-        const saved = sessionStorage.getItem('livekitInterviewTranscript');
-        if (saved) {
-            try {
-                const data = JSON.parse(saved) as TranscriptEntry[];
-                setTranscript(data);
-            } catch (e) {
-                console.error('Failed to parse persisted transcript', e);
-            }
-        }
-    }, []);
-    // Persist transcript on change
-    useEffect(() => {
-        sessionStorage.setItem('livekitInterviewTranscript', JSON.stringify(transcript));
-    }, [transcript]);
+    // Removed transcript persistence to prevent stale data issues
+    // useEffect(() => { ... }, []);
+    // useEffect(() => { ... }, [transcript]);
     const isMicEnabledRef = useRef(true); // Ref for AudioWorklet access
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
@@ -529,7 +516,20 @@ const ConversationRoom = ({
             }
 
             console.log('[ConversationRoom] Connecting to WebSocket...');
-            ws = new WebSocket(`ws://localhost:8000/ws/gemini-proxy?sessionId=${sessionId}`);
+            const wsBase = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+            let wsUrl = '';
+            if (wsBase.startsWith('ws')) {
+                wsUrl = `${wsBase}/ws/gemini-proxy?sessionId=${sessionId}`;
+            } else {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.host;
+                // If wsBase is /ws, we want /ws/gemini-proxy. If it's empty, we want /ws/gemini-proxy?
+                // Let's assume if it's relative, it replaces the /ws prefix logic or we need to be careful.
+                // If VITE_WS_URL=/ws, then we want /ws/gemini-proxy.
+                // If we append /gemini-proxy, it works.
+                wsUrl = `${protocol}//${host}${wsBase}/gemini-proxy?sessionId=${sessionId}`;
+            }
+            ws = new WebSocket(wsUrl);
             (window as any).__geminiWs = ws;
 
             ws.onopen = () => {
@@ -1148,6 +1148,7 @@ export default function LiveKitInterviewScreen({
             setInterviewState('connecting');
 
             // 2. Create LiveKit room and get token
+            // Use a consistent room name logic or let the service handle it
             const roomConfig = livekitService.createInterviewRoomConfig(
                 currentApplicationId,
                 interviewingCandidate.jobId,

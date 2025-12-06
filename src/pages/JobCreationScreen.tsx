@@ -19,8 +19,13 @@ export default function JobCreationScreen({ onCancelJobAction, jobToEdit, onSave
     const recruiters = useMemo(() => usersData.filter(u => u.role === 'Recruiter' || u.role === 'Agent'), [usersData]);
     const [recruitmentManager, setRecruitmentManager] = useState(isEditing ? jobToEdit.recruitment_manager || '' : recruiters[0]?.name || '');
     const [primaryRecruiter, setPrimaryRecruiter] = useState(isEditing ? jobToEdit.primary_recruiter || '' : recruiters[1]?.name || '');
+
+    // Screening Config State
+    const [screeningEnabled, setScreeningEnabled] = useState(isEditing ? jobToEdit.screening_enabled || false : false);
+    const [screeningQuestions, setScreeningQuestions] = useState(isEditing ? (jobToEdit.screening_config?.questions || '') : '');
+
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // --- HANDLERS ---
     const handleAddSkill = (e) => {
         if (e.key === 'Enter' && newSkill.trim() !== '') {
@@ -61,13 +66,22 @@ export default function JobCreationScreen({ onCancelJobAction, jobToEdit, onSave
             interviewed: isEditing ? jobToEdit.interviewed : 0,
             salaryMin: isEditing ? jobToEdit.salaryMin : 0,
             salaryMax: isEditing ? jobToEdit.salaryMax : 0,
+            screening_enabled: screeningEnabled,
+            screening_config: {
+                questions: screeningQuestions
+            }
         };
-        
+
         const result = await onSaveJob(jobPayload);
 
         if (!result?.success) {
             setIsLoading(false);
-            alert(result?.error || 'Failed to save the job. Please try again.');
+            const errorMessage = result?.error || 'Failed to save the job. Please try again.';
+            if (errorMessage.includes('Could not find') && errorMessage.includes('column')) {
+                alert('Database Schema Error: Missing columns in the "jobs" table.\n\nPlease run the SQL script located at "backend/update_schema.sql" in your Supabase Dashboard SQL Editor to fix this.');
+            } else {
+                alert(errorMessage);
+            }
         }
         // On success, App.tsx handles navigation, and this component will unmount.
     };
@@ -109,9 +123,34 @@ export default function JobCreationScreen({ onCancelJobAction, jobToEdit, onSave
                         </div>
 
                         <div className="form-section">
-                             <h3 className="form-section-header">Job Content</h3>
+                            <h3 className="form-section-header">Job Content</h3>
                             <div className="form-group"><label htmlFor="job-description">Job Description*</label><textarea id="job-description" value={jobDescription} onChange={e => setJobDescription(e.target.value)} rows={8}></textarea></div>
-                            <div className="form-group"><label htmlFor="skills">Required Skills*</label><div className="skills-input-container"><div className="skills-tags">{skills.map(skill => (<div key={skill} className="tag">{skill}<button onClick={() => handleRemoveSkill(skill)}>&times;</button></div>))}<input type="text" id="skills" value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={handleAddSkill} placeholder="Add a skill and press Enter"/></div></div></div>
+                            <div className="form-group"><label htmlFor="skills">Required Skills*</label><div className="skills-input-container"><div className="skills-tags">{skills.map(skill => (<div key={skill} className="tag">{skill}<button onClick={() => handleRemoveSkill(skill)}>&times;</button></div>))}<input type="text" id="skills" value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={handleAddSkill} placeholder="Add a skill and press Enter" /></div></div></div>
+                        </div>
+                        <div className="form-section">
+                            <h3 className="form-section-header">Screening Configuration</h3>
+                            <div className="form-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={screeningEnabled}
+                                        onChange={e => setScreeningEnabled(e.target.checked)}
+                                    />
+                                    Enable AI Screening for this Job
+                                </label>
+                            </div>
+                            {screeningEnabled && (
+                                <div className="form-group">
+                                    <label htmlFor="screening-questions">Screening Questions / Criteria</label>
+                                    <textarea
+                                        id="screening-questions"
+                                        value={screeningQuestions}
+                                        onChange={e => setScreeningQuestions(e.target.value)}
+                                        rows={5}
+                                        placeholder="Enter specific questions or criteria the AI should focus on during the screening interview..."
+                                    ></textarea>
+                                </div>
+                            )}
                         </div>
                     </fieldset>
                 </div>

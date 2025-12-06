@@ -8,6 +8,29 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3001,
       host: '0.0.0.0',
+      allowedHosts: ["stasia-mediastinal-fathomlessly.ngrok-free.dev"],
+      proxy: {
+        "/api": {
+          target: "http://localhost:8000",
+          changeOrigin: true,
+          secure: false
+        },
+        "/ws": {
+          target: "ws://localhost:8000",
+          changeOrigin: true,
+          ws: true
+        },
+        "/livekit": {
+          target: "http://localhost:7880",
+          changeOrigin: true,
+          ws: true,
+          rewrite: (path) => path.replace(/^\/livekit/, ""),
+        },
+        "/avatar_output": {
+          target: "http://localhost:8000",
+          changeOrigin: true
+        }
+      },
     },
     plugins: [react()],
     define: {

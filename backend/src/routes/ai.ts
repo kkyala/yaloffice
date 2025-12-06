@@ -48,6 +48,17 @@ router.post('/screening/report', async (req: Request, res: Response) => {
           .update({ interview_config: newConfig })
           .eq('id', applicationId);
       }
+    } else if (req.body.userId) {
+      // If userId is provided (initial screening), update the user profile
+      const userId = req.body.userId;
+      await supabase
+        .from('users')
+        .update({
+          screening_status: 'completed',
+          screening_report: report,
+          screening_transcript: transcript
+        })
+        .eq('id', userId);
     }
 
     // Audit Log
@@ -353,6 +364,115 @@ router.post('/screening/chat', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[AI Routes] Screening chat error:', error);
     res.status(500).json({ error: 'Failed to chat', message: error.message });
+  }
+});
+
+/**
+ * POST /api/ai/screening/finalize
+ * Finalize screening session, generate report, and save to screening_assessments
+ */
+router.post('/screening/finalize', async (req: Request, res: Response) => {
+  try {
+    const { transcript, candidateName, userId, jobTitle, jobId } = req.body;
+    if (!transcript || !candidateName || !userId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Generate report
+    const report = await aiService.generateScreeningReport(transcript, candidateName);
+
+    // Save to screening_assessments table
+    const { interviewStore } = await import('../services/interviewStore.js');
+    await interviewStore.saveScreeningAssessment({
+      userId,
+      jobTitle: jobTitle || 'General Application',
+      jobId,
+      score: report.score,
+      summary: report.summary,
+      strengths: report.keyStrengths || report.strengths,
+      weaknesses: report.areasForImprovement || report.weaknesses,
+      skillsAnalysis: report.skillsAssessment || report.skillsAnalysis,
+      transcript: transcript
+    });
+
+    // Audit Log
+    await auditLogger.log({
+      userId,
+      action: 'screening_finalized',
+      resourceType: 'screening_assessment',
+      details: { candidate: candidateName, score: report.score }
+    });
+
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    console.error('[AI Routes] Screening finalize error:', error);
+    res.status(500).json({ error: 'Failed to finalize screening', message: error.message });
+  }
+});
+
+/**
+ * POST /api/ai/resume/process-screening
+ * Process resume through AI conversation and save to screening_assessments
+ * This is called automatically after resume upload
+ */
+router.post('/resume/process-screening', async (req: Request, res: Response) => {
+  try {
+    const { resumeData, userId, candidateName, candidateEmail, jobTitle, jobId } = req.body;
+
+    if (!resumeData || !userId || !candidateName || !candidateEmail) {
+      return res.status(400).json({
+        error: 'Missing required fields: resumeData, userId, candidateName, candidateEmail'
+      });
+    }
+
+    // Process resume through AI screening
+    const assessment = await aiService.processResumeScreening(
+      resumeData,
+      candidateName,
+      candidateEmail,
+      jobTitle,
+      jobId
+    );
+
+    // Save to screening_assessments table
+    const { interviewStore } = await import('../services/interviewStore.js');
+    await interviewStore.saveScreeningAssessment({
+      userId,
+      jobTitle: jobTitle || 'General Application',
+      jobId,
+      score: assessment.score,
+      summary: assessment.summary,
+      strengths: assessment.strengths,
+      weaknesses: assessment.weaknesses,
+      skillsAnalysis: assessment.skillsAnalysis,
+      transcript: assessment.transcript
+    });
+
+    // Audit Log
+    await auditLogger.log({
+      userId,
+      action: 'resume_screening_processed',
+      resourceType: 'screening_assessment',
+      details: {
+        candidateName,
+        score: assessment.score,
+        jobTitle: jobTitle || 'General Application'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        assessment,
+        message: 'Resume screening completed and saved'
+      }
+    });
+  } catch (error: any) {
+    console.error('[AI Routes] Process resume screening error:', error);
+    res.status(500).json({
+      error: 'Failed to process resume screening',
+      message: error.message
+    });
   }
 });
 

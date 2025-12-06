@@ -1,5 +1,6 @@
 import { config } from '../config/appConfig';
 
+
 const API_BASE_URL = config.apiBaseUrl || 'http://localhost:8000/api';
 
 class ApiService {
@@ -61,6 +62,19 @@ class ApiService {
         }
     }
 
+    private async logAudit(userId: string, action: string, details: any) {
+        try {
+            await this.post('/audit-logs', {
+                user_id: userId,
+                action,
+                details,
+                timestamp: new Date().toISOString()
+            });
+        } catch (err) {
+            console.error('Exception logging audit:', err);
+        }
+    }
+
     // Auth
     async login(credentials: any) {
         const { data, error } = await this.request('/auth/login', {
@@ -70,6 +84,10 @@ class ApiService {
 
         if (data?.session?.access_token) {
             this.setToken(data.session.access_token);
+            // Log login
+            if (data.user) {
+                this.logAudit(data.user.id, 'LOGIN', { email: data.user.email, role: data.user.role || 'User' });
+            }
         }
         return { data, error };
     }
@@ -82,6 +100,10 @@ class ApiService {
 
         if (data?.session?.access_token) {
             this.setToken(data.session.access_token);
+            // Log signup
+            if (data.user) {
+                this.logAudit(data.user.id, 'SIGNUP', { email: data.user.email, role: payload.options?.data?.role });
+            }
         }
         return { data, error };
     }

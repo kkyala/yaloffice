@@ -152,7 +152,9 @@ export default function App() {
     }, []);
 
     useEffect(() => {
+        console.log('Session changed:', session);
         if (!session?.user) {
+            console.log('No session user, stopping load');
             setIsLoading(false);
             return;
         }
@@ -160,25 +162,17 @@ export default function App() {
         let isMounted = true;
 
         const loadInitialData = async () => {
+            console.log('Loading initial data for user:', session.user.id);
             setIsLoading(true);
             const { data: userProfile, error: profileError } = await api.get(`/users/${session.user.id}`);
+            console.log('User profile fetch result:', { userProfile, profileError });
 
             if (!isMounted) return;
 
             let finalUserProfile = userProfile;
 
             if (profileError || !userProfile) {
-                // Profile not found logic
-                // Since we are using custom API, we might need to handle this differently.
-                // For now, if profile missing, we try to create it if we have metadata
-                // But session.user might not have metadata if it came from our custom login
-                // Let's assume login returns profile or we create it on signup
-
                 console.warn('User profile not found.');
-                // Try to create if we have info (e.g. from signup response)
-                // But here we just have session. 
-                // If profile is missing, we might need to logout or redirect to a "complete profile" page
-                // For now, logout
                 handleError(new Error('User profile not found'), 'fetching user profile');
                 await api.logout();
                 setSession(null);
@@ -188,9 +182,11 @@ export default function App() {
             setCurrentUser(finalUserProfile);
             if (finalUserProfile && !currentPage) {
                 const initialPage = roleConfig[finalUserProfile.role]?.defaultPage || 'dashboard';
+                console.log('Setting initial page:', initialPage);
                 setCurrentPage(initialPage);
                 setActiveParent(initialPage);
             }
+
 
             const promises = [
                 refetchUsers(),
@@ -223,7 +219,10 @@ export default function App() {
     }, [session, refetchCandidates]); // Removed currentPage to prevent re-running on navigation
 
     const handleLogin = async ({ email, password }: { email: string; password: string; }) => {
-        const { error } = await api.login({ email, password });
+        const { data, error } = await api.login({ email, password });
+        if (!error && data?.session) {
+            setSession(data.session);
+        }
         return { success: !error, error: error ? getErrorMessage(error) : null };
     };
     const handleSignup = async ({ email, password, fullName, role, mobileNumber }: { email: string; password: string; fullName: string; role: string; mobileNumber: string; }) => {
@@ -285,18 +284,36 @@ export default function App() {
         return { success: true };
     };
 
-    const handleSaveResume = async (resumeData: any) => {
+    const handleSaveResume = async (resumeData: any, file?: File) => {
         if (!currentUser) return { success: false, error: 'User not logged in.' };
 
         try {
-            const { data, error } = await api.post('/resumes', { user_id: currentUser.id, parsed_data: resumeData });
+            let filePayload = {};
+            if (file) {
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = error => reject(error);
+                });
+                filePayload = {
+                    file_content: base64,
+                    file_type: file.type,
+                    file_name: file.name
+                };
+            }
+
+            const { error } = await api.post('/resumes', {
+                user_id: currentUser.id,
+                parsed_data: resumeData,
+                ...filePayload
+            });
 
             if (error) throw error;
 
-            // Always update profile with resume data
+            // Update user profile with resume details if missing
             const updates: any = {};
-            if (resumeData.personalInfo?.name) updates.name = resumeData.personalInfo.name;
-            if (resumeData.personalInfo?.phone) updates.mobile = resumeData.personalInfo.phone;
+            if (resumeData.personalInfo?.phone) updates.mobile_number = resumeData.personalInfo.phone;
             if (resumeData.personalInfo?.city) updates.city = resumeData.personalInfo.city;
             if (resumeData.personalInfo?.state) updates.state = resumeData.personalInfo.state;
             if (resumeData.personalInfo?.linkedin) updates.linkedin_url = resumeData.personalInfo.linkedin;
@@ -323,9 +340,14 @@ export default function App() {
             interviewStatus: 'finished',
             aiScore: score,
             transcript,
-            analysis
+            analysis,
+            completedAt: new Date().toISOString()
         };
-        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
+        // Update status to 'Interviewing' if not already, and mark interview as completed
+        const { error } = await api.put(`/candidates/${applicationId}`, { 
+            interview_config: newConfig,
+            status: appData.status === 'Interviewing' ? appData.status : 'Interviewing' // Keep status as Interviewing after completion
+        });
         if (error) handleError(error, 'saving interview results'); else await refetchCandidates();
     };
     const handleSaveAssessmentResults = async (applicationId: number, assessmentData: any) => {
@@ -344,7 +366,55 @@ export default function App() {
     const handleScheduleInterview = async (applicationId: number, config: any) => {
         const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching app for schedule'); return { success: false }; }
-        const newConfig = { ...(appData.interview_config || {}), ...config, scheduledAt: new Date().toISOString() }; // Add scheduledAt
+
+        // Check if this is for screening assignment (status is 'Screening' and no screeningStatus)
+        const isScreeningAssignment = appData.status === 'Screening' && !appData.interview_config?.screeningStatus;
+
+        if (isScreeningAssignment) {
+            // Agent is assigning audio screening
+            // Set screening status to 'assigned' and prepare for audio screening
+            const newConfig = {
+                ...(appData.interview_config || {}),
+                ...config,
+                screeningStatus: 'assigned',
+                screeningType: 'audio', // Audio screening
+                scheduledAt: new Date().toISOString()
+            };
+
+            const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
+            if (error) { handleError(error, 'assigning screening'); return { success: false }; }
+            await refetchCandidates();
+            return { success: true };
+        }
+
+        // For interview scheduling, check if screening is completed
+        if (appData.status === 'Screening' || appData.status === 'Sourced') {
+            // Check screening status from screening_assessments table
+            try {
+                const { data: screeningStatus } = await api.get(`/interview/screening-status/${appData.user_id || appData.candidate_id}`);
+                
+                if (!screeningStatus?.completed) {
+                    return { 
+                        success: false, 
+                        error: 'Screening assessment must be completed before scheduling interview. Please ensure the candidate has completed their initial screening.' 
+                    };
+                }
+            } catch (err) {
+                console.warn('Could not verify screening status:', err);
+                // Continue anyway, but log the warning
+            }
+        }
+
+        // Ensure interviewStatus is set if not provided in config, default to 'assessment_pending' for scheduling
+        const statusToSet = config.interviewStatus || 'assessment_pending';
+
+        const newConfig = {
+            ...(appData.interview_config || {}),
+            ...config,
+            interviewStatus: statusToSet,
+            scheduledAt: new Date().toISOString()
+        };
+
         const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) { handleError(error, 'scheduling interview'); return { success: false }; }
         await refetchCandidates();
@@ -375,10 +445,43 @@ export default function App() {
         if (existingApps && existingApps.length > 0) return { success: false, error: 'You have already applied for this job.' };
 
         const applicationPayload = { jobId: job.id, name: profileData.name, dob: profileData.dob, role: job.title, status: 'Applied', resumeSummary: profileData.summary, source: profileData.source, user_id: currentUser.id };
-        const { error: appError } = await api.post('/candidates', applicationPayload);
+        const { data: newApp, error: appError } = await api.post('/candidates', applicationPayload);
         if (appError) return { success: false, error: getErrorMessage(appError) };
+
+        // After applying, trigger job-specific resume screening if resume exists
+        // Get the latest resume for this user
+        try {
+            const { data: resumes } = await api.get(`/resumes/${currentUser.id}`);
+            if (resumes && resumes.length > 0) {
+                const latestResume = resumes[0];
+                if (latestResume.parsed_data) {
+                    // Trigger job-specific screening assessment
+                    // This happens asynchronously, so we don't wait for it
+                    const apiBase = process.env.VITE_API_URL || 'http://localhost:8000';
+                    fetch(`${apiBase}/api/ai/resume/process-screening`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            resumeData: latestResume.parsed_data,
+                            userId: currentUser.id,
+                            candidateName: profileData.name || currentUser.name,
+                            candidateEmail: currentUser.email,
+                            jobTitle: job.title,
+                            jobId: job.id
+                        })
+                    }).catch(err => {
+                        console.warn('Failed to trigger job-specific screening:', err);
+                        // Don't fail the application if screening fails
+                    });
+                }
+            }
+        } catch (err) {
+            console.warn('Could not trigger job-specific screening:', err);
+            // Continue anyway
+        }
+
         await refetchCandidates();
-        return { success: true };
+        return { success: true, applicationId: newApp?.id, data: newApp };
     };
 
     const handleSaveJob = async (jobData: any) => {
@@ -522,7 +625,6 @@ export default function App() {
                         user={currentUser}
                         initialTab={profileModalTab}
                         onClose={() => setProfileModalTab(null)}
-                        onChangeUsername={async (newName) => handleUpdateUserProfile({ name: newName })}
                         onChangePassword={async (newPassword) => {
                             const { error } = await api.put(`/users/${currentUser.id}`, { password: newPassword });
                             return { success: !error, error: error ? getErrorMessage(error) : undefined };
@@ -530,7 +632,7 @@ export default function App() {
                     />
                 )}
             </div>
-            {currentUser?.role === 'Candidate' && <FloatingAIChatWidget />}
+            {currentUser?.role === 'Candidate' && currentPage !== 'screening-session' && <FloatingAIChatWidget />}
         </AIProvider>
     );
 }

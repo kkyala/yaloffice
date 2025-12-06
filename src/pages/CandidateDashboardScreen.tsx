@@ -135,31 +135,7 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
     };
 
     const renderActionButton = (app: CandidateApplication) => {
-        if (!['Applied', 'Sourced', 'Screening', 'Interviewing'].includes(app.status)) {
-            return null;
-        }
-
         const interviewStatus = app.interview_config?.interviewStatus;
-
-        if (app.status === 'Screening' && !interviewStatus) {
-            return <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Awaiting Interview Setup</span>;
-        }
-
-        if (interviewStatus === 'assessment_pending' || interviewStatus === 'pending') {
-            return (
-                <button className="btn btn-primary btn-sm" onClick={() => handleStartAssessment(app)}>
-                    Start Pre-Interview Assessment
-                </button>
-            );
-        }
-
-        if (interviewStatus === 'assessment_completed' || interviewStatus === 'started') {
-            return (
-                <button className="btn btn-primary btn-sm" onClick={() => handleTakeInterview(app)}>
-                    {interviewStatus === 'assessment_completed' ? 'Start AI Interview' : 'Continue Interview'}
-                </button>
-            );
-        }
 
         if (interviewStatus === 'finished') {
             return (
@@ -169,33 +145,44 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
             );
         }
 
+        if (interviewStatus === 'assessment_completed' || interviewStatus === 'started') {
+            return (
+                <button className="btn btn-primary btn-sm" onClick={() => handleTakeInterview(app)}>
+                    Continue {app.status === 'Screening' ? 'Screening' : 'Interview'}
+                </button>
+            );
+        }
+
+        // Screening: Allow start if not finished/started (even if setup is pending or missing)
+        if (app.status === 'Screening') {
+            return (
+                <button className="btn btn-primary btn-sm" onClick={() => handleStartAssessment(app)}>
+                    Start Screening Interview
+                </button>
+            );
+        }
+
+        // Interviewing: Needs explicit setup
+        if (app.status === 'Interviewing') {
+            if (interviewStatus === 'assessment_pending' || interviewStatus === 'pending') {
+                return (
+                    <button className="btn btn-primary btn-sm" onClick={() => handleStartAssessment(app)}>
+                        Start Interview
+                    </button>
+                );
+            }
+            // If no status, it means awaiting setup
+            return <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Awaiting Interview Setup</span>;
+        }
+
         return null;
     };
-
-
 
     // Sorting UI
     const renderSortIcon = (key: string) => {
         if (sortConfig.key !== key) return null;
         return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
     };
-
-    const renderApplicationRow = (app: CandidateApplication) => (
-        <tr key={app.id} className="animate-fade-in">
-            <td>
-                <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{app.jobTitle}</strong>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0' }}>{app.company}</p>
-            </td>
-            <td>
-                <span className={`status-badge status-${app.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}>
-                    {app.status}
-                </span>
-            </td>
-            <td style={{ textAlign: 'right' }}>
-                {renderActionButton(app)}
-            </td>
-        </tr>
-    );
 
     return (
         <>
@@ -204,57 +191,86 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
                 <h1>My Applications</h1>
             </header>
 
-            {/* Search Bar */}
-            <div className="search-bar" style={{ marginBottom: '1.5rem', position: 'relative', width: '100%', maxWidth: '400px' }}>
-                <input
-                    type="text"
-                    placeholder="Search by job, company, or status..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem 2.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--surface-color)', fontSize: '0.9rem' }}
-                />
-                <SearchIcon style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', width: '16px' }} />
+            <div className="table-controls" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="search-bar glass-panel" style={{ position: 'relative', width: '350px', padding: '0', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden' }}>
+                    <input
+                        type="text"
+                        placeholder="Search by job, company, or status..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        style={{
+                            paddingLeft: '2.75rem',
+                            width: '100%',
+                            border: 'none',
+                            background: 'transparent',
+                            height: '46px'
+                        }}
+                    />
+                    <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-color)' }}>
+                        <SearchIcon style={{ width: '18px', height: '18px' }} />
+                    </div>
+                </div>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                    Showing <strong style={{ color: 'var(--text-primary)' }}>{currentItems.length}</strong> of {processedApplications.length} applications
+                </div>
             </div>
 
-            {/* Scheduled Interviews Section */}
-            {scheduledApps.length > 0 && (
-                <section style={{ marginBottom: '2rem' }}>
-                    <h2 style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>Scheduled Interviews</h2>
-                    <div className="table-container">
-                        <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
-                            <thead>
-                                <tr>
-                                    <th onClick={() => handleSort('jobTitle')} style={{ cursor: 'pointer' }}>Job Title {renderSortIcon('jobTitle')}</th>
-                                    <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {renderSortIcon('status')}</th>
-                                    <th style={{ textAlign: 'right' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {scheduledApps.map(renderApplicationRow)}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            )}
-
-            {/* All Other Applications Section */}
-            <section>
-                <h2 style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>All Applications</h2>
-                <div className="table-container">
-                    <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
-                        <thead>
-                            <tr>
-                                <th onClick={() => handleSort('jobTitle')} style={{ cursor: 'pointer' }}>Job Title {renderSortIcon('jobTitle')}</th>
-                                <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {renderSortIcon('status')}</th>
-                                <th style={{ textAlign: 'right' }}>Actions</th>
+            <div className="table-container">
+                <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
+                    <thead>
+                        <tr>
+                            <th onClick={() => handleSort('jobTitle')} style={{ cursor: 'pointer', userSelect: 'none' }}>Job Title {renderSortIcon('jobTitle')}</th>
+                            <th onClick={() => handleSort('company')} style={{ cursor: 'pointer', userSelect: 'none' }}>Company {renderSortIcon('company')}</th>
+                            <th onClick={() => handleSort('status')} style={{ cursor: 'pointer', userSelect: 'none' }}>Status {renderSortIcon('status')}</th>
+                            <th style={{ textAlign: 'right' }}>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {currentItems.length > 0 ? currentItems.map(app => (
+                            <tr key={app.id} className="animate-fade-in">
+                                <td>
+                                    <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{app.jobTitle}</strong>
+                                </td>
+                                <td>{app.company}</td>
+                                <td>
+                                    <span className={`status-badge status-${app.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}>
+                                        {app.status}
+                                    </span>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                    {renderActionButton(app)}
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {otherApps.map(renderApplicationRow)}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+                        )) : (
+                            <tr>
+                                <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
+                                    {searchTerm ? 'No applications match your search.' : 'You have not applied to any jobs yet.'}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+
+                {totalPages > 1 && (
+                    <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                        <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronLeftIcon style={{ width: '16px', height: '16px' }} /> Previous
+                        </button>
+                        <span style={{ fontSize: '0.9rem' }}>Page {currentPage} of {totalPages}</span>
+                        <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next <ChevronRightIcon style={{ width: '16px', height: '16px' }} />
+                        </button>
+                    </div>
+                )}
+            </div>
         </>
     );
 }

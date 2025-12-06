@@ -9,6 +9,7 @@ type Candidate = {
 type Job = {
     id: number;
     title: string;
+    screening_enabled?: boolean;
 };
 type PreInterviewAssessmentScreenProps = {
     interviewingCandidate: Candidate | null;
@@ -68,7 +69,14 @@ export default function PreInterviewAssessmentScreen({
 
         const result = await onSaveAssessmentResults(currentApplicationId, assessmentData);
         if (result.success) {
-            onNavigate('dashboard', 'dashboard');
+            // Check if job requires AI screening
+            // Note: job object is available in scope
+            if (job.screening_enabled) {
+                // Redirect to AI Screening Session
+                onNavigate('screening-session', 'dashboard');
+            } else {
+                onNavigate('dashboard', 'dashboard');
+            }
         } else {
             setError('There was an error submitting your assessment. Please try again.');
             setIsLoading(false);

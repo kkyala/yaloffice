@@ -45,10 +45,20 @@ class InterviewService {
   private sessionId: string | null = null;
 
   /**
+   * Helper to construct API URL
+   */
+  private getApiUrl(endpoint: string): string {
+    if (API_BASE.endsWith('/api')) {
+      return `${API_BASE}${endpoint.replace(/^\/api/, '')}`;
+    }
+    return `${API_BASE}${endpoint}`;
+  }
+
+  /**
    * Start a new interview session
    */
   async startInterview(config: InterviewConfig): Promise<InterviewSession> {
-    const response = await fetch(`${API_BASE}/api/interview/start`, {
+    const response = await fetch(this.getApiUrl('/api/interview/start'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config)
@@ -75,7 +85,15 @@ class InterviewService {
       onClose: () => void;
     }
   ): void {
-    const wsUrl = `${WS_BASE}/ws/gemini-proxy?sessionId=${sessionId}`;
+    const wsBase = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+    let wsUrl = '';
+    if (wsBase.startsWith('ws')) {
+      wsUrl = `${wsBase}/ws/gemini-proxy?sessionId=${sessionId}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      wsUrl = `${protocol}//${host}${wsBase}/gemini-proxy?sessionId=${sessionId}`;
+    }
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
@@ -163,7 +181,7 @@ class InterviewService {
       throw new Error('No active session');
     }
 
-    const response = await fetch(`${API_BASE}/api/interview/stop`, {
+    const response = await fetch(this.getApiUrl('/api/interview/stop'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: this.sessionId })
@@ -186,7 +204,7 @@ class InterviewService {
     currentQuestionIndex: number;
     questionCount: number;
   }> {
-    const response = await fetch(`${API_BASE}/api/interview/status/${sessionId}`);
+    const response = await fetch(this.getApiUrl(`/api/interview/status/${sessionId}`));
 
     if (!response.ok) {
       throw new Error('Failed to get status');

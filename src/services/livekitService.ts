@@ -60,8 +60,10 @@ class LiveKitService {
      */
     async getAccessToken(roomConfig: LiveKitRoomConfig): Promise<LiveKitToken> {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const endpoint = '/api/livekit/token';
+        const url = apiUrl.endsWith('/api') ? `${apiUrl}${endpoint.replace(/^\/api/, '')}` : `${apiUrl}${endpoint}`;
 
-        const response = await fetch(`${apiUrl}/api/livekit/token`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -79,9 +81,18 @@ class LiveKitService {
         }
 
         const data = await response.json();
+        let livekitUrl = this.url || data.url;
+
+        // Convert relative URL to absolute WebSocket URL
+        if (livekitUrl && livekitUrl.startsWith('/')) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            livekitUrl = `${protocol}//${host}${livekitUrl}`;
+        }
+
         return {
             token: data.token,
-            url: data.url || this.url,
+            url: livekitUrl,
         };
     }
 

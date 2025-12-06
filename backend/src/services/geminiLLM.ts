@@ -90,12 +90,14 @@ class GeminiLLMService {
    */
   async analyzeInterview(
     transcript: string,
-    jobTitle: string
+    jobTitle: string,
+    resumeText?: string
   ): Promise<{
     score: number;
     summary: string;
     strengths: string[];
-    improvements: string[];
+    weaknesses: string[];
+    skills_analysis?: Array<{ skill: string; score: number; reason: string }>;
   }> {
     this.initialize();
 
@@ -108,18 +110,27 @@ class GeminiLLMService {
       model: 'gemini-2.0-flash-exp'
     });
 
-    const prompt = `Analyze this interview transcript for a "${jobTitle}" position.
+    const resumeContext = resumeText ? `\nResume Context:\n${resumeText}\n` : '';
 
-Transcript:
-${transcript}
+    const prompt = `Analyze this screening interview transcript for a "${jobTitle}" position.
+    The goal is to evaluate the candidate's skills and experience based on their resume and the conversation.
+    
+    ${resumeContext}
 
-Provide a JSON response with:
-- score: number from 1.0 to 10.0
-- summary: 2-3 sentence overall assessment
-- strengths: array of 2-3 strong points
-- improvements: array of 2-3 areas to improve
+    Transcript:
+    ${transcript}
 
-Respond ONLY with valid JSON, no markdown.`;
+    Provide a JSON response with:
+    - score: number from 0 to 100 (integer) representing overall fit
+    - summary: 2-3 sentence professional assessment of the candidate's suitability
+    - strengths: array of 2-3 key technical or soft skill strengths demonstrated
+    - weaknesses: array of 2-3 areas for improvement or missing skills
+    - skills_analysis: array of objects, each containing:
+        - skill: string (name of the skill from resume or discussed)
+        - score: number (0-100)
+        - reason: short string explaining the score based on evidence from the chat
+
+    Respond ONLY with valid JSON, no markdown.`;
 
     const result = await analysisModel.generateContent(prompt);
     const responseText = result.response.text();
@@ -135,10 +146,10 @@ Respond ONLY with valid JSON, no markdown.`;
     } catch (err) {
       console.error('Failed to parse analysis:', err);
       return {
-        score: 5.0,
-        summary: 'Analysis could not be completed.',
+        score: 50,
+        summary: 'Analysis could not be completed due to an error.',
         strengths: [],
-        improvements: []
+        weaknesses: []
       };
     }
   }

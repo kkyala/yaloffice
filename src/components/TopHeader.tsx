@@ -53,15 +53,15 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isLangOpen, setIsLangOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-    
+
     const profileRef = useRef(null);
     const langRef = useRef(null);
     const notifRef = useRef(null);
-    
+
     useClickOutside(profileRef, () => setIsProfileOpen(false));
     useClickOutside(langRef, () => setIsLangOpen(false));
     useClickOutside(notifRef, () => setIsNotificationsOpen(false));
-    
+
     const handleProfileItemClick = (action) => {
         if (action === 'logout') {
             onLogout();
@@ -78,12 +78,21 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
         setIsLangOpen(false); // Close dropdown on selection
     };
 
-    // Mock notifications
+    // Mock notifications - In a real app, these would come from an API or websocket
     const notifications = [
-        { id: 1, text: "New candidate applied for Java Dev", time: "10m ago", unread: true },
-        { id: 2, text: "Interview scheduled with Sarah", time: "1h ago", unread: true },
-        { id: 3, text: "Weekly report is ready", time: "1d ago", unread: false },
+        { id: 1, text: `New candidate applied for ${user?.role === 'Employer' ? 'Senior React Dev' : 'Job Application'}`, time: "10m ago", unread: true, type: 'application' },
+        { id: 2, text: "Interview scheduled with Sarah", time: "1h ago", unread: true, type: 'interview' },
+        { id: 3, text: "Weekly recruitment report is ready", time: "1d ago", unread: false, type: 'system' },
     ];
+
+    const getNotificationIcon = (type) => {
+        switch (type) {
+            case 'application': return '📄';
+            case 'interview': return '📅';
+            case 'system': return '🔔';
+            default: return '●';
+        }
+    };
 
     return (
         <header className="top-header">
@@ -117,9 +126,12 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                             </div>
                             <ul style={{ maxHeight: '300px', overflowY: 'auto' }}>
                                 {notifications.map(n => (
-                                    <li key={n.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', backgroundColor: n.unread ? 'var(--primary-light-color)' : 'transparent', cursor: 'pointer' }}>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: n.unread ? '600' : '400' }}>{n.text}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{n.time}</div>
+                                    <li key={n.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', backgroundColor: n.unread ? 'var(--primary-light-color)' : 'transparent', cursor: 'pointer', display: 'flex', gap: '0.75rem', alignItems: 'start' }}>
+                                        <div style={{ fontSize: '1.2rem', marginTop: '0.1rem' }}>{getNotificationIcon(n.type)}</div>
+                                        <div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: n.unread ? '600' : '400', color: 'var(--text-primary)' }}>{n.text}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{n.time}</div>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -129,7 +141,7 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                         </div>
                     )}
                 </div>
-                
+
                 <div className="language-selector" ref={langRef}>
                     <button className="toolbar-icon" onClick={() => setIsLangOpen(!isLangOpen)} aria-haspopup="true" aria-expanded={isLangOpen}>
                         <GlobeIcon />
@@ -139,9 +151,9 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                             <ul>
                                 {languages.map(lang => (
                                     <li key={lang.code}>
-                                        <a href="#" onClick={handleLanguageSelect}>
-                                            <span className="flag-icon" role="img" aria-label={lang.name}>{lang.flag}</span>
-                                            {lang.name}
+                                        <a href="#" onClick={handleLanguageSelect} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span className="flag-icon" role="img" aria-label={lang.name} style={{ fontSize: '1.2rem' }}>{lang.flag}</span>
+                                            <span>{lang.name}</span>
                                         </a>
                                     </li>
                                 ))}
@@ -155,12 +167,12 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                 </button>
 
                 <div className="user-profile-menu" ref={profileRef}>
-                    <div onClick={() => setIsProfileOpen(!isProfileOpen)} style={{display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '2px'}} role="button" aria-haspopup="true" aria-expanded={isProfileOpen}>
+                    <div onClick={() => setIsProfileOpen(!isProfileOpen)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '2px' }} role="button" aria-haspopup="true" aria-expanded={isProfileOpen}>
                         <img src={`https://i.pravatar.cc/40?u=${user?.email || 'user'}`} alt={user?.name || 'User'} />
                     </div>
-                     {isProfileOpen && (
+                    {isProfileOpen && (
                         <div className="dropdown-menu" style={{ width: '220px' }}>
-                             <div style={{ padding: '1rem 1rem 0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+                            <div style={{ padding: '1rem 1rem 0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Hello,</div>
                                 <div style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name || 'User'}</div>
                             </div>

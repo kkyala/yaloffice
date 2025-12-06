@@ -139,8 +139,72 @@ class AIService {
       safeMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
     const prompt = isWord
-      ? `Parse this Word resume into structured JSON with: personalInfo, summary, experience[], education[], skills[].`
-      : `Parse this resume (PDF/Image) into structured JSON with: personalInfo, summary, experience[], education[], skills[].`;
+      ? `Parse this Word resume into structured JSON.
+         STRICTLY follow this schema:
+         {
+           "personalInfo": {
+             "name": "string",
+             "email": "string",
+             "phone": "string",
+             "linkedin": "string",
+             "city": "string",
+             "state": "string"
+           },
+           "summary": "string",
+           "experience": [{
+             "company": "string",
+             "role": "string",
+             "startDate": "string",
+             "endDate": "string",
+             "description": "string"
+           }],
+           "education": [{
+             "institution": "string",
+             "degree": "string",
+             "year": "string"
+           }],
+           "skills": ["string"],
+           "projects": [{
+             "name": "string",
+             "description": "string",
+             "technologies": ["string"]
+           }],
+           "certifications": ["string"]
+         }
+         Return ONLY the JSON.`
+      : `Parse this resume (PDF/Image) into structured JSON.
+         STRICTLY follow this schema:
+         {
+           "personalInfo": {
+             "name": "string",
+             "email": "string",
+             "phone": "string",
+             "linkedin": "string",
+             "city": "string",
+             "state": "string"
+           },
+           "summary": "string",
+           "experience": [{
+             "company": "string",
+             "role": "string",
+             "startDate": "string",
+             "endDate": "string",
+             "description": "string"
+           }],
+           "education": [{
+             "institution": "string",
+             "degree": "string",
+             "year": "string"
+           }],
+           "skills": ["string"],
+           "projects": [{
+             "name": "string",
+             "description": "string",
+             "technologies": ["string"]
+           }],
+           "certifications": ["string"]
+         }
+         Return ONLY the JSON.`;
 
     const model = this.genAI.getGenerativeModel({
       model: 'gemini-2.0-flash-exp'
@@ -355,6 +419,14 @@ class AIService {
       parts: [{ text: h.content }]
     }));
 
+    // FIX: Ensure history starts with user
+    if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
+      chatHistory.unshift({
+        role: 'user',
+        parts: [{ text: 'Hello, I am ready for the screening.' }]
+      });
+    }
+
     const chat = model.startChat({
       history: chatHistory
     });
@@ -367,11 +439,159 @@ class AIService {
     const result = await chat.sendMessage(prompt);
     let jsonText = result.response.text().trim();
 
+    // Clean markdown
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```/, '').replace(/```$/, '').trim();
     }
 
-    return JSON.parse(jsonText);
+    try {
+      return JSON.parse(jsonText);
+    } catch (err) {
+      console.warn("Failed to parse JSON from chat response, attempting fallback extraction or raw text usage.");
+
+      // Try to find JSON object in text
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          // Fallback to raw text
+        }
+      }
+
+      // Fallback: Treat entire text as response
+      return {
+        aiResponse: jsonText,
+        isComplete: false
+      };
+    }
+  }
+
+  /**
+   * Process resume through AI conversation and generate initial screening assessment
+   * This is called automatically after resume upload
+   */
+  async processResumeScreening(resumeData: any, candidateName: string, candidateEmail: string, jobTitle?: string, jobId?: number): Promise<{
+    score: number;
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    skillsAnalysis: any;
+    transcript: string;
+  }> {
+    this.initialize();
+    if (!this.genAI) throw new Error('AI Service not initialized');
+
+    // Convert resume data to text format
+    const resumeText = this.formatResumeAsText(resumeData);
+
+    const prompt = `You are an AI recruiter screening a candidate named ${candidateName} for the position: ${jobTitle || 'General Application'}.
+
+Resume Details:
+${resumeText}
+
+Conduct a thorough screening conversation by asking 4-5 relevant questions about:
+1. Their experience and skills
+2. Their motivation and interest
+3. Key achievements from their resume
+4. Any gaps or areas that need clarification
+
+After the conversation, provide a comprehensive assessment.
+
+Return a JSON object with:
+- score: Overall score (0-100) based on resume and conversation
+- summary: Executive summary of the candidate's fit
+- strengths: Array of key strengths (at least 3)
+- weaknesses: Array of areas for improvement or concerns (at least 2)
+- skillsAnalysis: Object with technical skills, soft skills, and experience level
+- transcript: The full conversation transcript
+
+Generate the conversation as if you had a chat with them, then provide the assessment.
+Return JSON only.`;
+
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const result = await model.generateContent(prompt);
+    let jsonText = (await result.response).text().trim();
+
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```/, '').replace(/```$/, '').trim();
+    }
+
+    const assessment = JSON.parse(jsonText);
+
+    // Ensure required fields exist
+    return {
+      score: assessment.score || 70,
+      summary: assessment.summary || 'Initial screening completed based on resume review.',
+      strengths: Array.isArray(assessment.strengths) ? assessment.strengths : ['Strong background', 'Relevant experience'],
+      weaknesses: Array.isArray(assessment.weaknesses) ? assessment.weaknesses : ['Needs further evaluation'],
+      skillsAnalysis: assessment.skillsAnalysis || { technical: [], soft: [], experience: 'mid-level' },
+      transcript: assessment.transcript || `AI Screening Conversation with ${candidateName}:\n\nResume reviewed and initial assessment completed.`
+    };
+  }
+
+  /**
+   * Format resume data as text for AI processing
+   */
+  private formatResumeAsText(resumeData: any): string {
+    let text = '';
+
+    if (resumeData.personalInfo) {
+      text += `Name: ${resumeData.personalInfo.name || 'N/A'}\n`;
+      text += `Email: ${resumeData.personalInfo.email || 'N/A'}\n`;
+      text += `Phone: ${resumeData.personalInfo.phone || 'N/A'}\n`;
+      text += `Location: ${resumeData.personalInfo.location || 'N/A'}\n`;
+      text += `LinkedIn: ${resumeData.personalInfo.linkedin || 'N/A'}\n\n`;
+    }
+
+    if (resumeData.summary) {
+      text += `Summary:\n${resumeData.summary}\n\n`;
+    }
+
+    if (resumeData.experience && Array.isArray(resumeData.experience)) {
+      text += `Experience:\n`;
+      resumeData.experience.forEach((exp: any, idx: number) => {
+        text += `${idx + 1}. ${exp.role || 'N/A'} at ${exp.company || 'N/A'}`;
+        if (exp.startDate || exp.endDate) {
+          text += ` (${exp.startDate || 'N/A'} - ${exp.endDate || 'Present'})`;
+        }
+        text += '\n';
+        if (exp.description) text += `   ${exp.description}\n`;
+      });
+      text += '\n';
+    }
+
+    if (resumeData.education && Array.isArray(resumeData.education)) {
+      text += `Education:\n`;
+      resumeData.education.forEach((edu: any, idx: number) => {
+        text += `${idx + 1}. ${edu.degree || 'N/A'} from ${edu.school || 'N/A'}`;
+        if (edu.year) text += ` (${edu.year})`;
+        text += '\n';
+      });
+      text += '\n';
+    }
+
+    if (resumeData.skills && Array.isArray(resumeData.skills)) {
+      text += `Skills: ${resumeData.skills.join(', ')}\n\n`;
+    }
+
+    if (resumeData.projects && Array.isArray(resumeData.projects)) {
+      text += `Projects:\n`;
+      resumeData.projects.forEach((proj: any, idx: number) => {
+        text += `${idx + 1}. ${proj.name || 'N/A'}`;
+        if (proj.technologies) {
+          text += ` (${Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies})`;
+        }
+        text += '\n';
+        if (proj.description) text += `   ${proj.description}\n`;
+      });
+    }
+
+    return text;
   }
 
   /**

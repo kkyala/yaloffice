@@ -24,8 +24,9 @@ router.get('/', requireAuth, async (req, res) => {
 
 // GET /api/users/:id
 router.get('/:id', requireAuth, async (req, res) => {
-    const { data, error } = await supabase.from('users').select('*').eq('id', req.params.id).single();
+    const { data, error } = await supabase.from('users').select('*').eq('id', req.params.id).maybeSingle();
     if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'User not found' });
     res.json(data);
 });
 

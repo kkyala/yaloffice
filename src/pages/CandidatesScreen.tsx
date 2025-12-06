@@ -1,7 +1,8 @@
 
-
 import React, { useState, useMemo } from 'react';
+import { api } from '../services/api';
 import AddCandidateScreen from './AddCandidateScreen';
+import { config } from '../config/appConfig';
 
 // Type definitions for clarity
 type CandidateApplication = {
@@ -175,7 +176,7 @@ const InterviewReportModal = ({ application, onClose }) => {
                     </div>
                 </div>
                 <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <a href={`http://localhost:8000/api/candidates/${application.id}/report/interview`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
+                    <a href={`${config.apiBaseUrl}/candidates/${application.id}/report/interview`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
                     <button className="btn btn-secondary" onClick={onClose}>Close</button>
                 </div>
             </div>
@@ -218,7 +219,7 @@ const ScreeningReportModal = ({ application, onClose }) => {
                     )}
                 </div>
                 <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <a href={`http://localhost:8000/api/candidates/${application.id}/report/screening`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
+                    <a href={`${config.apiBaseUrl}/candidates/${application.id}/report/screening`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
                     <button className="btn btn-secondary" onClick={onClose}>Close</button>
                 </div>
             </div>
@@ -226,33 +227,99 @@ const ScreeningReportModal = ({ application, onClose }) => {
     );
 };
 
-// Application Card Component
+// Candidate Profile Modal (with Screening Results)
+const CandidateProfileModal = ({ application, screeningData, isLoading, onClose }) => {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>Candidate Profile: {application.candidateName}</h2>
+                    <button className="modal-close-btn" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+                </div>
+                <div className="modal-body">
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <p><strong>Job:</strong> {application.jobTitle}</p>
+                        <p><strong>Status:</strong> {application.status}</p>
+                    </div>
+
+                    <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Initial Screening Results</h3>
+
+                    {isLoading ? (
+                        <p>Loading screening data...</p>
+                    ) : screeningData && screeningData.completed ? (
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                <div style={{
+                                    width: '60px', height: '60px', borderRadius: '50%',
+                                    background: screeningData.score >= 70 ? '#dcfce7' : '#fef3c7',
+                                    color: screeningData.score >= 70 ? '#166534' : '#92400e',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontWeight: 'bold', fontSize: '1.2rem'
+                                }}>
+                                    {screeningData.score}
+                                </div>
+                                <div>
+                                    <strong>Screening Score</strong>
+                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Completed on {new Date(screeningData.date).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            {/* We might not have summary here if the endpoint only returns score/date. 
+                                Let's check the endpoint. It returns score, date. 
+                                If we want summary, we need to update the endpoint or fetch it differently.
+                                For now, let's show what we have. 
+                            */}
+                            <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>
+                                Detailed screening report is available in the Screening phase.
+                            </p>
+                        </div>
+                    ) : (
+                        <p>No screening data available for this candidate.</p>
+                    )}
+                </div>
+                <div className="modal-footer">
+                    <button className="btn btn-secondary" onClick={onClose}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ApplicationCard Component
 type ApplicationCardProps = {
     application: EnrichedApplication;
     onDragStart: (e: React.DragEvent, applicationId: number) => void;
     onScheduleInterview: (app: EnrichedApplication) => void;
     onViewResults: (app: EnrichedApplication) => void;
     onStartInterview: (app: EnrichedApplication) => void;
-    onViewScreeningReport: (app: EnrichedApplication) => void; // New prop
+    onViewScreeningReport: (app: EnrichedApplication) => void;
+    onViewProfile: (app: EnrichedApplication) => void; // New prop
     onUpdateStatus: (id: number, status: string) => void;
 };
-const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragStart, onScheduleInterview, onViewResults, onStartInterview, onViewScreeningReport, onUpdateStatus }) => {
+const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragStart, onScheduleInterview, onViewResults, onStartInterview, onViewScreeningReport, onViewProfile, onUpdateStatus }) => {
     const { id, candidateName, jobTitle, aiScore, status } = application;
     const interviewStatus = application.interview_config?.interviewStatus;
     const interviewType = application.interview_config?.interviewType || 'audio';
     const screeningStatus = application.interview_config?.screeningStatus;
 
     const renderActionButton = () => {
+        if (status === 'Sourced') {
+            return (
+                <button className="btn btn-secondary btn-sm" onClick={() => onViewProfile(application)}>View Profile</button>
+            );
+        }
         if (status === 'Screening') {
             if (screeningStatus === 'completed') {
                 return (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => onViewScreeningReport(application)}>Report</button>
-                        <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Schedule</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Schedule Interview</button>
                     </div>
                 );
             } else {
-                return <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Screening Pending</span>;
+                // Show Setup Interview button if not completed
+                return (
+                    <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Setup Screening</button>
+                );
             }
         }
         if (status === 'Interviewing' && !interviewStatus) {
@@ -311,20 +378,38 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
 type PipelineColumnProps = {
     title: string;
     applications: EnrichedApplication[];
+    isReadOnly?: boolean; // New prop
     onDragOver: (e: React.DragEvent) => void;
     onDrop: (e: React.DragEvent, newStatus: string) => void;
     onDragStart: (e: React.DragEvent, applicationId: number) => void;
     onScheduleInterview: (app: EnrichedApplication) => void;
     onViewResults: (app: EnrichedApplication) => void;
     onStartInterview: (app: EnrichedApplication) => void;
-    onViewScreeningReport: (app: EnrichedApplication) => void; // New prop
+    onViewScreeningReport: (app: EnrichedApplication) => void;
+    onViewProfile: (app: EnrichedApplication) => void; // New prop
     onUpdateStatus: (id: number, status: string) => void;
 };
-const PipelineColumn: React.FC<PipelineColumnProps> = ({ title, applications, onDragOver, onDrop, onDragStart, onScheduleInterview, onViewResults, onStartInterview, onViewScreeningReport, onUpdateStatus }) => {
+const PipelineColumn: React.FC<PipelineColumnProps> = ({ title, applications, isReadOnly, onDragOver, onDrop, onDragStart, onScheduleInterview, onViewResults, onStartInterview, onViewScreeningReport, onViewProfile, onUpdateStatus }) => {
+    const handleDragOver = (e: React.DragEvent) => {
+        if (isReadOnly) return;
+        onDragOver(e);
+    };
+
+    const handleDrop = (e: React.DragEvent, newStatus: string) => {
+        if (isReadOnly) return;
+        onDrop(e, newStatus);
+    };
+
     return (
-        <div className="pipeline-column" onDragOver={onDragOver} onDrop={(e) => onDrop(e, title)}>
+        <div className="pipeline-column" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, title)} style={{ opacity: isReadOnly ? 0.7 : 1, pointerEvents: isReadOnly ? 'none' : 'auto' }}>
             <div className="pipeline-column-header" data-status={title}><h3>{title}</h3><span className="candidate-count">{applications.length}</span></div>
-            <div className="pipeline-column-body">
+            <div className="pipeline-column-body" style={{ pointerEvents: 'auto' }}>
+                {/* Re-enable pointer events for body so cards can be dragged OUT of read-only columns if needed, 
+                    but wait, if the column is read-only, usually we can't drop INTO it. 
+                    Can we drag OUT of it? Yes.
+                    So pointer-events: none on the column might break dragging out.
+                    Better to just handle onDrop/onDragOver.
+                */}
                 {applications.map(app => (
                     <ApplicationCard
                         key={app.id}
@@ -334,6 +419,7 @@ const PipelineColumn: React.FC<PipelineColumnProps> = ({ title, applications, on
                         onViewResults={onViewResults}
                         onStartInterview={onStartInterview}
                         onViewScreeningReport={onViewScreeningReport}
+                        onViewProfile={onViewProfile}
                         onUpdateStatus={onUpdateStatus}
                     />
                 ))}
@@ -359,8 +445,14 @@ export default function CandidatesScreen({
     const [appForSetup, setAppForSetup] = useState<EnrichedApplication | null>(null);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [appForReport, setAppForReport] = useState<EnrichedApplication | null>(null);
-    const [isScreeningReportOpen, setIsScreeningReportOpen] = useState(false); // New state
-    const [appForScreeningReport, setAppForScreeningReport] = useState<EnrichedApplication | null>(null); // New state
+    const [isScreeningReportOpen, setIsScreeningReportOpen] = useState(false);
+    const [appForScreeningReport, setAppForScreeningReport] = useState<EnrichedApplication | null>(null);
+
+    // Profile Modal State
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [appForProfile, setAppForProfile] = useState<EnrichedApplication | null>(null);
+    const [profileScreeningData, setProfileScreeningData] = useState<any>(null);
+    const [isProfileLoading, setIsProfileLoading] = useState(false);
 
     const jobsForFilter = useMemo(() => {
         let filteredJobs = jobsData;
@@ -430,7 +522,15 @@ export default function CandidatesScreen({
         if (appForSetup) {
             const result = await onScheduleInterview(appForSetup.id, config);
             if (result.success) {
-                onUpdateApplicationStatus(appForSetup.id, 'Interviewing');
+                // Only move to Interviewing if NOT in Screening phase (or if explicitly desired)
+                // If in Screening phase, we stay there until screening is done.
+                if (appForSetup.status !== 'Screening') {
+                    onUpdateApplicationStatus(appForSetup.id, 'Interviewing');
+                } else {
+                    // Force refresh to show updated button state (e.g. "Assessment Pending")
+                    // The parent component should handle refetch, but we might need to trigger it.
+                    // onScheduleInterview usually triggers refetch in App.tsx.
+                }
             }
             handleCloseSetupModal();
         }
@@ -464,6 +564,21 @@ export default function CandidatesScreen({
         setIsScreeningReportOpen(true);
     };
 
+    const handleViewProfile = async (app: EnrichedApplication) => {
+        setAppForProfile(app);
+        setIsProfileModalOpen(true);
+        setIsProfileLoading(true);
+        try {
+            const { data } = await api.get(`/interview/screening-status/${app.candidate_id}`);
+            setProfileScreeningData(data);
+        } catch (err) {
+            console.error("Failed to fetch screening status:", err);
+            setProfileScreeningData(null);
+        } finally {
+            setIsProfileLoading(false);
+        }
+    };
+
     if (view === 'add' && canAddCandidates) {
         return <AddCandidateScreen onSave={handleSaveAndExit} onCancel={() => setView('pipeline')} jobs={jobsData} />;
     }
@@ -485,6 +600,7 @@ export default function CandidatesScreen({
                         key={stage}
                         title={stage}
                         applications={applicationsByStage[stage] || []}
+                        isReadOnly={stage === 'Offer' && (currentUser?.role === 'Agent' || currentUser?.role === 'Recruiter')} // Assuming Agent/Recruiter are restricted
                         onDragOver={handleDragOver}
                         onDrop={handleDrop}
                         onDragStart={handleDragStart}
@@ -492,6 +608,7 @@ export default function CandidatesScreen({
                         onViewResults={handleViewResults}
                         onStartInterview={handleStartInterview}
                         onViewScreeningReport={handleViewScreeningReport}
+                        onViewProfile={handleViewProfile}
                         onUpdateStatus={onUpdateApplicationStatus}
                     />
                 ))}
@@ -514,6 +631,14 @@ export default function CandidatesScreen({
                 <ScreeningReportModal
                     application={appForScreeningReport}
                     onClose={() => setIsScreeningReportOpen(false)}
+                />
+            )}
+            {isProfileModalOpen && appForProfile && (
+                <CandidateProfileModal
+                    application={appForProfile}
+                    screeningData={profileScreeningData}
+                    isLoading={isProfileLoading}
+                    onClose={() => setIsProfileModalOpen(false)}
                 />
             )}
         </>

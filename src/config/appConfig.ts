@@ -1,6 +1,6 @@
 export const config = {
 
-    apiBaseUrl: 'http://localhost:8000/api',
+    apiBaseUrl: '/api',
     ai: {
         activeProvider: 'google',
 
@@ -58,7 +58,7 @@ export const config = {
     livekit: {
         apiKey: import.meta.env.VITE_LIVEKIT_API_KEY,
         apiSecret: import.meta.env.VITE_LIVEKIT_API_SECRET,
-        // url: import.meta.env.VITE_LIVEKIT_URL,
+        url: import.meta.env.VITE_LIVEKIT_URL,
         // Room settings for video interviews
         roomSettings: {
             // Maximum duration for interview rooms (in seconds)

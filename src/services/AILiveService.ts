@@ -1,20 +1,8 @@
-
-
 // src/services/AILiveService.ts
-import { GoogleGenAI, Modality as GoogleGenAIModality, Blob as GeminiBlob, LiveServerMessage } from '@google/genai';
 import { config } from '../config/appConfig';
 
 // --- INITIALIZATION ---
-let ai: GoogleGenAI | null = null;
-try {
-    if (process.env.API_KEY) {
-        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    } else {
-        console.error("API_KEY environment variable not set for AILiveService.");
-    }
-} catch (error) {
-    console.error("Failed to initialize GoogleGenAI in AILiveService:", error);
-}
+// GoogleGenAI SDK initialization removed as we are now using a WebSocket proxy.
 
 // --- CONSTANTS & CONFIGURATION ---
 
@@ -28,12 +16,12 @@ export type LiveModelName = typeof AVAILABLE_LIVE_MODELS[number];
  * Defines the configuration for Text-to-Speech (TTS) voice generation.
  */
 export interface VoiceConfig {
-  voiceName: VoiceName;
-  languageCode: string;
-  gender: 'MALE' | 'FEMALE' | 'NEUTRAL';
-  pitch?: number;
-  speakingRate?: number;
-  audioEncoding?: 'MP3' | 'OGG_OPUS' | 'LINEAR16';
+    voiceName: VoiceName;
+    languageCode: string;
+    gender: 'MALE' | 'FEMALE' | 'NEUTRAL';
+    pitch?: number;
+    speakingRate?: number;
+    audioEncoding?: 'MP3' | 'OGG_OPUS' | 'LINEAR16';
 }
 
 // --- DYNAMIC VOICE SELECTION ---
@@ -48,16 +36,10 @@ export function selectOptimalVoice(settings: { language: string }): VoiceName {
 }
 
 export function getVoiceConfigForLanguage(language: string, voice?: VoiceName): VoiceConfig {
-    const voiceName = voice || selectOptimalVoice({ language });
-    const gender = (voiceName === 'Charon' || voiceName === 'Fenrir') ? 'MALE' : 'FEMALE'; // Simplified
-    
     return {
-        voiceName,
+        voiceName: voice || selectOptimalVoice({ language }),
         languageCode: language,
-        gender: gender === 'MALE' ? 'MALE' : 'FEMALE',
-        speakingRate: 1.03,
-        pitch: 0.0,
-        audioEncoding: 'MP3'
+        gender: 'NEUTRAL'
     };
 }
 
@@ -66,11 +48,11 @@ export function getVoiceConfigForLanguage(language: string, voice?: VoiceName): 
 /**
  * Encodes a Uint8Array to a Base64 string.
  */
-export function encode(bytes: Uint8Array): string {
+export function encode(data: Uint8Array): string {
     let binary = '';
-    const len = bytes.byteLength;
+    const len = data.byteLength;
     for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
+        binary += String.fromCharCode(data[i]);
     }
     return btoa(binary);
 }
@@ -126,19 +108,15 @@ export const blobToBase64 = (blob: File | Blob): Promise<string> => {
  * Captures a single video frame from a HTMLVideoElement and returns it as a Base64 JPEG string.
  */
 export const captureVideoFrame = (videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement, jpegQuality: number = 0.7): string => {
-    if (!videoElement || !canvasElement) {
-        throw new Error("Video or canvas element not provided.");
-    }
+    if (!videoElement || !canvasElement) throw new Error("Video or canvas element not provided.");
 
     const context = canvasElement.getContext('2d');
-    if (!context) {
-        throw new Error("Could not get 2D context from canvas.");
-    }
+    if (!context) throw new Error("Could not get 2D context from canvas.");
 
     canvasElement.width = videoElement.videoWidth;
     canvasElement.height = videoElement.videoHeight;
     context.drawImage(videoElement, 0, 0, videoElement.videoWidth, videoElement.videoHeight);
-    
+
     // Using toDataURL for direct Base64, more efficient than toBlob for single frames.
     const dataURL = canvasElement.toDataURL('image/jpeg', jpegQuality);
     return dataURL.split(',')[1]; // Return only the Base64 data
@@ -156,42 +134,147 @@ export const captureVideoFrame = (videoElement: HTMLVideoElement, canvasElement:
  */
 export function createLiveSession(callbacks: {
     onopen: () => void;
-    onmessage: (message: LiveServerMessage) => Promise<void>;
-    onerror: (e: ErrorEvent) => void;
+    onmessage: (message: any) => Promise<void>;
+    onerror: (e: Event) => void;
     onclose: (e: CloseEvent) => void;
 }, sessionSettings: {
     systemInstruction: string;
     model: LiveModelName;
     voiceConfig: VoiceConfig;
-    enableVideo?: boolean; // New flag to enable video stream support
-}) {
-    if (!ai) throw new Error("AI Service not initialized in AILiveService.");
-    
-    const { systemInstruction, model, voiceConfig, enableVideo } = sessionSettings;
+    enableVideo?: boolean;
+}): Promise<{
+    sendRealtimeInput: (input: { media: { mimeType: string; data: string }[] }) => void;
+    close: () => void;
+}> {
+    return new Promise((resolve, reject) => {
+        const { systemInstruction, model, voiceConfig, enableVideo } = sessionSettings;
 
-    return ai.live.connect({
-        model: model,
-        callbacks,
-        config: {
-            responseModalities: [GoogleGenAIModality.AUDIO], // Gemini Live currently only returns audio
-            speechConfig: { 
-                voiceConfig: { 
-                    prebuiltVoiceConfig: { voiceName: voiceConfig.voiceName }
+        // Connect to Backend Proxy instead of Google Direct
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host; // e.g. localhost:3000 or ngrok
+        const wsUrl = `${protocol}//${host}/ws/gemini-proxy?sessionId=${Date.now()}`;
+
+        console.log('[AILiveService] Connecting to backend proxy:', wsUrl);
+        const ws = new WebSocket(wsUrl);
+
+        // Define session object
+        const session = {
+            sendRealtimeInput: (input: { media: { mimeType: string; data: string }[] }) => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    // If it's audio/pcm, send as binary for efficiency (backend handles this)
+                    // But the input here is base64 string from the UI.
+                    // The backend proxy expects binary for audio chunks if we want to use the optimized path,
+                    // OR we can send JSON.
+
+                    // Let's send binary for audio to match backend expectation:
+                    // "if (Buffer.isBuffer(data)) { ... }"
+
+                    const chunk = input.media[0];
+                    if (chunk.mimeType.includes('audio')) {
+                        // Convert base64 to binary and send
+                        const binaryString = atob(chunk.data);
+                        const len = binaryString.length;
+                        const bytes = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        ws.send(bytes);
+                    } else {
+                        // Send other types (like image/video) as JSON
+                        ws.send(JSON.stringify({
+                            type: 'audio', // or 'image' if we support it later
+                            data: chunk.data,
+                            mimeType: chunk.mimeType
+                        }));
+                    }
                 }
             },
-            systemInstruction: systemInstruction,
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
-            // FIX: Removed visualConfig. Video streaming is handled by sending image/jpeg via sendRealtimeInput.
-            // visualConfig: enableVideo ? {} : undefined, 
-        },
+            close: () => {
+                ws.close();
+            }
+        };
+
+        ws.onopen = () => {
+            console.log('[AILiveService] WebSocket connected');
+
+            // Send start configuration to backend proxy
+            const startConfig = {
+                type: 'start',
+                config: {
+                    systemInstruction: systemInstruction,
+                    model: model,
+                    voiceName: voiceConfig.voiceName
+                }
+            };
+            ws.send(JSON.stringify(startConfig));
+
+            callbacks.onopen();
+            resolve(session);
+        };
+
+        ws.onmessage = async (event) => {
+            try {
+                const message = JSON.parse(event.data);
+
+                // Map backend proxy messages to what the UI expects
+                // Backend sends: { type: 'audio', audio: { data: base64 } }
+                // UI expects: { serverContent: { modelTurn: { parts: [{ inlineData: { data: base64, mimeType: 'audio/pcm;rate=24000' } }] } } }
+
+                if (message.type === 'audio' && message.audio) {
+                    // Wrap in the structure the UI expects (simulating Google SDK format)
+                    await callbacks.onmessage({
+                        serverContent: {
+                            modelTurn: {
+                                parts: [{
+                                    inlineData: {
+                                        mimeType: message.audio.mimeType || 'audio/pcm;rate=24000',
+                                        data: message.audio.data
+                                    }
+                                }]
+                            },
+                            turnComplete: false
+                        }
+                    });
+                } else if (message.type === 'transcript' && message.transcript) {
+                    // Handle text transcript
+                    await callbacks.onmessage({
+                        serverContent: {
+                            modelTurn: {
+                                parts: [{
+                                    text: message.transcript.text
+                                }]
+                            },
+                            turnComplete: message.transcript.isFinal
+                        }
+                    });
+                } else if (message.type === 'error') {
+                    console.error('[AILiveService] Proxy error:', message.error);
+                    // callbacks.onerror(new Event('error')); // Optional: trigger error callback
+                }
+            } catch (err) {
+                console.error('[AILiveService] Error processing message:', err);
+            }
+        };
+
+        ws.onerror = (e) => {
+            console.error('[AILiveService] WebSocket error:', e);
+            callbacks.onerror(e);
+            if (ws.readyState === WebSocket.CONNECTING) {
+                reject(e);
+            }
+        };
+
+        ws.onclose = (e) => {
+            console.log('[AILiveService] WebSocket closed:', e.code, e.reason);
+            callbacks.onclose(e);
+        };
     });
 }
 
 // --- MAIN EXPORT OBJECT ---
 export const aiLiveService = {
-    isInitialized: () => !!ai,
-    
+    isInitialized: () => true, // Always true now as we use backend proxy
+
     // Configs
     AVAILABLE_LIVE_MODELS,
     AVAILABLE_VOICES,

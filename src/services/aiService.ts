@@ -14,12 +14,17 @@
  * - Content generation
  */
 
+import { config } from '../config/appConfig';
 import { Type as GoogleGenAIType, Modality as GoogleGenAIModality } from '@google/genai';
 
-// Backend API URL - uses environment variable or defaults to localhost
+// Backend API URL - uses config or defaults to relative path
 const getApiBase = (): string => {
-    // @ts-ignore - Vite env
-    return import.meta.env?.VITE_API_URL || 'http://localhost:8000';
+    const base = config.apiBaseUrl || '';
+    // If base ends with /api, remove it to avoid double /api in constructed URLs
+    if (base.endsWith('/api')) {
+        return base.slice(0, -4);
+    }
+    return base;
 };
 
 // ========================================================================================
@@ -309,6 +314,7 @@ export const aiService = {
     // Screening
     startScreening,
     chatScreening,
+    finalizeScreening,
 };
 
 /**
@@ -345,6 +351,26 @@ async function chatScreening(history: { role: string; content: string }[], userR
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to chat');
+    }
+
+    const result = await response.json();
+    return result.data;
+}
+
+/**
+ * Finalize screening - proxied to backend
+ */
+async function finalizeScreening(transcript: string, candidateName: string, userId: string, jobTitle?: string, jobId?: number): Promise<any> {
+    const API_BASE = getApiBase();
+    const response = await fetch(`${API_BASE}/api/ai/screening/finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript, candidateName, userId, jobTitle, jobId })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to finalize screening');
     }
 
     const result = await response.json();

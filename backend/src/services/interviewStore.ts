@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseService.js';
 import { auditLogger } from './auditLogger.js';
 
@@ -23,13 +24,31 @@ export interface InterviewSession {
     score: number;
     summary: string;
     strengths: string[];
-    improvements: string[];
+    weaknesses: string[];
   };
 }
 
 class InterviewStore {
   async set(sessionId: string, session: InterviewSession): Promise<void> {
-    const { error } = await supabase
+    // Create a fresh admin client to ensure we bypass RLS
+    // This is a safeguard against module initialization order issues
+    const adminUrl = process.env.SUPABASE_URL;
+    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    let client = supabase;
+
+    if (adminUrl && adminKey) {
+      client = createClient(adminUrl, adminKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+    } else {
+      console.warn('[InterviewStore] Service Role Key missing, using default client. RLS errors may occur.');
+    }
+
+    const { error } = await client
       .from('interviews')
       .upsert({
         id: sessionId,
@@ -37,19 +56,62 @@ class InterviewStore {
         job_title: session.jobTitle,
         candidate_id: session.candidateId,
         candidate_name: session.candidateName,
-        status: session.status,
-        question_count: session.questionCount,
-        current_question_index: session.currentQuestionIndex,
-        difficulty: session.difficulty,
         custom_questions: session.customQuestions,
-        transcript: session.transcript,
-        analysis: session.analysis,
+        status: session.status,
         started_at: session.startedAt,
-        ended_at: session.endedAt
+        ended_at: session.endedAt,
+        transcript: session.transcript,
+        current_question_index: session.currentQuestionIndex,
+        analysis: session.analysis,
+        question_count: session.questionCount, // Kept from original
+        difficulty: session.difficulty // Kept from original
       });
 
     if (error) {
       console.error('Error saving interview session:', error);
+      const keyPrefix = adminKey ? adminKey.substring(0, 5) + '...' : 'undefined';
+      console.error(`[InterviewStore] Used key prefix: ${keyPrefix}`);
+      throw error;
+    }
+  }
+
+  async saveScreeningAssessment(data: {
+    userId: string;
+    jobTitle: string;
+    jobId?: number;
+    score: number;
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    skillsAnalysis: any;
+    transcript: string;
+  }): Promise<void> {
+    const adminUrl = process.env.SUPABASE_URL;
+    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    let client = supabase;
+    if (adminUrl && adminKey) {
+      client = createClient(adminUrl, adminKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+    }
+
+    const { error } = await client
+      .from('screening_assessments')
+      .insert({
+        user_id: data.userId,
+        job_title: data.jobTitle,
+        job_id: data.jobId,
+        overall_score: data.score,
+        summary: data.summary,
+        strengths: data.strengths,
+        weaknesses: data.weaknesses,
+        skills_analysis: data.skillsAnalysis,
+        transcript: data.transcript
+      });
+
+    if (error) {
+      console.error('Error saving screening assessment:', error);
       throw error;
     }
   }

@@ -18,14 +18,14 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
 
     if (!job) {
         return (
-             <div className="page-content">
+            <div className="page-content">
                 <h2>Job not found</h2>
                 <p>The job you are trying to apply for could not be found. It may have been closed.</p>
                 <button className="btn btn-secondary" onClick={() => onNavigate('find-jobs', 'find-jobs')}>Back to Jobs</button>
             </div>
         );
     }
-    
+
     const handleCancel = () => {
         onNavigate('find-jobs', 'find-jobs');
     };
@@ -50,10 +50,22 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
             source,
             dob,
         };
-        
+
         const result = await onApplyForJob(job, profileData);
         if (result && result.success) {
-            onNavigate('dashboard', 'dashboard');
+            if (job.screening_enabled) {
+                // Redirect to screening if required
+                // Assuming result.applicationId or result.data.id is available
+                const applicationId = result.applicationId || result.data?.id;
+                if (applicationId) {
+                    onNavigate('pre-interview-assessment', 'dashboard', { candidateId: applicationId, applicationId: applicationId });
+                } else {
+                    // Fallback if ID missing
+                    onNavigate('dashboard', 'dashboard');
+                }
+            } else {
+                onNavigate('dashboard', 'dashboard');
+            }
         } else {
             setIsLoading(false);
             setSubmitError(result?.error || 'There was an error submitting your application. Please try again.');
@@ -72,11 +84,11 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
                 </div>
             </header>
             <form onSubmit={handleSubmit}>
-                 <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
                     Please complete your profile to apply for the <strong>{job.title}</strong> position at <strong>{job.employer}</strong>. This information will be saved for future applications.
                 </p>
-                
-                {submitError && <div className="login-error" style={{marginBottom: '1.5rem'}}>{submitError}</div>}
+
+                {submitError && <div className="login-error" style={{ marginBottom: '1.5rem' }}>{submitError}</div>}
 
                 <fieldset disabled={isLoading}>
                     <div className="form-grid-2-col">
@@ -89,8 +101,8 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
                         <div className="form-group grid-col-span-2"><label htmlFor="applicant-linkedin">LinkedIn Profile URL</label><input id="applicant-linkedin" type="url" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} /></div>
                         <div className="form-group grid-col-span-2"><label htmlFor="applicant-source">Source*</label><select id="applicant-source" value={source} onChange={(e) => setSource(e.target.value)} required><option value="" disabled>How did you hear about us?</option><option>LinkedIn</option><option>Dice</option><option>Indeed</option><option>Company Website</option><option>Referral</option><option>Other</option></select></div>
                     </div>
-                    
-                    <div className="form-group"><label htmlFor="applicant-summary">Resume Summary / Cover Letter</label><textarea id="applicant-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={4} placeholder="Briefly describe why you're a good fit for this role."/></div>
+
+                    <div className="form-group"><label htmlFor="applicant-summary">Resume Summary / Cover Letter</label><textarea id="applicant-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={4} placeholder="Briefly describe why you're a good fit for this role." /></div>
                 </fieldset>
             </form>
         </>

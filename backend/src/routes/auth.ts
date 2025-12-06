@@ -18,15 +18,20 @@ router.post('/login', async (req, res) => {
 
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
-    const { email, password, options } = req.body;
-    const trimmedEmail = email?.trim();
-    const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password, options });
+    try {
+        const { email, password, options } = req.body;
+        const trimmedEmail = email?.trim();
+        const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password, options });
 
-    if (error) {
-        return res.status(400).json({ error: error.message });
+        if (error) {
+            return res.status(400).json({ error: error.message });
+        }
+
+        res.json({ session: data.session, user: data.user });
+    } catch (error: any) {
+        console.error('Signup error:', error);
+        res.status(500).json({ error: 'Internal Server Error during signup' });
     }
-
-    res.json({ session: data.session, user: data.user });
 });
 
 // POST /api/auth/logout

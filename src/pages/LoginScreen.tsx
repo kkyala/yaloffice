@@ -12,6 +12,12 @@ export default function LoginScreen({ onLogin, onSignup }) {
     const [authError, setAuthError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
+    // Clear fields on mount to prevent browser autofill from populating the state
+    React.useEffect(() => {
+        setEmail('');
+        setPassword('');
+    }, []);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -164,7 +170,7 @@ export default function LoginScreen({ onLogin, onSignup }) {
                         <input
                             id="email"
                             name="email"
-                            autoComplete="email"
+                            autoComplete="off"
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -178,7 +184,7 @@ export default function LoginScreen({ onLogin, onSignup }) {
                         <input
                             id="password"
                             name="password"
-                            autoComplete={isSigningUp ? "new-password" : "current-password"}
+                            autoComplete="new-password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}

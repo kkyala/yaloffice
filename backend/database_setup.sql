@@ -32,6 +32,21 @@ create table if not exists public.jobs (
   description text,
   requirements text[],
   status text default 'Active',
+  job_code text,
+  business_unit text,
+  client text,
+  client_bill_rate text,
+  pay_rate text,
+  recruitment_manager text,
+  primary_recruiter text,
+  qualifications text,
+  open boolean default true,
+  sourced int default 0,
+  screened int default 0,
+  shortlisted int default 0,
+  interviewed int default 0,
+  "salaryMin" numeric,
+  "salaryMax" numeric,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
