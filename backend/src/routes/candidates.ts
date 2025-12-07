@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../services/supabaseService.js';
 import { pdfService } from '../services/pdfService.js';
 import { auditLogger } from '../services/auditLogger.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -94,22 +95,55 @@ router.post('/', async (req, res) => {
     res.json(candidate);
 });
 
-// PUT /api/candidates/:id
-router.put('/:id', async (req, res) => {
+// PATCH /api/candidates/:id
+router.patch('/:id', requireAuth, async (req, res) => {
     const { data, error } = await supabase.from('candidates').update(req.body).eq('id', req.params.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
 
     // Audit Log
     try {
         await auditLogger.log({
-            userId: 'system', // TODO: Extract actual user from auth middleware if available
-            action: 'candidate_updated',
+            userId: req.user.id,
+            action: 'candidate_patched',
             resourceType: 'candidate',
             resourceId: req.params.id,
             details: { changes: req.body }
         });
     } catch (logError) {
         console.error('Audit log failed:', logError);
+    }
+
+    res.json(data);
+});
+
+// PUT /api/candidates/:id/status
+router.put('/:id/status', requireAuth, async (req, res) => {
+    const { status } = req.body;
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // 1. Get current state for logging
+    const { data: before, error: fetchError } = await supabase.from('candidates').select('status').eq('id', id).single();
+    if (fetchError) return res.status(500).json({ error: 'Failed to fetch candidate before update.' });
+
+    // 2. Update the status
+    const { data, error } = await supabase.from('candidates').update({ status }).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    // 3. Log the change
+    try {
+        await auditLogger.log({
+            userId,
+            action: 'candidate_status_changed',
+            resourceType: 'candidate',
+            resourceId: id,
+            details: {
+                from: before.status,
+                to: status
+            }
+        });
+    } catch (logError) {
+        console.error('Audit log failed for status change:', logError);
     }
 
     res.json(data);

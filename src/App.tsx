@@ -13,6 +13,7 @@ import FeedbackBanner from './components/FeedbackBanner';
 import FloatingAIChatWidget from './components/FloatingAIChatWidget';
 import AIVideoInterviewScreen from './pages/AIVideoInterviewScreen';
 import LiveKitInterviewScreen from './pages/LiveKitInterviewScreen';
+import ScreeningInterviewScreen from './pages/ScreeningInterviewScreen';
 
 const getErrorMessage = (error: any) => {
     if (typeof error === 'string') return error;
@@ -269,7 +270,7 @@ export default function App() {
 
     const handleUpdateUserProfile = async (profileData: any) => {
         if (!currentUser) return { success: false, error: 'User not logged in.' };
-        const { data, error } = await api.put(`/users/${currentUser.id}`, profileData);
+        const { data, error } = await api.patch(`/users/${currentUser.id}`, profileData);
         if (error) { handleError(error, 'updating user profile'); return { success: false, error: getErrorMessage(error) }; }
         setCurrentUser(data);
         await refetchUsers();
@@ -277,7 +278,7 @@ export default function App() {
     };
     const handleSaveAIConfig = async (config: any) => {
         if (!currentUser) return { success: false, error: 'No user is currently logged in.' };
-        const { data, error } = await api.put(`/users/${currentUser.id}`, { ai_config: config });
+        const { data, error } = await api.patch(`/users/${currentUser.id}`, { ai_config: config });
         if (error) { handleError(error, 'saving AI configuration'); return { success: false, error: getErrorMessage(error) }; }
         setCurrentUser(data);
         await refetchUsers();
@@ -319,7 +320,7 @@ export default function App() {
             if (resumeData.personalInfo?.linkedin) updates.linkedin_url = resumeData.personalInfo.linkedin;
 
             if (Object.keys(updates).length > 0) {
-                await api.put(`/users/${currentUser.id}`, updates);
+                await api.patch(`/users/${currentUser.id}`, updates);
                 await refetchUsers();
             }
 
@@ -344,9 +345,8 @@ export default function App() {
             completedAt: new Date().toISOString()
         };
         // Update status to 'Interviewing' if not already, and mark interview as completed
-        const { error } = await api.put(`/candidates/${applicationId}`, { 
-            interview_config: newConfig,
-            status: appData.status === 'Interviewing' ? appData.status : 'Interviewing' // Keep status as Interviewing after completion
+        const { error } = await api.patch(`/candidates/${applicationId}`, {
+            interview_config: newConfig
         });
         if (error) handleError(error, 'saving interview results'); else await refetchCandidates();
     };
@@ -354,13 +354,13 @@ export default function App() {
         const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching candidate for assessment save'); return { success: false }; }
         const newConfig = { ...(appData.interview_config || {}), interviewStatus: 'assessment_completed', assessmentData };
-        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
+        const { error } = await api.patch(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) { handleError(error, 'saving assessment results'); return { success: false }; }
         await refetchCandidates();
         return { success: true };
     };
     const handleUpdateApplicationStatus = async (applicationId: number, newStatus: string) => {
-        const { error } = await api.put(`/candidates/${applicationId}`, { status: newStatus });
+        const { error } = await api.put(`/candidates/${applicationId}/status`, { status: newStatus });
         if (error) handleError(error, 'updating application status'); else await refetchCandidates();
     };
     const handleScheduleInterview = async (applicationId: number, config: any) => {
@@ -381,7 +381,7 @@ export default function App() {
                 scheduledAt: new Date().toISOString()
             };
 
-            const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
+            const { error } = await api.patch(`/candidates/${applicationId}`, { interview_config: newConfig });
             if (error) { handleError(error, 'assigning screening'); return { success: false }; }
             await refetchCandidates();
             return { success: true };
@@ -415,7 +415,7 @@ export default function App() {
             scheduledAt: new Date().toISOString()
         };
 
-        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
+        const { error } = await api.patch(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) { handleError(error, 'scheduling interview'); return { success: false }; }
         await refetchCandidates();
         return { success: true };
@@ -424,7 +424,7 @@ export default function App() {
         const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching app for interview start'); return { success: false }; }
         const newConfig = { ...(appData.interview_config || {}), interviewStatus: 'started' };
-        const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
+        const { error } = await api.patch(`/candidates/${applicationId}`, { interview_config: newConfig });
         if (error) { handleError(error, 'starting interview session'); return { success: false }; }
         await refetchCandidates();
         return { success: true };
@@ -432,7 +432,7 @@ export default function App() {
     const handleApplyForJob = async (job: any, profileData: any) => {
         if (!currentUser) return { success: false, error: 'User not logged in' };
         const userProfilePayload = { name: profileData.name, mobile: profileData.mobile_number, city: profileData.city, state: profileData.state, linkedin_url: profileData.linkedin_url, work_authorization: profileData.work_authorization };
-        const { error: userUpdateError } = await api.put(`/users/${currentUser.id}`, userProfilePayload);
+        const { error: userUpdateError } = await api.patch(`/users/${currentUser.id}`, userProfilePayload);
         if (userUpdateError) return { success: false, error: getErrorMessage(userUpdateError) };
         await refetchUsers();
 
@@ -493,7 +493,7 @@ export default function App() {
             let response: any;
             if (isUpdate) {
                 const { id, ...updateFields } = payload;
-                response = await api.put(`/jobs/${id}`, updateFields);
+                response = await api.patch(`/jobs/${id}`, updateFields);
             } else {
                 const { id, ...insertFields } = payload;
                 response = await api.post('/jobs', insertFields);
@@ -519,7 +519,7 @@ export default function App() {
     };
 
     const handlePublishJob = async (jobId: number) => {
-        const { error } = await api.put(`/jobs/${jobId}`, { status: 'Active' });
+        const { error } = await api.patch(`/jobs/${jobId}`, { status: 'Active' });
         if (error) handleError(error, 'publishing job'); else await refetchJobs();
     };
 
@@ -603,6 +603,10 @@ export default function App() {
                                 onSaveInterviewResults={handleSaveInterviewResults} onStartInterviewSession={handleStartInterviewSession} onNavigate={handleNavigate}
                                 jobsData={jobsData}
                             />
+                        ) : currentPage === 'screening-interview' ? (
+                            <ScreeningInterviewScreen
+                                onStartScreening={() => handleNavigate('screening-session', 'dashboard', { applicationId: currentApplicationId })}
+                            />
                         ) : (
                             <PageComponent
                                 currentUser={currentUser} usersData={usersData} jobsData={jobsData} candidatesData={candidatesData} placementsData={placementsData}
@@ -626,7 +630,7 @@ export default function App() {
                         initialTab={profileModalTab}
                         onClose={() => setProfileModalTab(null)}
                         onChangePassword={async (newPassword) => {
-                            const { error } = await api.put(`/users/${currentUser.id}`, { password: newPassword });
+                            const { error } = await api.patch(`/users/${currentUser.id}`, { password: newPassword });
                             return { success: !error, error: error ? getErrorMessage(error) : undefined };
                         }}
                     />

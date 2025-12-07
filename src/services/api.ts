@@ -142,6 +142,13 @@ class ApiService {
             body: JSON.stringify(body),
         }).catch(err => ({ data: null, error: err }));
     }
+
+    async patch(endpoint: string, body: any) {
+        return this.request(endpoint, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        }).catch(err => ({ data: null, error: err }));
+    }
 }
 
 export const api = new ApiService();

@@ -35,6 +35,7 @@ import CalendarScreen from '../pages/CalendarScreen';
 import AIVideoInterviewScreen from '../pages/AIVideoInterviewScreen'; // NEW: Video Interview Screen
 import LiveKitInterviewScreen from '../pages/LiveKitInterviewScreen'; // Tavus + LiveKit Interview
 import ScreeningSessionScreen from '../pages/ScreeningSessionScreen'; // NEW: Audio Screening
+import ScreeningInterviewScreen from '../pages/ScreeningInterviewScreen';
 
 // A placeholder for pages that are mentioned but not fully implemented
 const PlaceholderScreen = ({ pageName }) => (
@@ -101,6 +102,7 @@ export const roleConfig = {
             'apply-for-job': JobApplicationScreen,
             'pre-interview-assessment': PreInterviewAssessmentScreen,
             'screening-session': ScreeningSessionScreen, // NEW
+            'screening-interview': ScreeningInterviewScreen,
             interview: AIInterviewScreen, // Existing audio interview
             'ai-video-interview': AIVideoInterviewScreen, // Gemini Video interview
             'livekit-interview': LiveKitInterviewScreen, // Tavus + LiveKit interview
