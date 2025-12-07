@@ -136,6 +136,7 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
 
     const renderActionButton = (app: CandidateApplication) => {
         const interviewStatus = app.interview_config?.interviewStatus;
+        const screeningStatus = app.interview_config?.screeningStatus;
 
         if (interviewStatus === 'finished') {
             return (
@@ -154,10 +155,10 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
         }
 
         // Screening: Allow start if not finished/started (even if setup is pending or missing)
-        if (app.status === 'Screening') {
+        if (app.status === 'Screening' && screeningStatus === 'assigned') {
             return (
-                <button className="btn btn-primary btn-sm" onClick={() => handleStartAssessment(app)}>
-                    Start Screening Interview
+                <button className="btn btn-primary btn-sm" onClick={() => onNavigate('screening-interview', 'dashboard', { applicationId: app.id })}>
+                    Start Screening
                 </button>
             );
         }

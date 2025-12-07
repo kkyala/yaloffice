@@ -24,8 +24,8 @@ router.post('/', async (req, res) => {
     res.json(data);
 });
 
-// PUT /api/jobs/:id
-router.put('/:id', async (req, res) => {
+// PATCH /api/jobs/:id
+router.patch('/:id', async (req, res) => {
     const { data, error } = await supabase.from('jobs').update(req.body).eq('id', req.params.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);

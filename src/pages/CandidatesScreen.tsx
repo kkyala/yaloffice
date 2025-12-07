@@ -67,10 +67,12 @@ const SetupInterviewModal = ({ candidateName, application, onSave, onCancel }) =
         });
     };
 
+    const isScreeningSetup = application.status === 'Screening';
+
     return (
         <div className="modal-overlay">
             <div className="modal-content" style={{ maxWidth: '500px' }}>
-                <div className="modal-header"><h2>Setup AI Interview for {candidateName}</h2></div>
+                <div className="modal-header"><h2>{isScreeningSetup ? "Setup AI Screening" : "Setup AI Interview"} for {candidateName}</h2></div>
                 <div className="modal-body">
                     <div className="form-group"><label>Number of Questions</label><input type="number" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))} /></div>
                     <div className="form-group"><label>Difficulty</label><select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
@@ -299,7 +301,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
     const { id, candidateName, jobTitle, aiScore, status } = application;
     const interviewStatus = application.interview_config?.interviewStatus;
     const interviewType = application.interview_config?.interviewType || 'audio';
-    const screeningStatus = application.interview_config?.screeningStatus;
+    const screeningStatus = application.interview_config?.screeningStatus; // New field
 
     const renderActionButton = () => {
         if (status === 'Sourced') {
@@ -308,6 +310,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
             );
         }
         if (status === 'Screening') {
+            // If screening is complete, show Report and Schedule Interview buttons.
             if (screeningStatus === 'completed') {
                 return (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -315,12 +318,18 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
                         <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Schedule Interview</button>
                     </div>
                 );
-            } else {
-                // Show Setup Interview button if not completed
-                return (
-                    <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Setup Screening</button>
-                );
             }
+            // If screening is pending, show a status message.
+            if (screeningStatus === 'pending') {
+                 return <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Screening Pending</span>;
+            }
+            // Otherwise, show the Setup Screening button.
+            return (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => onViewProfile(application)}>View Profile</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Setup Screening</button>
+                </div>
+            );
         }
         if (status === 'Interviewing' && !interviewStatus) {
             return (
@@ -520,17 +529,19 @@ export default function CandidatesScreen({
 
     const handleSaveInterviewConfig = async (config: object) => {
         if (appForSetup) {
-            const result = await onScheduleInterview(appForSetup.id, config);
+            // If the setup is for screening, add a specific status for it.
+            const isScreeningSetup = appForSetup.status === 'Screening';
+            const updatedConfig = isScreeningSetup
+                ? { ...config, screeningStatus: 'assigned' }
+                : config;
+
+            const result = await onScheduleInterview(appForSetup.id, updatedConfig);
             if (result.success) {
-                // Only move to Interviewing if NOT in Screening phase (or if explicitly desired)
-                // If in Screening phase, we stay there until screening is done.
-                if (appForSetup.status !== 'Screening') {
+                // Only move to Interviewing if it's not a screening setup.
+                if (!isScreeningSetup) {
                     onUpdateApplicationStatus(appForSetup.id, 'Interviewing');
-                } else {
-                    // Force refresh to show updated button state (e.g. "Assessment Pending")
-                    // The parent component should handle refetch, but we might need to trigger it.
-                    // onScheduleInterview usually triggers refetch in App.tsx.
                 }
+                // No status change needed for screening, the card will update automatically.
             }
             handleCloseSetupModal();
         }
@@ -600,7 +611,8 @@ export default function CandidatesScreen({
                         key={stage}
                         title={stage}
                         applications={applicationsByStage[stage] || []}
-                        isReadOnly={stage === 'Offer' && (currentUser?.role === 'Agent' || currentUser?.role === 'Recruiter')} // Assuming Agent/Recruiter are restricted
+                        // Make the 'Offer' stage read-only for agents as per requirements.
+                        isReadOnly={stage === 'Offer' && currentUser?.role === 'Agent'}
                         onDragOver={handleDragOver}
                         onDrop={handleDrop}
                         onDragStart={handleDragStart}

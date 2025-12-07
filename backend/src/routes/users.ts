@@ -30,8 +30,8 @@ router.get('/:id', requireAuth, async (req, res) => {
     res.json(data);
 });
 
-// PUT /api/users/:id
-router.put('/:id', requireAuth, async (req, res) => {
+// PATCH /api/users/:id
+router.patch('/:id', requireAuth, async (req, res) => {
     const { data, error } = await supabase.from('users').update(req.body).eq('id', req.params.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
