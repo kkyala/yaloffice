@@ -302,7 +302,7 @@ router.post('/analyze-screening', async (req, res) => {
 
           await supabase
             .from('candidates')
-            .update({ 
+            .update({
               interview_config: newConfig,
               status: 'Screening' // Ensure status is set to Screening
             })
@@ -372,6 +372,49 @@ router.get('/screening-status/:userId', async (req, res) => {
   } catch (err: any) {
     console.error('Error checking screening status:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/interview/upload-audio
+ * Upload interview audio recording
+ */
+router.post('/upload-audio', async (req, res) => {
+  try {
+    const { sessionId, candidateId, audioData } = req.body;
+
+    if (!audioData || !sessionId) {
+      return res.status(400).json({ error: 'Missing audio data or session ID' });
+    }
+
+    // Decode base64
+    const base64Data = audioData.replace(/^data:audio\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Path: interviews/audio/{candidateId}_{sessionId}.webm
+    // Using a flat structure within the type folder for easier access
+    const filePath = `interviews/audio/${candidateId || 'anon'}_${sessionId}.webm`;
+
+    const { data, error } = await supabase.storage
+      .from('resumes') // Reusing resumes bucket
+      .upload(filePath, buffer, {
+        contentType: 'audio/webm',
+        upsert: true
+      });
+
+    if (error) {
+      console.error('Supabase storage error:', error);
+      throw error;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('resumes')
+      .getPublicUrl(filePath);
+
+    res.json({ success: true, publicUrl });
+  } catch (error: any) {
+    console.error('Error uploading audio:', error);
+    res.status(500).json({ error: 'Failed to upload audio recording' });
   }
 });
 

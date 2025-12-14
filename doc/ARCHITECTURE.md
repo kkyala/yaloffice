@@ -181,6 +181,34 @@ Frontend displays video:
   - Falls back to static "AI" circle if no avatar
 ```
 
+### 5. Client-Side Recording & Storage Flow (Persistence)
+
+```
+Frontend (MediaRecorder)
+  │ - Captures mixed audio (Mic + AI Output)
+  │ - Stores in chunks (Blob[])
+  ↓
+Finish Interview Trigger
+  │ - Converts chunks to single Blob (audio/webm)
+  │ - Converts Blob to Base64
+  ↓
+POST /api/interview/upload-audio
+  │ - Validates session & candidate
+  │ - Decodes Base64 to Buffer
+  ↓
+Backend (Supabase Storage)
+  │ - Uploads to 'resumes' bucket
+  │ - Path: {candidateId}/audio/{sessionId}.webm
+  ↓
+Backend (Database)
+  │ - Generates Public URL
+  │ - Saves URL to candidates table (interview_config)
+  ↓
+Frontend
+  │ - Receives success response with URL
+  │ - Proceed to Results/Report Screen
+```
+
 ## Why This Architecture?
 
 ### Why WebSocket for Audio (Not LiveKit Data Channel)?
@@ -313,7 +341,7 @@ WAV2LIP_CHECKPOINT=./models/wav2lip_gan.pth
 
 ## Port Usage
 
-- `3000` - Frontend (Vite dev server)
+- `3001` - Frontend (Vite dev server)
 - `7880` - LiveKit WebSocket (WebRTC signaling)
 - `7881` - LiveKit REST API (room management)
 - `8000` - Backend HTTP + WebSocket server

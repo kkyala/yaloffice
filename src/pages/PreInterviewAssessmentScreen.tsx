@@ -15,7 +15,7 @@ type PreInterviewAssessmentScreenProps = {
     interviewingCandidate: Candidate | null;
     currentApplicationId: number | null;
     jobsData: Job[];
-    onSaveAssessmentResults: (applicationId: number, assessmentData: object) => Promise<{ success: boolean }>;
+    onSaveAssessmentResults: (applicationId: number, assessmentData: object) => Promise<{ success: boolean; error?: string }>;
     onNavigate: (page: string, parent: string) => void;
 };
 
@@ -78,7 +78,7 @@ export default function PreInterviewAssessmentScreen({
                 onNavigate('dashboard', 'dashboard');
             }
         } else {
-            setError('There was an error submitting your assessment. Please try again.');
+            setError(result.error || 'There was an error submitting your assessment. Please try again.');
             setIsLoading(false);
         }
     };

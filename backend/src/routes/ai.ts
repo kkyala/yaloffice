@@ -320,6 +320,42 @@ router.post('/generate/json', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/ai/generate/text
+ * Generate generic text content
+ */
+router.post('/generate/text', async (req: Request, res: Response) => {
+  try {
+    const { prompt, useThinkingMode } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({
+        error: 'Missing required field: prompt'
+      });
+    }
+
+    const text = await aiService.generateText(prompt, useThinkingMode);
+
+    // Audit Log
+    await auditLogger.log({
+      action: 'text_generated',
+      resourceType: 'content_generation',
+      details: { promptLength: prompt.length }
+    });
+
+    res.json({
+      success: true,
+      data: { text }
+    });
+  } catch (error: any) {
+    console.error('[AI Routes] Text generation error:', error);
+    res.status(500).json({
+      error: 'Failed to generate text',
+      message: error.message
+    });
+  }
+});
+
 // ========================================================================================
 // SCREENING ENDPOINTS
 // ========================================================================================
@@ -459,6 +495,24 @@ router.post('/resume/process-screening', async (req: Request, res: Response) => 
         jobTitle: jobTitle || 'General Application'
       }
     });
+
+
+
+    // AUTO-AGENT: Move candidate to 'Screening' if score is good
+    if (assessment.score >= 60 && jobId) {
+      // We need to update the candidate status to 'Screening'
+      const { error: updateError } = await supabase
+        .from('candidates')
+        .update({ status: 'Screening' })
+        .eq('jobId', jobId)
+        .eq('user_id', userId);
+
+      if (updateError) {
+        console.warn('[AI Routes] Failed to auto-move candidate to Screening:', updateError);
+      } else {
+        console.log(`[AI Routes] Auto-moved candidate ${candidateName} to Screening (Score: ${assessment.score})`);
+      }
+    }
 
     res.json({
       success: true,

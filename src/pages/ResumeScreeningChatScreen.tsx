@@ -103,9 +103,14 @@ const ResumeScreeningChatScreen: React.FC<ResumeScreeningChatScreenProps> = ({ c
 
     return (
         <div className="ai-screening-chat">
-            <header className="page-header">
-                <h1>AI Resume Screening</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Chat with Yal to complete your profile assessment</p>
+            <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1>AI Resume Screening</h1>
+                    <p style={{ color: 'var(--text-secondary)' }}>Chat with Yal to complete your profile assessment</p>
+                </div>
+                <button className="btn btn-outline-danger btn-sm" onClick={onComplete}>
+                    End Screening
+                </button>
             </header>
 
             <div className="ai-widget chat-widget" style={{ height: '600px', display: 'flex', flexDirection: 'column' }}>

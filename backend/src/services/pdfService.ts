@@ -104,5 +104,59 @@ export const pdfService = {
 
             doc.end();
         });
+    },
+
+    generateScoreCard: (candidateName: string, jobTitle: string, score: number, breakdown: any): Promise<Buffer> => {
+        // ... (lines 109-140 are fine, just fixing the comma above)
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument();
+            const buffers: Buffer[] = [];
+            doc.on('data', buffers.push.bind(buffers));
+            doc.on('end', () => resolve(Buffer.concat(buffers)));
+            doc.on('error', reject);
+
+            doc.fontSize(24).text('Interview Score Card', { align: 'center' });
+            doc.moveDown();
+            doc.fontSize(16).text(`Candidate: ${candidateName}`);
+            doc.text(`Position: ${jobTitle}`);
+            doc.moveDown(2);
+
+            // Big Score
+            doc.fontSize(40).fillColor('#4338ca').text(`${score}/10`, { align: 'center' });
+            doc.fillColor('black');
+            doc.fontSize(14).text('Overall AI Score', { align: 'center' });
+            doc.moveDown(2);
+
+            // Breakdown
+            if (breakdown) {
+                doc.fontSize(16).text('Score Breakdown', { underline: true });
+                doc.moveDown();
+                Object.entries(breakdown).forEach(([key, val]) => {
+                    doc.fontSize(14).text(`${key.charAt(0).toUpperCase() + key.slice(1)}: ${val}/10`);
+                });
+            }
+            doc.end();
+        });
+    },
+
+    generateTranscriptPdf: (candidateName: string, jobTitle: string, transcript: string): Promise<Buffer> => {
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument();
+            const buffers: Buffer[] = [];
+            doc.on('data', buffers.push.bind(buffers));
+            doc.on('end', () => resolve(Buffer.concat(buffers)));
+            doc.on('error', reject);
+
+            doc.fontSize(20).text('Interview Transcript', { align: 'center' });
+            doc.moveDown();
+            doc.fillColor('grey').fontSize(12).text(`Candidate: ${candidateName} | Position: ${jobTitle}`, { align: 'center' });
+            doc.moveDown(2);
+
+            doc.fontSize(10).fillColor('black').text(transcript, {
+                align: 'justify',
+                lineGap: 4
+            });
+            doc.end();
+        });
     }
 };

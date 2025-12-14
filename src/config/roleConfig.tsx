@@ -9,7 +9,6 @@ import AdminDashboardScreen from '../pages/AdminDashboardScreen';
 import UserManagementScreen from '../pages/UserManagementScreen';
 import EmployerDashboardScreen from '../pages/EmployerDashboardScreen';
 import CandidatesScreen from '../pages/CandidatesScreen';
-import AIInterviewScreen from '../pages/AIInterviewScreen';
 import JobsScreen from '../pages/JobsScreen';
 import SettingsScreen from '../pages/SettingsScreen';
 import RecruiterDashboardScreen from '../pages/RecruiterDashboardScreen';
@@ -25,16 +24,15 @@ import JobCreationScreen from '../pages/JobCreationScreen';
 import AgentJobsListScreen from '../pages/AgentJobsListScreen';
 import AIInterviewReportScreen from '../pages/AIInterviewReportScreen';
 import AIInterviewPlatformScreen from '../pages/AIInterviewPlatformScreen';
-import GeminiLiveScreen from '../pages/GeminiLiveScreen';
+import RecruiterVoiceAgentScreen from '../pages/RecruiterVoiceAgentScreen';
 import PreInterviewAssessmentScreen from '../pages/PreInterviewAssessmentScreen';
 import SkillZoneScreen from '../pages/SkillZoneScreen';
 import RecruitmentSurveyScreen from '../pages/RecruitmentSurveyScreen';
 import EmployerAIPlatformScreen from '../pages/EmployerAIPlatformScreen';
 import MyResumeScreen from '../pages/MyResumeScreen';
 import CalendarScreen from '../pages/CalendarScreen';
-import AIVideoInterviewScreen from '../pages/AIVideoInterviewScreen'; // NEW: Video Interview Screen
-import LiveKitInterviewScreen from '../pages/LiveKitInterviewScreen'; // Tavus + LiveKit Interview
-import ScreeningSessionScreen from '../pages/ScreeningSessionScreen'; // NEW: Audio Screening
+import AvatarInterviewScreen from '../pages/AvatarInterviewScreen';
+import ScreeningSessionScreen from '../pages/ScreeningSessionScreen';
 
 // A placeholder for pages that are mentioned but not fully implemented
 const PlaceholderScreen = ({ pageName }) => (
@@ -71,7 +69,7 @@ export const roleConfig = {
             'ai-platform': EmployerAIPlatformScreen,
             'recruitment-pipeline': CandidatesScreen,
             'recruitment-survey': RecruitmentSurveyScreen,
-            'candidates': AllCandidatesScreen, // Pointing to the real component now
+            'candidates': AllCandidatesScreen,
             'skill-zone': SkillZoneScreen,
             'calendar': CalendarScreen,
 
@@ -80,8 +78,8 @@ export const roleConfig = {
             'employer-add-job': JobCreationScreen,
             'employer-edit-job': JobCreationScreen,
             'interview-report': AIInterviewReportScreen,
-            'interview': AIInterviewScreen, // Existing audio interview
-            'ai-video-interview': AIVideoInterviewScreen, // NEW: Video interview
+            'interview': AvatarInterviewScreen,
+            'video-interview': AvatarInterviewScreen,
         },
     },
     Candidate: {
@@ -100,10 +98,10 @@ export const roleConfig = {
             'calendar': CalendarScreen,
             'apply-for-job': JobApplicationScreen,
             'pre-interview-assessment': PreInterviewAssessmentScreen,
-            'screening-session': ScreeningSessionScreen, // NEW
-            interview: AIInterviewScreen, // Existing audio interview
-            'ai-video-interview': AIVideoInterviewScreen, // Gemini Video interview
-            'livekit-interview': LiveKitInterviewScreen, // Tavus + LiveKit interview
+            'screening-session': ScreeningSessionScreen,
+            'interview': AvatarInterviewScreen,
+            'video-interview': AvatarInterviewScreen,
+            'avatar-interview': AvatarInterviewScreen,
             'interview-report': AIInterviewReportScreen,
             settings: SettingsScreen,
         },
@@ -147,8 +145,8 @@ export const roleConfig = {
             settings: SettingsScreen,
             'calendar': CalendarScreen,
             'interview-report': AIInterviewReportScreen,
-            'interview': AIInterviewScreen, // Existing audio interview
-            'ai-video-interview': AIVideoInterviewScreen, // NEW: Video interview
+            'interview': AvatarInterviewScreen,
+            'video-interview': AvatarInterviewScreen,
         },
     },
     Recruiter: {
@@ -156,7 +154,7 @@ export const roleConfig = {
         navItems: [
             { name: 'Dashboard', page: 'dashboard', icon: <DashboardIcon /> },
             { name: 'AI Platform', page: 'ai-platform', icon: <ChatIcon /> },
-            { name: 'Gemini Interview Live', page: 'gemini-live', icon: <ChatIcon /> },
+            { name: 'Recruiter Voice Agent', page: 'voice-agent', icon: <ChatIcon /> },
             { name: 'Calendar', page: 'calendar', icon: <CalendarIcon /> },
             { name: 'AI Candidates Match', page: 'matching', icon: <TargetIcon /> },
             { name: 'Talent Pipeline', page: 'candidates', icon: <CandidatesIcon /> },
@@ -166,15 +164,15 @@ export const roleConfig = {
         pages: {
             dashboard: RecruiterDashboardScreen,
             'ai-platform': AIInterviewPlatformScreen,
-            'gemini-live': GeminiLiveScreen,
+            'voice-agent': RecruiterVoiceAgentScreen,
             candidates: CandidatesScreen,
             matching: CandidateMatchingScreen,
             allCandidates: AllCandidatesScreen,
             settings: SettingsScreen,
             'calendar': CalendarScreen,
             'interview-report': AIInterviewReportScreen,
-            'interview': AIInterviewScreen, // Existing audio interview
-            'ai-video-interview': AIVideoInterviewScreen, // NEW: Video interview
+            'interview': AvatarInterviewScreen,
+            'video-interview': AvatarInterviewScreen,
         },
     },
 };

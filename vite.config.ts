@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3001,
       host: '0.0.0.0',
-      allowedHosts: ["stasia-mediastinal-fathomlessly.ngrok-free.dev"],
+      allowedHosts: ["stasia-mediastinal-fathomlessly.ngrok-free.dev", "unmerchantable-lorina-broodily.ngrok-free.dev"],
       proxy: {
         "/api": {
           target: "http://localhost:8000",

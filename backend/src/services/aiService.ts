@@ -14,6 +14,7 @@
 
 import { GoogleGenerativeAI, GenerateContentResponse } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import mammoth from 'mammoth';
 
 dotenv.config();
 
@@ -47,6 +48,11 @@ export interface ResumeData {
     year: string;
   }>;
   skills: string[];
+  projects?: Array<{
+    name: string;
+    description: string;
+    technologies?: string[] | string;
+  }>;
   certifications?: string[];
 }
 
@@ -132,15 +138,36 @@ class AIService {
     }
 
     const safeMime = this.normalizeMime(mimeType);
-    const safeData = this.cleanBase64(fileBase64);
+    let safeData = this.cleanBase64(fileBase64);
 
     const isWord =
       safeMime === 'application/msword' ||
       safeMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-    const prompt = isWord
-      ? `Parse this Word resume into structured JSON.
-         STRICTLY follow this schema:
+    let extractedText = '';
+
+    if (isWord) {
+      console.log(`[AIService] Attempting to parse Word document. Mime: ${mimeType}, Size: ${safeData.length}`);
+      try {
+        const buffer = Buffer.from(safeData, 'base64');
+        const result = await mammoth.extractRawText({ buffer: buffer });
+        extractedText = result.value;
+        console.log(`[AIService] Mammoth extraction success. Text length: ${extractedText.length}`);
+        if (result.messages && result.messages.length > 0) {
+          console.log('[AIService] Mammoth messages:', result.messages);
+        }
+      } catch (err) {
+        console.error('[AIService] Mammoth extraction failed:', err);
+      }
+    } else {
+      console.log(`[AIService] Parsing non-Word document. Mime: ${mimeType}`);
+    }
+
+    // Determine prompt based on whether we have extracted text or not.
+    // If we have extractedText, we send that as text prompt.
+    // If not (PDF/Image), we send inlineData.
+
+    const schema = `
          {
            "personalInfo": {
              "name": "string",
@@ -170,50 +197,37 @@ class AIService {
              "technologies": ["string"]
            }],
            "certifications": ["string"]
-         }
+         }`;
+
+    const prompt = isWord && extractedText
+      ? `Parse this resume text into structured JSON.
+         STRICTLY follow this schema:
+         ${schema}
+         
+         Resume Content:
+         ${extractedText}
+         
+         Note: Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
          Return ONLY the JSON.`
       : `Parse this resume (PDF/Image) into structured JSON.
          STRICTLY follow this schema:
-         {
-           "personalInfo": {
-             "name": "string",
-             "email": "string",
-             "phone": "string",
-             "linkedin": "string",
-             "city": "string",
-             "state": "string"
-           },
-           "summary": "string",
-           "experience": [{
-             "company": "string",
-             "role": "string",
-             "startDate": "string",
-             "endDate": "string",
-             "description": "string"
-           }],
-           "education": [{
-             "institution": "string",
-             "degree": "string",
-             "year": "string"
-           }],
-           "skills": ["string"],
-           "projects": [{
-             "name": "string",
-             "description": "string",
-             "technologies": ["string"]
-           }],
-           "certifications": ["string"]
-         }
+         ${schema}
+
+         Note: Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
          Return ONLY the JSON.`;
 
     const model = this.genAI.getGenerativeModel({
       model: 'gemini-2.0-flash-exp'
     });
 
-    const result = await model.generateContent([
-      { text: prompt },
-      { inlineData: { mimeType: safeMime, data: safeData } }
-    ]);
+    let parts: any[] = [{ text: prompt }];
+
+    // Only attach binary if we didn't extract text (i.e. it's a PDF/Image)
+    if (!isWord || !extractedText) {
+      parts.push({ inlineData: { mimeType: safeMime, data: safeData } });
+    }
+
+    const result = await model.generateContent(parts);
 
     const response = await result.response;
     let jsonText = response.text().trim();
@@ -237,6 +251,7 @@ class AIService {
       throw new Error('Failed to parse resume JSON from AI response');
     }
   }
+
 
   /**
    * Screen resume against job description
@@ -413,22 +428,56 @@ class AIService {
 
     const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-    // Convert history to Gemini format
-    const chatHistory = history.map(h => ({
-      role: h.role === 'ai' ? 'model' : 'user',
-      parts: [{ text: h.content }]
-    }));
+    // Validate and Clean History
+    // 1. Map to internal format
+    // 2. Filter empty content (prevents "required oneof field 'data'" error)
+    // 3. Merge consecutive same-role messages (Google GenAI requires alternating roles)
 
-    // FIX: Ensure history starts with user
-    if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
-      chatHistory.unshift({
-        role: 'user',
-        parts: [{ text: 'Hello, I am ready for the screening.' }]
-      });
+    const cleanHistory: Array<{ role: string, parts: [{ text: string }] }> = [];
+
+    // Add initial user message if needed (will be handled by merge logic if user provides history starting with user)
+    // Actually, let's process the input history first.
+
+    for (const h of history) {
+      const content = (h.content || '').trim();
+      if (!content) continue; // Skip empty messages
+
+      const role = h.role === 'ai' ? 'model' : 'user';
+      const lastMsg = cleanHistory[cleanHistory.length - 1];
+
+      if (lastMsg && lastMsg.role === role) {
+        // Merge with previous message to enforce alternating roles
+        lastMsg.parts[0].text += `\n\n${content}`;
+      } else {
+        cleanHistory.push({
+          role,
+          parts: [{ text: content }]
+        });
+      }
     }
 
+    // Ensure history starts with user for Gemini
+    if (cleanHistory.length === 0 || cleanHistory[0].role === 'model') {
+      const introText = 'Hello, I am ready for the screening.';
+      if (cleanHistory.length > 0 && cleanHistory[0].role === 'model') {
+        // If first is model, prepend user
+        cleanHistory.unshift({
+          role: 'user',
+          parts: [{ text: introText }]
+        });
+      } else {
+        // If empty
+        cleanHistory.push({
+          role: 'user',
+          parts: [{ text: introText }]
+        });
+      }
+    }
+
+    console.log(`[AIService] Chat Screening History: ${cleanHistory.length} turns`);
+
     const chat = model.startChat({
-      history: chatHistory
+      history: cleanHistory
     });
 
     const prompt = `User response: "${userResponse}".
@@ -624,6 +673,23 @@ Return JSON only.`;
     }
 
     return JSON.parse(jsonText);
+  }
+
+  /**
+   * Generate generic text content
+   */
+  async generateText(prompt: string, useThinkingMode: boolean = false): Promise<string> {
+    this.initialize();
+    if (!this.genAI) throw new Error('AI Service not initialized');
+
+    // Use a model suitable for text generation. 
+    // Thinking mode could select a different model if available, but for now we default to the standard.
+    const model = this.genAI.getGenerativeModel({
+      model: useThinkingMode ? 'gemini-2.0-flash-thinking-exp-01-21' : 'gemini-2.0-flash-exp'
+    });
+
+    const result = await model.generateContent(prompt);
+    return (await result.response).text();
   }
 }
 

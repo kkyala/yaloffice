@@ -1,41 +1,38 @@
 /**
  * AI Service - Frontend Proxy
- *
+ * 
  * ⚠️ SECURITY: This service proxies all AI calls to the backend.
- * NO direct Gemini API calls happen in the frontend.
- *
- * All requests go to: http://localhost:8000/api/ai/*
- *
- * Backend handles:
- * - Resume parsing (PDF, Word, Images)
- * - Resume screening and matching
- * - Interview scoring and analysis
- * - Video analysis
- * - Content generation
+ * NO direct API calls to AI providers (Gemini, OpenAI, etc.) happen in the frontend.
+ * 
+ * All requests go to: /api/ai/* (prefixed by API_BASE)
  */
 
-import { config } from '../config/appConfig';
-import { Type as GoogleGenAIType, Modality as GoogleGenAIModality } from '@google/genai';
+import { api } from './api';
 
-// Backend API URL - uses config or defaults to relative path
-const getApiBase = (): string => {
-    const base = config.apiBaseUrl || '';
-    // If base ends with /api, remove it to avoid double /api in constructed URLs
-    if (base.endsWith('/api')) {
-        return base.slice(0, -4);
-    }
-    return base;
-};
+// --- GENERIC AI TYPE DEFINITIONS ---
+export const AISchemaType = {
+    STRING: 'STRING',
+    NUMBER: 'NUMBER',
+    INTEGER: 'INTEGER',
+    BOOLEAN: 'BOOLEAN',
+    ARRAY: 'ARRAY',
+    OBJECT: 'OBJECT'
+} as const;
 
-// ========================================================================================
-// TYPES (kept for compatibility)
-// ========================================================================================
+export const AIModality = {
+    TEXT: 'TEXT',
+    IMAGE: 'IMAGE',
+    AUDIO: 'AUDIO',
+    VIDEO: 'VIDEO'
+} as const;
 
+// --- CONSTANTS & CONFIGURATION ---
+
+export const AVAILABLE_LIVE_MODELS = ['voice-optimized', 'standard'] as const;
 export const AVAILABLE_VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'] as const;
-export const AVAILABLE_CHAT_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'] as const;
 
 export type VoiceName = typeof AVAILABLE_VOICES[number];
-export type ChatModelName = typeof AVAILABLE_CHAT_MODELS[number];
+export type LiveModelName = typeof AVAILABLE_LIVE_MODELS[number];
 
 export interface VoiceConfig {
     voiceName: VoiceName;
@@ -46,23 +43,14 @@ export interface VoiceConfig {
     audioEncoding?: 'MP3' | 'OGG_OPUS' | 'LINEAR16';
 }
 
-export interface ModelConfig {
-    chatModel: ChatModelName;
-}
-
 export interface InterviewSettings {
     language: string;
     voice?: VoiceName;
-    models?: ModelConfig;
     enableNativeAudio?: boolean;
 }
 
-export interface AssistantResponse {
-    text: string;
-}
-
 // ========================================================================================
-// VOICE SELECTION HELPERS (kept for compatibility)
+// VOICE HELPERS
 // ========================================================================================
 
 export function selectOptimalVoice(settings: Pick<InterviewSettings, 'language'>): VoiceName {
@@ -82,153 +70,345 @@ export function getVoiceConfigForLanguage(language: string, voice?: VoiceName): 
         voiceName,
         languageCode: language,
         gender: gender,
-        speakingRate: 1.03,
+        speakingRate: 1.0,
         pitch: 0.0,
         audioEncoding: 'MP3'
     };
 }
 
 // ========================================================================================
-// BACKEND PROXY FUNCTIONS
+// MEDIA HELPERS
 // ========================================================================================
 
 /**
- * Parse resume document (PDF, Word, Image) - proxied to backend
+ * Encodes a Uint8Array to a Base64 string.
+ */
+export function encode(data: Uint8Array): string {
+    let binary = '';
+    const len = data.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(data[i]);
+    }
+    return btoa(binary);
+}
+
+/**
+ * Decodes a Base64 string to a Uint8Array.
+ */
+export function decode(base64: string): Uint8Array {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+}
+
+/**
+ * Decodes raw PCM audio data into an AudioBuffer.
+ */
+export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+    const dataInt16 = new Int16Array(data.buffer);
+    const frameCount = dataInt16.length / numChannels;
+    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+    for (let channel = 0; channel < numChannels; channel++) {
+        const channelData = buffer.getChannelData(channel);
+        for (let i = 0; i < frameCount; i++) {
+            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+        }
+    }
+    return buffer;
+}
+
+/**
+ * Converts a File or Blob object to a Base64 string.
+ */
+export const blobToBase64 = (blob: File | Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result.split(',')[1]); // Remove data URL prefix
+            } else {
+                reject(new Error('Failed to read blob as base64 string.'));
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
+
+/**
+ * Captures a single video frame from a HTMLVideoElement and returns it as a Base64 JPEG string.
+ */
+export const captureVideoFrame = (videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement, jpegQuality: number = 0.7): string => {
+    if (!videoElement || !canvasElement) throw new Error("Video or canvas element not provided.");
+
+    const context = canvasElement.getContext('2d');
+    if (!context) throw new Error("Could not get 2D context from canvas.");
+
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+    context.drawImage(videoElement, 0, 0, videoElement.videoWidth, videoElement.videoHeight);
+
+    const dataURL = canvasElement.toDataURL('image/jpeg', jpegQuality);
+    return dataURL.split(',')[1];
+};
+
+// ========================================================================================
+// LIVE SESSION (WEBSOCKET)
+// ========================================================================================
+
+/**
+ * Establishes a real-time, bidirectional connection for Gemini Live conversations,
+ * capable of handling both audio and optional video (image frames).
+ */
+export function createLiveSession(callbacks: {
+    onopen: () => void;
+    onmessage: (message: any) => Promise<void>;
+    onerror: (e: Event) => void;
+    onclose: (e: CloseEvent) => void;
+}, sessionSettings: {
+    systemInstruction: string;
+    model: LiveModelName;
+    voiceConfig: VoiceConfig;
+    enableVideo?: boolean;
+}): Promise<{
+    sendRealtimeInput: (input: { media?: { mimeType?: string; data?: string } | { mimeType?: string; data?: string }[]; text?: string }) => void;
+    close: () => void;
+}> {
+    return new Promise((resolve, reject) => {
+        const { systemInstruction, model, voiceConfig } = sessionSettings;
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws/gemini-proxy?sessionId=${Date.now()}`;
+
+        console.log('[AIService] Connecting to backend proxy:', wsUrl);
+        const ws = new WebSocket(wsUrl);
+
+        const session = {
+            sendRealtimeInput: (input: { media?: { mimeType: string; data: string } | { mimeType: string; data: string }[]; text?: string }) => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    if (input.text) {
+                        ws.send(JSON.stringify({
+                            type: 'text',
+                            text: input.text
+                        }));
+                        return;
+                    }
+
+                    if (input.media) {
+                        const chunk = Array.isArray(input.media) ? input.media[0] : input.media;
+                        if (chunk && chunk.mimeType && chunk.data) {
+                            if (chunk.mimeType.includes('audio')) {
+                                const binaryString = atob(chunk.data);
+                                const len = binaryString.length;
+                                const bytes = new Uint8Array(len);
+                                for (let i = 0; i < len; i++) {
+                                    bytes[i] = binaryString.charCodeAt(i);
+                                }
+                                if (Math.random() < 0.02) {
+                                    console.log(`[AIService] Sending ${bytes.length} bytes of audio to backend`);
+                                }
+                                ws.send(bytes);
+                            } else {
+                                ws.send(JSON.stringify({
+                                    type: 'audio',
+                                    data: chunk.data,
+                                    mimeType: chunk.mimeType
+                                }));
+                            }
+                        }
+                    }
+                }
+            },
+            close: () => {
+                ws.close();
+            }
+        };
+
+        ws.onopen = () => {
+            console.log('[AIService] WebSocket connected');
+            const startConfig = {
+                type: 'start',
+                config: {
+                    systemInstruction: systemInstruction,
+                    model: model,
+                    voiceName: voiceConfig.voiceName
+                }
+            };
+            ws.send(JSON.stringify(startConfig));
+            callbacks.onopen();
+            resolve(session);
+        };
+
+        ws.onmessage = async (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'audio' && message.audio) {
+                    await callbacks.onmessage({
+                        serverContent: {
+                            modelTurn: {
+                                parts: [{
+                                    inlineData: {
+                                        mimeType: message.audio.mimeType || 'audio/pcm;rate=24000',
+                                        data: message.audio.data
+                                    }
+                                }]
+                            },
+                            turnComplete: false
+                        }
+                    });
+                } else if (message.type === 'transcript' && message.transcript) {
+                    await callbacks.onmessage({
+                        serverContent: {
+                            modelTurn: {
+                                parts: [{
+                                    text: message.transcript.text
+                                }]
+                            },
+                            turnComplete: message.transcript.isFinal
+                        }
+                    });
+                } else if (message.type === 'error') {
+                    console.error('[AIService] Proxy error:', message.error);
+                }
+            } catch (err) {
+                console.error('[AIService] Error processing message:', err);
+            }
+        };
+
+        ws.onerror = (e) => {
+            console.error('[AIService] WebSocket error:', e);
+            callbacks.onerror(e);
+            if (ws.readyState === WebSocket.CONNECTING) {
+                reject(e);
+            }
+        };
+
+        ws.onclose = (e) => {
+            console.log('[AIService] WebSocket closed:', e.code, e.reason);
+            callbacks.onclose(e);
+        };
+    });
+}
+
+
+// ========================================================================================
+// REST BACKEND PROXY
+// ========================================================================================
+
+async function requestBackend(endpoint: string, body: any): Promise<any> {
+    // Uses the API service to handle token, headers, and base URL logic automatically
+    const { data, error } = await api.post(`/ai/${endpoint}`, body);
+
+    if (error) {
+        throw error;
+    }
+
+    // Unwrap standard backend response format: { success: true, data: ... }
+    if (data && data.success && data.data) {
+        return data.data;
+    }
+
+    return data;
+}
+
+/**
+ * Parse resume document (PDF, Word, Image)
  */
 async function parseResumeDocument(fileBase64: string, mimeType: string): Promise<any> {
-    const API_BASE = getApiBase();
-    const response = await fetch(`${API_BASE}/api/ai/resume/parse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileBase64, mimeType })
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to parse resume');
-    }
-
-    const result = await response.json();
-    return result.data;
+    return requestBackend('resume/parse', { fileBase64, mimeType });
 }
 
 /**
- * Screen resume against job description - proxied to backend
+ * Screen resume against job description
  */
 async function screenResume(resumeText: string, jobDescription: string): Promise<any> {
-    const API_BASE = getApiBase();
-    const response = await fetch(`${API_BASE}/api/ai/resume/screen`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeText, jobDescription })
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to screen resume');
-    }
-
-    const result = await response.json();
-    return result.data;
+    return requestBackend('resume/screen', { resumeText, jobDescription });
 }
 
 /**
- * Score interview response - proxied to backend
+ * Score interview response
  */
 async function scoreResponse(question: string, response: string): Promise<{ score: number, feedback: string }> {
-    const API_BASE = getApiBase();
-    const res = await fetch(`${API_BASE}/api/ai/interview/score`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, response })
-    });
-
-    if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Failed to score response');
-    }
-
-    const result = await res.json();
-    return result.data;
+    return requestBackend('interview/score', { question, response });
 }
 
 /**
- * Generate interview summary - proxied to backend
+ * Generate interview summary
  */
 async function generateInterviewSummary(transcript: string): Promise<string> {
-    const API_BASE = getApiBase();
-    const response = await fetch(`${API_BASE}/api/ai/interview/summary`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript })
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to generate summary');
-    }
-
-    const result = await response.json();
-    return result.data.summary;
+    const data = await requestBackend('interview/summary', { transcript });
+    return data.summary;
 }
 
 /**
- * Analyze video - proxied to backend
+ * Analyze video
  */
 async function analyzeVideo(
     videoPart: { inlineData: { data: string; mimeType: string; } },
     prompt: string
 ): Promise<string> {
-    const API_BASE = getApiBase();
-    const response = await fetch(`${API_BASE}/api/ai/video/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            videoBase64: videoPart.inlineData.data,
-            mimeType: videoPart.inlineData.mimeType,
-            analysisPrompt: prompt
-        })
+    const data = await requestBackend('video/analyze', {
+        videoBase64: videoPart.inlineData.data,
+        mimeType: videoPart.inlineData.mimeType,
+        analysisPrompt: prompt
     });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to analyze video');
-    }
-
-    const result = await response.json();
-    return result.data.analysis;
+    return data.analysis;
 }
 
 /**
- * Generate structured JSON content - proxied to backend
+ * Generate structured JSON content
  */
 async function generateJsonContent(prompt: string, responseSchema: any): Promise<any> {
-    const API_BASE = getApiBase();
-
-    // Extract expected fields from schema
     const expectedFields = responseSchema.properties ? Object.keys(responseSchema.properties) : [];
-
-    const response = await fetch(`${API_BASE}/api/ai/generate/json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, expectedFields })
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to generate JSON content');
-    }
-
-    const result = await response.json();
-    return result.data;
+    return requestBackend('generate/json', { prompt, expectedFields });
 }
 
 /**
- * Generate speech - NOT IMPLEMENTED (use backend TTS or browser synthesis)
+ * Generate text - proxied to backend
  */
-async function generateSpeech(_text: string, _voice: VoiceName): Promise<string> {
-    throw new Error('TTS not implemented in frontend - use backend API or browser synthesis');
+async function generateText(prompt: string, useThinkingMode: boolean = false): Promise<string> {
+    const data = await requestBackend('generate/text', { prompt, useThinkingMode });
+    return data.text;
 }
+
+/**
+ * Generate text stream - proxied to backend (currently simulated stream)
+ */
+async function* generateTextStream(prompt: string, useThinkingMode: boolean = false): AsyncGenerator<string> {
+    const text = await generateText(prompt, useThinkingMode);
+    yield text;
+}
+
+/**
+ * Start screening session
+ */
+async function startScreening(resumeText: string, candidateName: string): Promise<{ greeting: string; firstQuestion: string }> {
+    return requestBackend('screening/start', { resumeText, candidateName });
+}
+
+/**
+ * Chat screening
+ */
+async function chatScreening(history: { role: string; content: string }[], userResponse: string): Promise<{ aiResponse: string; isComplete: boolean }> {
+    return requestBackend('screening/chat', { history, userResponse });
+}
+
+/**
+ * Finalize screening
+ */
+async function finalizeScreening(transcript: string, candidateName: string, userId: string, jobTitle?: string, jobId?: number): Promise<any> {
+    return requestBackend('screening/finalize', { transcript, candidateName, userId, jobTitle, jobId });
+}
+
+
+// ========================================================================================
+// FALLBACKS & UTILS
+// ========================================================================================
 
 /**
  * Browser-based speech synthesis (fallback)
@@ -245,7 +425,6 @@ function synthesizeSpeech(text: string): Promise<void> {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
         utterance.rate = 1;
-        utterance.pitch = 1;
 
         utterance.onend = () => resolve();
         utterance.onerror = (event) => reject(event.error || 'Speech synthesis error');
@@ -259,36 +438,20 @@ function synthesizeSpeech(text: string): Promise<void> {
     });
 }
 
-/**
- * Stub functions for compatibility (not used in LiveKit flow)
- */
-function isInitialized(): boolean {
-    return true; // Always return true since backend handles initialization
-}
-
-function createChatSession(_config: { systemInstruction: string, model?: string }): any {
-    throw new Error('createChatSession not available in frontend - use backend API');
-}
-
-function generateText(_prompt: string, _useThinkingMode: boolean): Promise<string> {
-    throw new Error('generateText not available in frontend - use backend API');
-}
-
-async function* generateTextStream(_prompt: string, _useThinkingMode: boolean): AsyncGenerator<string> {
-    throw new Error('generateTextStream not available in frontend - use backend API');
-}
 
 // ========================================================================================
 // EXPORT
 // ========================================================================================
 
 export const aiService = {
-    // Status
-    isInitialized,
+    // Initialization check (always true for backend proxy)
+    isInitialized: () => true,
 
-    // Type exports for compatibility
-    GoogleGenAIType,
-    GoogleGenAIModality,
+    // Generic Types
+    AISchemaType,
+    AIModality,
+    AVAILABLE_LIVE_MODELS,
+    AVAILABLE_VOICES,
 
     // Backend-proxied functions
     parseResumeDocument,
@@ -297,17 +460,6 @@ export const aiService = {
     generateInterviewSummary,
     analyzeVideo,
     generateJsonContent,
-
-    // Speech
-    generateSpeech,
-    synthesizeSpeech,
-
-    // Voice helpers
-    selectOptimalVoice,
-    getVoiceConfigForLanguage,
-
-    // Stub functions (throw errors - use backend instead)
-    createChatSession,
     generateText,
     generateTextStream,
 
@@ -315,64 +467,17 @@ export const aiService = {
     startScreening,
     chatScreening,
     finalizeScreening,
+
+    // Live Session & Media
+    createLiveSession,
+    encode,
+    decode,
+    decodeAudioData,
+    blobToBase64,
+    captureVideoFrame,
+
+    // Client-side utils
+    synthesizeSpeech,
+    selectOptimalVoice,
+    getVoiceConfigForLanguage,
 };
-
-/**
- * Start screening session - proxied to backend
- */
-async function startScreening(resumeText: string, candidateName: string): Promise<{ greeting: string; firstQuestion: string }> {
-    const API_BASE = getApiBase();
-    const response = await fetch(`${API_BASE}/api/ai/screening/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeText, candidateName })
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to start screening');
-    }
-
-    const result = await response.json();
-    return result.data;
-}
-
-/**
- * Chat screening - proxied to backend
- */
-async function chatScreening(history: { role: string; content: string }[], userResponse: string): Promise<{ aiResponse: string; isComplete: boolean }> {
-    const API_BASE = getApiBase();
-    const response = await fetch(`${API_BASE}/api/ai/screening/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history, userResponse })
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to chat');
-    }
-
-    const result = await response.json();
-    return result.data;
-}
-
-/**
- * Finalize screening - proxied to backend
- */
-async function finalizeScreening(transcript: string, candidateName: string, userId: string, jobTitle?: string, jobId?: number): Promise<any> {
-    const API_BASE = getApiBase();
-    const response = await fetch(`${API_BASE}/api/ai/screening/finalize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, candidateName, userId, jobTitle, jobId })
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to finalize screening');
-    }
-
-    const result = await response.json();
-    return result.data;
-}

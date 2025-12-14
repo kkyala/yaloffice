@@ -592,27 +592,51 @@ export default function ScreeningSessionScreen({ currentUser, onNavigate, interv
                     <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.025em', margin: 0 }}>AI Screening</h1>
                     <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Live voice assessment with our AI recruiter</p>
                 </div>
-                <div style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.875rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    background: status === 'active' ? '#fef2f2' : status === 'connecting' ? '#fffbeb' : '#f3f4f6',
-                    color: status === 'active' ? '#dc2626' : status === 'connecting' ? '#d97706' : '#4b5563',
-                    border: status === 'active' ? '1px solid #fecaca' : status === 'connecting' ? '1px solid #fde68a' : '1px solid #e5e7eb',
-                    boxShadow: status === 'active' ? '0 0 0 4px rgba(254, 242, 242, 0.5)' : 'none'
-                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    {(status === 'active' || status === 'connecting') && (
+                        <button
+                            onClick={stopSession}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                background: '#dc2626',
+                                color: 'white',
+                                borderRadius: '0.5rem',
+                                fontWeight: 600,
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                boxShadow: 'var(--box-shadow-sm)',
+                                fontSize: '0.875rem'
+                            }}
+                        >
+                            <StopCircleIcon style={{ width: '16px', height: '16px' }} />
+                            End Screening
+                        </button>
+                    )}
                     <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: status === 'active' ? '#ef4444' : status === 'connecting' ? '#f59e0b' : '#9ca3af',
-                        animation: status === 'active' ? 'pulse 1.5s infinite' : status === 'connecting' ? 'bounce 1s infinite' : 'none'
-                    }} />
-                    {status === 'active' ? 'LIVE RECORDING' : status === 'connecting' ? 'CONNECTING...' : 'READY'}
+                        padding: '0.5rem 1rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.875rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        background: status === 'active' ? '#fef2f2' : status === 'connecting' ? '#fffbeb' : '#f3f4f6',
+                        color: status === 'active' ? '#dc2626' : status === 'connecting' ? '#d97706' : '#4b5563',
+                        border: status === 'active' ? '1px solid #fecaca' : status === 'connecting' ? '1px solid #fde68a' : '1px solid #e5e7eb',
+                        boxShadow: status === 'active' ? '0 0 0 4px rgba(254, 242, 242, 0.5)' : 'none'
+                    }}>
+                        <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: status === 'active' ? '#ef4444' : status === 'connecting' ? '#f59e0b' : '#9ca3af',
+                            animation: status === 'active' ? 'pulse 1.5s infinite' : status === 'connecting' ? 'bounce 1s infinite' : 'none'
+                        }} />
+                        {status === 'active' ? 'LIVE RECORDING' : status === 'connecting' ? 'CONNECTING...' : 'READY'}
+                    </div>
                 </div>
             </div>
 

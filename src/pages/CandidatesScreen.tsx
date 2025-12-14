@@ -508,9 +508,16 @@ export default function CandidatesScreen({
     const handleDrop = (e: React.DragEvent, newStatus: string) => {
         e.preventDefault();
         const applicationId = parseInt(e.dataTransfer.getData("text/plain"), 10);
-        const droppedApp = candidatesData.find(app => app.id === applicationId);
+        const droppedApp = enrichedList.find(app => app.id === applicationId); // Use enrichedList to get full app object
+
         if (droppedApp && droppedApp.status !== newStatus) {
-            onUpdateApplicationStatus(applicationId, newStatus);
+            if (newStatus === 'Interviewing') {
+                // If moving to Interviewing, open setup modal to configure interview
+                setAppForSetup(droppedApp);
+                setIsSetupModalOpen(true);
+            } else {
+                onUpdateApplicationStatus(applicationId, newStatus);
+            }
         }
     };
 

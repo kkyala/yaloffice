@@ -137,6 +137,26 @@ class LiveKitService {
         // Room names should be alphanumeric with hyphens
         return /^[a-zA-Z0-9-_]+$/.test(roomName);
     }
+
+    /**
+     * Connect to a room (abstraction for fetching token)
+     */
+    async connectToRoom(applicationId: string, participantName: string): Promise<{ token: string; serverUrl: string }> {
+        // Create a config
+        // JobId is not readily available here, but we can pass a dummy or parse if needed. 
+        // For now, let's use a simplified room name generation or pass explicit params.
+        // Actually, let's just use applicationId as the unique identifier for now in the room name.
+        const roomName = `interview-${applicationId}`;
+
+        const roomConfig = {
+            roomName,
+            participantName,
+            enableRecording: config.livekit.roomSettings.enableRecording
+        };
+
+        const { token, url } = await this.getAccessToken(roomConfig);
+        return { token, serverUrl: url };
+    }
 }
 
 export const livekitService = new LiveKitService();

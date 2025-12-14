@@ -88,47 +88,49 @@ export default function CandidateMatchingScreen({ jobsData = [], candidatesData 
         setIsLoading(true);
         setError('');
         setRankedCandidates([]);
-        
+
         try {
             const candidatesToRank = candidatesData.map(c => ({ id: c.id, name: c.name, dob: c.dob, role: c.role }));
             const prompt = `Based on the following job description, rank the candidates by scoring them on the criteria in the requested JSON schema. Respond ONLY with a valid JSON array that follows the schema, with no additional text or markdown. Job Description: "${jobDescription}". Candidates: ${JSON.stringify(candidatesToRank)}.`;
-            const schema = { 
-                type: aiService.GoogleGenAIType.ARRAY, 
-                items: { 
-                    type: aiService.GoogleGenAIType.OBJECT, 
-                    properties: { 
-                        id: { type: aiService.GoogleGenAIType.NUMBER }, 
-                        resumeScore: { type: aiService.GoogleGenAIType.NUMBER, description: "Candidate's resume match to the job." }, 
-                        interviewScore: { type: aiService.GoogleGenAIType.NUMBER, description: "A hypothetical score for interview performance." }, 
-                        skillScore: { type: aiService.GoogleGenAIType.NUMBER, description: "Score for technical skills alignment." }, 
-                        suitabilityScore: { type: aiService.GoogleGenAIType.NUMBER, description: "Overall suitability for the role." } 
+            const schema = {
+                type: aiService.AISchemaType.ARRAY,
+                items: {
+                    type: aiService.AISchemaType.OBJECT,
+                    properties: {
+                        id: { type: aiService.AISchemaType.NUMBER },
+                        resumeScore: { type: aiService.AISchemaType.NUMBER, description: "Candidate's resume match to the job." },
+                        interviewScore: { type: aiService.AISchemaType.NUMBER, description: "A hypothetical score for interview performance." },
+                        skillScore: { type: aiService.AISchemaType.NUMBER, description: "Score for technical skills alignment." },
+                        suitabilityScore: { type: aiService.AISchemaType.NUMBER, description: "Overall suitability for the role." },
+                        totalScore: { type: aiService.AISchemaType.NUMBER },
+                        reasoning: { type: aiService.AISchemaType.STRING }
                     },
-                    required: ["id", "resumeScore", "interviewScore", "skillScore", "suitabilityScore"]
-                } 
+                    required: ['id', 'resumeScore', 'interviewScore', 'skillScore', 'suitabilityScore', 'totalScore', 'reasoning']
+                }
             };
 
             const results = await aiService.generateJsonContent(prompt, schema);
-            
+
             if (!results || !Array.isArray(results)) throw new Error("AI returned an invalid or empty JSON response.");
 
             const ranked = results.map(res => {
                 const candidate = candidatesData.find(c => c.id === res.id);
                 if (!candidate) return null;
-                
+
                 const resumeScore = clampScore(res.resumeScore);
                 const interviewScore = clampScore(res.interviewScore);
                 const skillScore = clampScore(res.skillScore);
                 const suitabilityScore = clampScore(res.suitabilityScore);
 
                 const totalScore = (resumeScore * 0.4) + (interviewScore * 0.4) + (skillScore * 0.1) + (suitabilityScore * 0.1);
-                
-                return { 
-                    ...candidate, 
-                    resumeScore, 
-                    interviewScore, 
-                    skillScore, 
-                    suitabilityScore, 
-                    totalScore: parseFloat(totalScore.toFixed(1)) 
+
+                return {
+                    ...candidate,
+                    resumeScore,
+                    interviewScore,
+                    skillScore,
+                    suitabilityScore,
+                    totalScore: parseFloat(totalScore.toFixed(1))
                 };
             }).filter(Boolean).sort((a, b) => b.totalScore - a.totalScore);
 
@@ -164,12 +166,12 @@ export default function CandidateMatchingScreen({ jobsData = [], candidatesData 
         onMoveCandidates(candidatesToMove, selectedJobId);
         setSelectedCandidateIds(new Set());
     };
-    
+
     return (
         <>
             <header className="page-header">
                 <h1>AI Candidate Match</h1>
-                 {rankedCandidates.length > 0 && (
+                {rankedCandidates.length > 0 && (
                     <div className="header-actions">
                         {selectedCandidateIds.size > 0 && (
                             <button className="btn btn-secondary" onClick={handleMoveToPipeline}>
@@ -194,9 +196,9 @@ export default function CandidateMatchingScreen({ jobsData = [], candidatesData 
                     <button className="btn btn-primary btn-full" onClick={handleRankCandidates} disabled={isLoading || noCandidatesExist}>
                         {isLoading ? 'Analyzing Candidates...' : '3. Find Best Matches with AI'}
                     </button>
-                     {noCandidatesExist && <p className="no-candidates-warning">Please add candidates to your talent pool before running the match.</p>}
+                    {noCandidatesExist && <p className="no-candidates-warning">Please add candidates to your talent pool before running the match.</p>}
                 </div>
-                
+
                 <div className="matching-results-panel">
                     {isLoading ? (
                         <div className="loading-state">
@@ -206,16 +208,16 @@ export default function CandidateMatchingScreen({ jobsData = [], candidatesData 
                         </div>
                     ) : error ? (
                         <div className="error-state">
-                             <h3>An Error Occurred</h3>
-                             <p>{error}</p>
+                            <h3>An Error Occurred</h3>
+                            <p>{error}</p>
                         </div>
                     ) : rankedCandidates.length > 0 ? (
                         <div className="ranked-list-container">
                             <div className="ranked-list-header">
                                 <div className="header-selection">
-                                    <input 
-                                        type="checkbox" 
-                                        onChange={handleSelectAll} 
+                                    <input
+                                        type="checkbox"
+                                        onChange={handleSelectAll}
                                         checked={selectedCandidateIds.size === rankedCandidates.length && rankedCandidates.length > 0}
                                         aria-label="Select all candidates"
                                     />
@@ -225,7 +227,7 @@ export default function CandidateMatchingScreen({ jobsData = [], candidatesData 
                             </div>
                             <div className="ranked-list">
                                 {rankedCandidates.map((c, index) => (
-                                    <RankedCandidateCard 
+                                    <RankedCandidateCard
                                         key={c.id}
                                         candidate={c}
                                         rank={index + 1}

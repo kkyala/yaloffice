@@ -60,6 +60,7 @@ Behaviours:
 async function createGeminiConnection(
   sessionId: string,
   systemInstruction: string,
+  modelName: string,
   onMessage: (msg: GeminiMessage) => void,
   onError: (err: Error) => void,
   onClose: () => void
@@ -72,9 +73,17 @@ async function createGeminiConnection(
     onError(new Error('GEMINI_API_KEY not configured'));
     return null;
   }
+  // Resolve abstract model names to specific versions
+  let modelId = modelName;
+  if (!modelId || modelId === 'standard' || modelId === 'default') {
+    modelId = 'gemini-2.0-flash-exp';
+  } else if (modelId === 'advanced' || modelId === 'voice-optimized') {
+    modelId = 'gemini-2.5-flash-native-audio-preview-09-2025';
+  } else {
+    // Fallback for direct model names if needed, or default
+    modelId = modelName || 'gemini-2.0-flash-exp';
+  }
 
-  // Use the live-capable model
-  const model = 'gemini-2.0-flash-exp';
   const url = `${GEMINI_LIVE_URL}?key=${apiKey}`;
 
   let ws: WebSocket;
@@ -92,7 +101,7 @@ async function createGeminiConnection(
     // Send initial setup message
     const setupMessage = {
       setup: {
-        model: `models/${model}`,
+        model: `models/${modelId}`,
         generationConfig: {
           responseModalities: ['AUDIO'],
           speechConfig: {
@@ -132,16 +141,34 @@ async function createGeminiConnection(
       const message = JSON.parse(data.toString());
       if (message.serverContent) {
         const content = message.serverContent;
+
+        // Log input transcription (user's speech recognized by Gemini)
+        if (content.inputTranscription) {
+          console.log(`[Gemini] 📝 User speech recognized: "${content.inputTranscription.text}"`);
+          onMessage({ type: 'transcript', transcript: { text: content.inputTranscription.text, isFinal: true, speaker: 'user' } });
+        }
+
         if (content.modelTurn?.parts) {
           for (const part of content.modelTurn.parts) {
             if (part.inlineData?.mimeType?.startsWith('audio/')) {
+              console.log(`[Gemini] 🔊 Received AI audio chunk`);
               onMessage({ type: 'audio', audio: { data: part.inlineData.data, mimeType: part.inlineData.mimeType } });
             }
             if (part.text) {
+              console.log(`[Gemini] 💬 AI text response: "${part.text.substring(0, 50)}..."`);
               onMessage({ type: 'transcript', transcript: { text: part.text, isFinal: content.turnComplete || false, speaker: 'model' } });
             }
           }
         }
+
+        if (content.turnComplete) {
+          console.log(`[Gemini] ✅ Turn complete`);
+        }
+      }
+
+      // Handle setup complete
+      if (message.setupComplete) {
+        console.log(`[Gemini] 🎉 Setup complete for session ${sessionId}`);
       }
     } catch (err) {
       console.error('[Gemini] Failed to parse message:', err);
@@ -172,43 +199,73 @@ export function setupGeminiProxyWS(wss: WebSocketServer): void {
 
     let geminiWs: WebSocket | null = null;
 
-    clientWs.on('message', async (data) => {
-      // Check if it's a config message (JSON)
-      if (!Buffer.isBuffer(data)) {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.type === 'start' && msg.config) {
-            console.log(`[Proxy] Received start command for session ${sessionId}`);
+    clientWs.on('message', async (data, isBinary) => {
+      // Parse message. In 'ws', data is Buffer.
+      // We first try to parse it as JSON to see if it's a control message (start/text).
+      // If parsing fails or it's binary audio data, we treat it as such.
 
-            // Initialize Gemini Connection
-            geminiWs = await createGeminiConnection(
-              sessionId,
-              msg.config.systemInstruction || INTERVIEW_SYSTEM_PROMPT,
-              (geminiMsg) => {
-                if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(geminiMsg));
-              },
-              (err) => {
-                if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'error', error: { message: err.message } }));
-              },
-              () => {
-                if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'gemini_closed' }));
-              }
-            );
+      let parsedMsg: any = null;
+      let isJson = false;
 
-            if (geminiWs) {
-              geminiConnections.set(clientWs, geminiWs);
-            }
-            return;
-          }
-        } catch (e) {
-          // Not a JSON start message, treat as normal data
+      try {
+        const str = data.toString();
+        // Check if it looks like JSON before parsing to avoid unnecessary overhead for audio
+        if (str.trim().startsWith('{')) {
+          parsedMsg = JSON.parse(str);
+          isJson = true;
         }
+      } catch (e) {
+        // Not JSON
       }
 
-      // Forward other messages (audio/text) to Gemini if connected
+      // 1. Handle "Start" Command (Session Init)
+      if (isJson && parsedMsg.type === 'start' && parsedMsg.config) {
+        console.log(`[Proxy] Received start command for session ${sessionId}`);
+
+        // Initialize Gemini Connection
+        const systemInstruction = parsedMsg.config.systemInstruction || INTERVIEW_SYSTEM_PROMPT;
+        const requestedModel = parsedMsg.config.model;
+
+        geminiWs = await createGeminiConnection(
+          sessionId,
+          systemInstruction,
+          requestedModel,
+          (geminiMsg) => {
+            if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(geminiMsg));
+          },
+          (err) => {
+            if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'error', error: { message: err.message } }));
+          },
+          () => {
+            if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify({ type: 'gemini_closed' }));
+          }
+        );
+
+        if (geminiWs) {
+          geminiConnections.set(clientWs, geminiWs);
+        }
+        return;
+      }
+
+      // 2. Forward Data to Gemini (if connected)
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
-        if (Buffer.isBuffer(data)) {
-          // Audio Data
+        if (isJson && parsedMsg.type === 'text') {
+          // Text Input
+          console.log(`[Proxy] Forwarding text to Gemini: "${parsedMsg.text?.substring(0, 50)}..."`);
+          geminiWs.send(JSON.stringify({
+            clientContent: {
+              turns: [{ role: 'user', parts: [{ text: parsedMsg.text }] }],
+              turnComplete: true
+            }
+          }));
+        } else if (Buffer.isBuffer(data)) {
+          // Audio Data (Binary)
+          const audioBytes = data.length;
+          // Log every 50th audio packet to avoid flooding
+          if (Math.random() < 0.02) {
+            console.log(`[Proxy] Forwarding audio to Gemini: ${audioBytes} bytes`);
+          }
+
           geminiWs.send(JSON.stringify({
             realtimeInput: {
               mediaChunks: [{
@@ -218,16 +275,8 @@ export function setupGeminiProxyWS(wss: WebSocketServer): void {
             }
           }));
         } else {
-          // JSON Data
-          const msg = JSON.parse(data.toString());
-          if (msg.type === 'text') {
-            geminiWs.send(JSON.stringify({
-              clientContent: {
-                turns: [{ role: 'user', parts: [{ text: msg.text }] }],
-                turnComplete: true
-              }
-            }));
-          }
+          // Fallback for non-buffer audio (shouldn't happen with standard ws client sending bytes)
+          console.warn('[Proxy] Received unexpected non-buffer data from client');
         }
       }
     });

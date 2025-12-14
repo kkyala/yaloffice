@@ -17,6 +17,7 @@ type Candidate = {
             strengths: string[];
             improvements: string[];
         };
+        audioRecordingUrl?: string;
     };
 };
 
@@ -166,6 +167,12 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
                 </div>
                 <div className="report-main-content">
                     <div className="dashboard-widget" style={{ height: 'calc(100vh - 200px)' }}>
+                        {interviewData?.audioRecordingUrl && (
+                            <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+                                <h3 style={{ marginBottom: '1rem' }}>Interview Recording</h3>
+                                <audio controls src={interviewData.audioRecordingUrl} style={{ width: '100%' }} />
+                            </div>
+                        )}
                         <h3>Interview Transcript</h3>
                         <div className="transcript-container" style={{ overflowY: 'auto', height: 'calc(100% - 40px)', paddingRight: '1rem' }}>
                             {transcript ? transcript.split('\n\n').map((line, index) => {

@@ -16,17 +16,6 @@ const Icon = (props) => (
     />
 );
 
-// export const YaalOfficeLogo = (props) => (
-//   <img
-//     src={`data:image/png;base64,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`}
-//     alt="Yāl Office Logo"
-//     width="40"
-//     height="40"
-//     style={{ objectFit: 'contain' }}
-//     {...props}
-//   />
-// );
-
 export const YaalOfficeLogo = (props) => (
     <img
         src="https://storage.googleapis.com/yalimages/ChatGPT%20Image%20Nov%2019%2C%202025%2C%2007_09_42%20AM.png"
@@ -248,6 +237,21 @@ export const GoogleIcon = (props) => (
         <path fill="#4285F4" d="M21.35 11.1H12v2.8h5.35c-0.25 1.3-1.05 2.35-2.25 3.15v2.6h3.65c2.15-2 3.4-4.9 3.4-8.15 0-0.8-0.1-1.55-0.25-2.3z" />
         <path fill="#34A853" d="M12 21c2.7 0 4.95-0.9 6.6-2.45l-3.65-2.6c-0.9 0.6-2.05 0.95-3.4 0.95-2.6 0-4.8-1.75-5.6-4.1H2.9v2.6C4.55 18.4 8 21 12 21z" />
         <path fill="#FBBC05" d="M6.4 12.85c-0.2-0.6-0.3-1.25-0.3-1.9s0.1-1.3 0.3-1.9V6.45H2.9c-1.35 2.7-1.35 5.8 0 8.5l3.5-2.1z" />
-        <path fill="#EA4335" d="M12 5.45c1.45 0 2.75 0.5 3.8 1.5l2.85-2.85C16.95 2.55 14.7 1.5 12 1.5 8 1.5 4.55 4.1 2.9 7.45l3.5 2.1c0.8-2.35 3-4.1 5.6-4.1z" />
     </svg>
+);
+
+export const UserIcon = (props) => (
+    <Icon {...props}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></Icon>
+);
+
+export const GraduationCapIcon = (props) => (
+    <Icon {...props}><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></Icon>
+);
+
+export const CodeIcon = (props) => (
+    <Icon {...props}><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></Icon>
+);
+
+export const AwardIcon = (props) => (
+    <Icon {...props}><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></Icon>
 );

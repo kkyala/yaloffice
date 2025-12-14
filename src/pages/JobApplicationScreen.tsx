@@ -42,7 +42,7 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
         const profileData = {
             name,
             summary,
-            mobile_number: mobile,
+            mobile: mobile,
             city,
             state,
             linkedin_url: linkedin,

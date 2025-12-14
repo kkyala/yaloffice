@@ -11,8 +11,7 @@ import ProfileModal from './components/ProfileModal';
 import { AIProvider } from './context/AIProvider';
 import FeedbackBanner from './components/FeedbackBanner';
 import FloatingAIChatWidget from './components/FloatingAIChatWidget';
-import AIVideoInterviewScreen from './pages/AIVideoInterviewScreen';
-import LiveKitInterviewScreen from './pages/LiveKitInterviewScreen';
+import AvatarInterviewScreen from './pages/AvatarInterviewScreen';
 
 const getErrorMessage = (error: any) => {
     if (typeof error === 'string') return error;
@@ -313,7 +312,7 @@ export default function App() {
 
             // Update user profile with resume details if missing
             const updates: any = {};
-            if (resumeData.personalInfo?.phone) updates.mobile_number = resumeData.personalInfo.phone;
+            if (resumeData.personalInfo?.phone) updates.mobile = resumeData.personalInfo.phone;
             if (resumeData.personalInfo?.city) updates.city = resumeData.personalInfo.city;
             if (resumeData.personalInfo?.state) updates.state = resumeData.personalInfo.state;
             if (resumeData.personalInfo?.linkedin) updates.linkedin_url = resumeData.personalInfo.linkedin;
@@ -332,7 +331,7 @@ export default function App() {
         }
     };
 
-    const handleSaveInterviewResults = async (applicationId: number, score: number, transcript: string, analysis?: any) => {
+    const handleSaveInterviewResults = async (applicationId: number, score: number, transcript: string, analysis?: any, audioUrl?: string) => {
         const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching candidate for interview save'); return; }
         const newConfig = {
@@ -341,10 +340,11 @@ export default function App() {
             aiScore: score,
             transcript,
             analysis,
+            audioRecordingUrl: audioUrl,
             completedAt: new Date().toISOString()
         };
         // Update status to 'Interviewing' if not already, and mark interview as completed
-        const { error } = await api.put(`/candidates/${applicationId}`, { 
+        const { error } = await api.put(`/candidates/${applicationId}`, {
             interview_config: newConfig,
             status: appData.status === 'Interviewing' ? appData.status : 'Interviewing' // Keep status as Interviewing after completion
         });
@@ -352,10 +352,19 @@ export default function App() {
     };
     const handleSaveAssessmentResults = async (applicationId: number, assessmentData: any) => {
         const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
-        if (fetchError) { handleError(fetchError, 'fetching candidate for assessment save'); return { success: false }; }
+        if (fetchError) {
+            handleError(fetchError, 'fetching candidate for assessment save');
+            return { success: false, error: getErrorMessage(fetchError) };
+        }
+
         const newConfig = { ...(appData.interview_config || {}), interviewStatus: 'assessment_completed', assessmentData };
         const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
-        if (error) { handleError(error, 'saving assessment results'); return { success: false }; }
+
+        if (error) {
+            handleError(error, 'saving assessment results');
+            return { success: false, error: getErrorMessage(error) };
+        }
+
         await refetchCandidates();
         return { success: true };
     };
@@ -392,11 +401,11 @@ export default function App() {
             // Check screening status from screening_assessments table
             try {
                 const { data: screeningStatus } = await api.get(`/interview/screening-status/${appData.user_id || appData.candidate_id}`);
-                
+
                 if (!screeningStatus?.completed) {
-                    return { 
-                        success: false, 
-                        error: 'Screening assessment must be completed before scheduling interview. Please ensure the candidate has completed their initial screening.' 
+                    return {
+                        success: false,
+                        error: 'Screening assessment must be completed before scheduling interview. Please ensure the candidate has completed their initial screening.'
                     };
                 }
             } catch (err) {
@@ -422,16 +431,25 @@ export default function App() {
     };
     const handleStartInterviewSession = async (applicationId: number) => {
         const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
-        if (fetchError) { handleError(fetchError, 'fetching app for interview start'); return { success: false }; }
+        if (fetchError) {
+            handleError(fetchError, 'fetching app for interview start');
+            return { success: false, error: getErrorMessage(fetchError) };
+        }
+
         const newConfig = { ...(appData.interview_config || {}), interviewStatus: 'started' };
         const { error } = await api.put(`/candidates/${applicationId}`, { interview_config: newConfig });
-        if (error) { handleError(error, 'starting interview session'); return { success: false }; }
+
+        if (error) {
+            handleError(error, 'starting interview session');
+            return { success: false, error: getErrorMessage(error) };
+        }
+
         await refetchCandidates();
         return { success: true };
     };
     const handleApplyForJob = async (job: any, profileData: any) => {
         if (!currentUser) return { success: false, error: 'User not logged in' };
-        const userProfilePayload = { name: profileData.name, mobile: profileData.mobile_number, city: profileData.city, state: profileData.state, linkedin_url: profileData.linkedin_url, work_authorization: profileData.work_authorization };
+        const userProfilePayload = { name: profileData.name, mobile: profileData.mobile, city: profileData.city, state: profileData.state, linkedin_url: profileData.linkedin_url, work_authorization: profileData.work_authorization };
         const { error: userUpdateError } = await api.put(`/users/${currentUser.id}`, userProfilePayload);
         if (userUpdateError) return { success: false, error: getErrorMessage(userUpdateError) };
         await refetchUsers();
@@ -555,11 +573,8 @@ export default function App() {
     // Determine which interview component to use based on interviewType
     const getInterviewComponent = () => {
         const interviewType = interviewingCandidate?.interview_config?.interviewType;
-        if (interviewType === 'livekit' || interviewType === 'tavus') {
-            return LiveKitInterviewScreen;
-        }
-        if (interviewType === 'video') {
-            return AIVideoInterviewScreen;
+        if (interviewType === 'livekit' || interviewType === 'tavus' || interviewType === 'video') {
+            return AvatarInterviewScreen;
         }
         // Default to audio interview
         return currentPage === 'interview' ? roleConfig[currentUser.role].pages['interview'] : PageComponent;
