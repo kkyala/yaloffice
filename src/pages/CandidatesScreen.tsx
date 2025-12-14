@@ -448,6 +448,8 @@ export default function CandidatesScreen({
     const [isScreeningReportOpen, setIsScreeningReportOpen] = useState(false);
     const [appForScreeningReport, setAppForScreeningReport] = useState<EnrichedApplication | null>(null);
 
+    const [pendingStatusUpdate, setPendingStatusUpdate] = useState<string | null>(null);
+
     // Profile Modal State
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [appForProfile, setAppForProfile] = useState<EnrichedApplication | null>(null);
@@ -508,12 +510,13 @@ export default function CandidatesScreen({
     const handleDrop = (e: React.DragEvent, newStatus: string) => {
         e.preventDefault();
         const applicationId = parseInt(e.dataTransfer.getData("text/plain"), 10);
-        const droppedApp = enrichedList.find(app => app.id === applicationId); // Use enrichedList to get full app object
+        const droppedApp = enrichedList.find(app => app.id === applicationId);
 
         if (droppedApp && droppedApp.status !== newStatus) {
             if (newStatus === 'Interviewing') {
                 // If moving to Interviewing, open setup modal to configure interview
                 setAppForSetup(droppedApp);
+                setPendingStatusUpdate('Interviewing'); // Set intent to move to Interviewing
                 setIsSetupModalOpen(true);
             } else {
                 onUpdateApplicationStatus(applicationId, newStatus);
@@ -522,21 +525,31 @@ export default function CandidatesScreen({
     };
 
     const handleSaveAndExit = (candidateData) => { onSaveCandidate(candidateData); setView('pipeline'); };
-    const handleOpenSetupModal = (app: EnrichedApplication) => { setAppForSetup(app); setIsSetupModalOpen(true); };
-    const handleCloseSetupModal = () => { setIsSetupModalOpen(false); setAppForSetup(null); };
+
+    const handleOpenSetupModal = (app: EnrichedApplication) => {
+        setAppForSetup(app);
+        // If opening via "Schedule Interview" button (when screening is done), imply move to Interviewing
+        if (app.status === 'Screening' && app.interview_config?.screeningStatus === 'completed') {
+            setPendingStatusUpdate('Interviewing');
+        } else {
+            setPendingStatusUpdate(null);
+        }
+        setIsSetupModalOpen(true);
+    };
+
+    const handleCloseSetupModal = () => {
+        setIsSetupModalOpen(false);
+        setAppForSetup(null);
+        setPendingStatusUpdate(null);
+    };
 
     const handleSaveInterviewConfig = async (config: object) => {
         if (appForSetup) {
             const result = await onScheduleInterview(appForSetup.id, config);
             if (result.success) {
-                // Only move to Interviewing if NOT in Screening phase (or if explicitly desired)
-                // If in Screening phase, we stay there until screening is done.
-                if (appForSetup.status !== 'Screening') {
-                    onUpdateApplicationStatus(appForSetup.id, 'Interviewing');
-                } else {
-                    // Force refresh to show updated button state (e.g. "Assessment Pending")
-                    // The parent component should handle refetch, but we might need to trigger it.
-                    // onScheduleInterview usually triggers refetch in App.tsx.
+                // Check if we have a pending status update (from drag or schedule button)
+                if (pendingStatusUpdate) {
+                    onUpdateApplicationStatus(appForSetup.id, pendingStatusUpdate);
                 }
             }
             handleCloseSetupModal();

@@ -497,20 +497,37 @@ router.post('/resume/process-screening', async (req: Request, res: Response) => 
     });
 
 
+    // AUTO-AGENT: Manage Pipeline Stage
+    // Flow: Applied -> Sourced (Manual/LowScore) -> Screening (Auto/HighScore)
+    if (jobId) {
+      let newStatus = 'Sourced'; // Default step after resume parsing
+      let statusReason = 'Resume parsed and scored';
 
-    // AUTO-AGENT: Move candidate to 'Screening' if score is good
-    if (assessment.score >= 60 && jobId) {
-      // We need to update the candidate status to 'Screening'
+      if (assessment.score >= 60) {
+        newStatus = 'Screening'; // Fast-track to Screening
+        statusReason = 'Auto-advanced to Screening based on high resume score';
+      }
+
+      console.log(`[AI Routes] Updating candidate ${candidateName} status to ${newStatus} (Score: ${assessment.score})`);
+
       const { error: updateError } = await supabase
         .from('candidates')
-        .update({ status: 'Screening' })
+        .update({
+          status: newStatus,
+          interview_config: {
+            // Preserve existing config, but ensure screening score is saved
+            // We do NOT overwrite interviewStatus here, as that is for the next stage (Interviewing)
+            // But we might want to flag that screening is ready to start?
+            // The dashboard checks status === 'Screening'.
+            screeningScore: assessment.score,
+            screeningDate: new Date().toISOString()
+          }
+        })
         .eq('jobId', jobId)
         .eq('user_id', userId);
 
       if (updateError) {
-        console.warn('[AI Routes] Failed to auto-move candidate to Screening:', updateError);
-      } else {
-        console.log(`[AI Routes] Auto-moved candidate ${candidateName} to Screening (Score: ${assessment.score})`);
+        console.warn('[AI Routes] Failed to update candidate status:', updateError);
       }
     }
 
