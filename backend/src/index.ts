@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 
@@ -18,8 +20,6 @@ import resumesRouter from './routes/resumes.js';
 import auditLogsRouter from './routes/auditLogs.js';
 import { setupGeminiProxyWS } from './services/geminiProxy.js';
 import { roomLifecycleManager } from './services/roomLifecycleManager.js';
-
-dotenv.config();
 
 const app = express();
 const server = createServer(app);

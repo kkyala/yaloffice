@@ -17,8 +17,8 @@ import {
     useLocalParticipant,
     useTracks,
     ParticipantTile,
-    ControlBar,
     RoomAudioRenderer,
+    DisconnectButton, // Added
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { livekitService } from '../services/livekitService';
@@ -176,6 +176,17 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
     );
 };
 
+// Custom minimal controls to avoid localStorage crash in prebuilt ControlBar
+const CustomControls = () => {
+    return (
+        <div className="livekit-control-bar" style={{ padding: '1rem', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+            <DisconnectButton style={{ backgroundColor: '#ef4444', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                End Interview
+            </DisconnectButton>
+        </div>
+    );
+};
+
 // Room Component (unchanged)
 const RoomContent = () => {
     // Render the room layout with participants
@@ -198,10 +209,7 @@ const RoomContent = () => {
                     />
                 ))}
             </div>
-            <ControlBar
-                className="livekit-control-bar"
-                style={{ padding: '1rem', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)' }}
-            />
+            <CustomControls />
             <RoomAudioRenderer />
         </div>
     );
@@ -282,7 +290,7 @@ export default function AvatarInterviewScreen({
                 serverUrl={roomUrl}
                 token={token}
                 connect={true}
-                video={enableVideo}
+                video={false}
                 audio={true}
                 onDisconnected={handleLeave}
                 onError={handleError}
@@ -299,9 +307,14 @@ export default function AvatarInterviewScreen({
             <div className="finished-screen">
                 <h2>Interview Completed</h2>
                 <p>Thank you for completing the interview. Your results are being processed.</p>
-                <button className="btn btn-primary" onClick={() => onNavigate('interview-report', 'dashboard', { applicationId: currentApplicationId })}>
-                    View Report
-                </button>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                    <button className="btn btn-primary" onClick={() => onNavigate('interview-report', 'dashboard', { applicationId: currentApplicationId })}>
+                        View Report
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => onNavigate('dashboard', 'dashboard')}>
+                        Exit to Dashboard
+                    </button>
+                </div>
             </div>
         );
     }

@@ -156,7 +156,7 @@ export default function JobListScreen({
                                         {job.status !== 'Active' && (
                                             <button
                                                 className="btn btn-primary btn-sm"
-                                                onClick={() => onPublishJob(job)}
+                                                onClick={() => onPublishJob(job.id)}
                                             >
                                                 Publish
                                             </button>

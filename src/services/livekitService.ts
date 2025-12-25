@@ -81,14 +81,25 @@ class LiveKitService {
         }
 
         const data = await response.json();
+
+        // Dynamic URL handling for Ngrok/Remote access
         let livekitUrl = this.url || data.url;
 
-        // Convert relative URL to absolute WebSocket URL
+        // If we are on a remote host (like ngrok), force the client to use the current host's proxy
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!isLocalhost && livekitUrl.includes('localhost')) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            livekitUrl = `${protocol}//${window.location.host}/livekit`;
+        }
+
+        // Convert relative URL to absolute WebSocket URL (fallback)
         if (livekitUrl && livekitUrl.startsWith('/')) {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.host;
             livekitUrl = `${protocol}//${host}${livekitUrl}`;
         }
+
+        console.log("Connecting to LiveKit URL:", livekitUrl);
 
         return {
             token: data.token,
