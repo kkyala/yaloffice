@@ -560,8 +560,13 @@ export default function App() {
     const handleSendJobToCandidate = async (jobId: number, candidateId: number) => console.log('Send job:', jobId, 'to candidate:', candidateId);
     const handleMoveCandidatesToPipeline = (candidates: any[], jobId: number) => console.log('Move candidates:', candidates, 'to job:', jobId);
 
+    const handleForgotPassword = async (email: string) => {
+        const { error } = await api.resetPassword(email);
+        return { success: !error, error: error ? getErrorMessage(error) : undefined };
+    };
+
     if (isLoading) return <div className="loading-overlay"><h2>Loading Yāl Office...</h2></div>;
-    if (!currentUser) return <LoginScreen onLogin={handleLogin} onSignup={handleSignup} />;
+    if (!currentUser) return <LoginScreen onLogin={handleLogin} onSignup={handleSignup} onForgotPassword={handleForgotPassword} />;
 
     const PageComponent = currentRoleConfig?.pages[currentPage];
     if (!PageComponent) return <div className="loading-overlay"><h2>Page not found or role not configured.</h2></div>;

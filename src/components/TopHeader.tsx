@@ -109,6 +109,9 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                 </div>
             </div>
             <div className="header-toolbar">
+                {/* Check-In Widget (Style) */}
+
+
                 <button className="toolbar-icon" onClick={() => onNavigate && onNavigate('settings', 'settings')} title="Settings">
                     <SettingsIcon />
                 </button>
@@ -120,38 +123,40 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                         <span className="badge">2</span>
                     </button>
                     {isNotificationsOpen && (
-                        <div className="dropdown-menu notifications-dropdown" style={{ width: '300px', right: '-50px' }}>
-                            <div className="dropdown-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', fontWeight: '600' }}>
+                        <div className="dropdown-menu notifications-dropdown" style={{ width: '320px', right: '-80px' }}>
+                            <div className="dropdown-header" style={{ padding: '1rem', fontWeight: '600', color: 'var(--text-primary)' }}>
                                 Notifications
                             </div>
                             <ul style={{ maxHeight: '300px', overflowY: 'auto' }}>
                                 {notifications.map(n => (
-                                    <li key={n.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', backgroundColor: n.unread ? 'var(--primary-light-color)' : 'transparent', cursor: 'pointer', display: 'flex', gap: '0.75rem', alignItems: 'start' }}>
-                                        <div style={{ fontSize: '1.2rem', marginTop: '0.1rem' }}>{getNotificationIcon(n.type)}</div>
-                                        <div>
-                                            <div style={{ fontSize: '0.9rem', fontWeight: n.unread ? '600' : '400', color: 'var(--text-primary)' }}>{n.text}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{n.time}</div>
-                                        </div>
+                                    <li key={n.id} style={{ backgroundColor: n.unread ? 'var(--primary-subtle)' : 'transparent' }}>
+                                        <a href="#" onClick={(e) => e.preventDefault()} style={{ alignItems: 'flex-start', padding: '0.75rem 1rem' }}>
+                                            <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{getNotificationIcon(n.type)}</span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <span style={{ fontSize: '0.9rem', fontWeight: n.unread ? '600' : '500', color: 'var(--text-primary)' }}>{n.text}</span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{n.time}</span>
+                                            </div>
+                                        </a>
                                     </li>
                                 ))}
                             </ul>
-                            <div className="dropdown-footer" style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                <a href="#" style={{ fontSize: '0.8rem', color: 'var(--primary-color)' }} onClick={(e) => e.preventDefault()}>View all</a>
+                            <div className="dropdown-footer" style={{ textAlign: 'center' }}>
+                                <a href="#" style={{ justifyContent: 'center', color: 'var(--primary-color)', fontSize: '0.85rem' }} onClick={(e) => e.preventDefault()}>View all notifications</a>
                             </div>
                         </div>
                     )}
                 </div>
 
-                <div className="language-selector" ref={langRef}>
+                <div className="language-selector" ref={langRef} style={{ position: 'relative' }}>
                     <button className="toolbar-icon" onClick={() => setIsLangOpen(!isLangOpen)} aria-haspopup="true" aria-expanded={isLangOpen}>
                         <GlobeIcon />
                     </button>
                     {isLangOpen && (
-                        <div className="dropdown-menu">
+                        <div className="dropdown-menu" style={{ width: '200px' }}>
                             <ul>
                                 {languages.map(lang => (
                                     <li key={lang.code}>
-                                        <a href="#" onClick={handleLanguageSelect} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <a href="#" onClick={handleLanguageSelect}>
                                             <span className="flag-icon" role="img" aria-label={lang.name} style={{ fontSize: '1.2rem' }}>{lang.flag}</span>
                                             <span>{lang.name}</span>
                                         </a>
@@ -166,21 +171,34 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                     <BuildingIcon />
                 </button>
 
-                <div className="user-profile-menu" ref={profileRef}>
-                    <div onClick={() => setIsProfileOpen(!isProfileOpen)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '2px' }} role="button" aria-haspopup="true" aria-expanded={isProfileOpen}>
-                        <img src={`https://i.pravatar.cc/40?u=${user?.email || 'user'}`} alt={user?.name || 'User'} />
+                <div className="user-profile-menu" ref={profileRef} style={{ position: 'relative' }}>
+                    <div onClick={() => setIsProfileOpen(!isProfileOpen)} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '2px', borderRadius: '50%', border: '2px solid transparent', transition: 'all 0.2s' }} role="button" aria-haspopup="true" aria-expanded={isProfileOpen} onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary-light-color)'} onMouseOut={(e) => e.currentTarget.style.borderColor = 'transparent'}>
+                        <img src={`https://i.pravatar.cc/40?u=${user?.email || 'user'}`} alt={user?.name || 'User'} style={{ borderRadius: '50%', width: '36px', height: '36px', objectFit: 'cover' }} />
                     </div>
                     {isProfileOpen && (
-                        <div className="dropdown-menu" style={{ width: '220px' }}>
-                            <div style={{ padding: '1rem 1rem 0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Hello,</div>
-                                <div style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name || 'User'}</div>
+                        <div className="dropdown-menu" style={{ width: '240px', right: '0' }}>
+                            <div className="dropdown-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Signed in as</div>
+                                <div style={{ fontWeight: '700', fontSize: '1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name || 'User'}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{user?.role || 'Guest'}</div>
                             </div>
                             <ul>
-                                <li><a href="#" onClick={(e) => { e.preventDefault(); handleProfileItemClick('profile'); }}>My Profile</a></li>
+                                <li>
+                                    <a href="#" onClick={(e) => { e.preventDefault(); handleProfileItemClick('profile'); }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span>My Profile</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: '400' }}>Account settings & more</span>
+                                        </div>
+                                    </a>
+                                </li>
                                 <li><a href="#" onClick={(e) => { e.preventDefault(); handleProfileItemClick('username'); }}>Change Username</a></li>
                                 <li><a href="#" onClick={(e) => { e.preventDefault(); handleProfileItemClick('password'); }}>Change Password</a></li>
-                                <li><a href="#" onClick={(e) => { e.preventDefault(); handleProfileItemClick('logout'); }}><LogoutIcon /> Logout</a></li>
+                                <li style={{ borderTop: '1px solid var(--border-color)', marginTop: '0.5rem', paddingTop: '0.5rem' }}>
+                                    <a href="#" onClick={(e) => { e.preventDefault(); handleProfileItemClick('logout'); }} style={{ color: 'var(--error-color)' }}>
+                                        <LogoutIcon />
+                                        <span>Logout</span>
+                                    </a>
+                                </li>
                             </ul>
                         </div>
                     )}

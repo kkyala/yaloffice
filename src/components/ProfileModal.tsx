@@ -9,6 +9,9 @@ const profileSchema = z.object({
     email: z.string().email("Invalid email address"),
     mobile: z.string().min(10, "Mobile number must be at least 10 digits").optional().or(z.literal('')),
     role: z.string().optional(),
+    linkedin_url: z.string().url("Invalid LinkedIn URL").optional().or(z.literal('')),
+    city: z.string().optional(),
+    state: z.string().optional(),
     bio: z.string().max(200, "Bio must be less than 200 characters").optional(),
 });
 
@@ -31,6 +34,9 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
         mobile: user.mobile || '',
         role: user.role || '',
         bio: user.bio || '',
+        linkedin_url: user.linkedin_url || '',
+        city: user.city || '',
+        state: user.state || ''
     });
 
     const [password, setPassword] = useState('');
@@ -49,6 +55,9 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
             mobile: user.mobile || '',
             role: user.role || '',
             bio: user.bio || '',
+            linkedin_url: user.linkedin_url || '',
+            city: user.city || '',
+            state: user.state || ''
         });
     }, [user]);
 
@@ -185,6 +194,31 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
                                         value={formData.role}
                                         disabled
                                         style={{ backgroundColor: 'var(--light-bg)', cursor: 'not-allowed' }}
+                                    />
+                                </div>
+                                <div className="form-group grid-col-span-2">
+                                    <label>Agreed LinkedIn Profile URL</label>
+                                    <input
+                                        type="url"
+                                        value={formData.linkedin_url || ''}
+                                        onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
+                                        placeholder="https://linkedin.com/in/username"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>City</label>
+                                    <input
+                                        type="text"
+                                        value={formData.city || ''}
+                                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>State</label>
+                                    <input
+                                        type="text"
+                                        value={formData.state || ''}
+                                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                                     />
                                 </div>
                                 <div className="form-group grid-col-span-2">

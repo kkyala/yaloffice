@@ -70,7 +70,7 @@ export default function CalendarScreen({ candidatesData = [], jobsData = [], cur
                     <h1>My Calendar</h1>
                 </div>
                 <div className="header-actions">
-                    <button className="btn btn-primary" onClick={() => alert('Add Event functionality coming soon!')}>
+                    <button className="btn btn-primary" onClick={() => window.alert('Event creation is managed through the Interview Scheduling flow in the Pipeline view.')}>
                         + Add Event
                     </button>
                 </div>

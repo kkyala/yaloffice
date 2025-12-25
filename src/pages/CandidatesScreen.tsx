@@ -16,6 +16,7 @@ type CandidateApplication = {
         interviewType?: 'audio' | 'video' | 'livekit'; // Audio, Video (Gemini), or AI Avatar (Tavus+LiveKit)
         [key: string]: any;
     };
+    linkedin_url?: string;
 };
 type Job = {
     id: number;
@@ -33,6 +34,7 @@ type EnrichedApplication = {
     candidateName: string;
     jobTitle: string;
     aiScore: number | null;
+    linkedin_url?: string;
 };
 type CandidatesScreenProps = {
     candidatesData: CandidateApplication[];
@@ -226,7 +228,11 @@ const CandidateProfileModal = ({ application, screeningData, isLoading, onClose 
                 <div className="modal-body">
                     <div style={{ marginBottom: '1.5rem' }}>
                         <p><strong>Job:</strong> {application.jobTitle}</p>
+                        <p><strong>Job:</strong> {application.jobTitle}</p>
                         <p><strong>Status:</strong> {application.status}</p>
+                        {application.linkedin_url && (
+                            <p><strong>LinkedIn:</strong> <a href={application.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>{application.linkedin_url}</a></p>
+                        )}
                     </div>
 
                     <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Initial Screening Results</h3>
@@ -473,6 +479,7 @@ export default function CandidatesScreen({
                 candidateName: candidateApp.name,
                 jobTitle: job.title,
                 aiScore: candidateApp.interview_config?.aiScore ?? null,
+                linkedin_url: candidateApp.linkedin_url,
             };
         }).filter((app): app is EnrichedApplication => app !== null);
     }, [candidatesData, jobsData, currentUser, jobsForFilter, pipelineJobFilter]);
