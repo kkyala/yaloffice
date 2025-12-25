@@ -70,6 +70,19 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
     const score = interviewData?.aiScore;
     const savedAnalysis = interviewData?.analysis;
 
+    // Handle missing candidate data gracefully
+    useEffect(() => {
+        if (!interviewingCandidate) {
+            console.warn("No candidate data found for report, redirecting...");
+            // Use a short timeout to allow render if needed, or immediate
+            onNavigate('recruitment', 'recruitment');
+        }
+    }, [interviewingCandidate, onNavigate]);
+
+    if (!interviewingCandidate) {
+        return <div className="loading-screen">Loading report info...</div>;
+    }
+
     const handleGenerateSummary = async () => {
         if (!transcript || !isReady) return;
         setIsLoadingSummary(true);

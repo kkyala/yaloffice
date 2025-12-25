@@ -104,8 +104,14 @@ router.put('/:id', async (req, res) => {
     if (findError) console.error('[PUT DEBUG] Find Error:', findError);
     else console.log('[PUT DEBUG] Found existing candidate?', existing ? 'YES' : 'NO');
 
+    // Sanitize body: remove fields that are not columns (unless mapped)
+    // The frontend sends interviewStatus/screeningStatus at top level, but they belong in interview_config (which is also present)
+    const { interviewStatus, screeningStatus, ...cleanBody } = req.body;
+
+    console.log('[PUT DEBUG] Clean Body:', JSON.stringify(cleanBody));
+
     // Remove .single() to prevent "Cannot coerce" error error if update returns 0 rows or unexpected format
-    const { data, error } = await supabase.from('candidates').update(req.body).eq('id', req.params.id).select();
+    const { data, error } = await supabase.from('candidates').update(cleanBody).eq('id', req.params.id).select();
 
     if (error) {
         console.error('Supabase Update Error:', error);

@@ -43,6 +43,25 @@ router.post('/logout', async (req, res) => {
     res.json({ success: true });
 });
 
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res) => {
+    const { email } = req.body;
+    const trimmedEmail = email?.trim();
+
+    if (!trimmedEmail) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // supabase.auth.resetPasswordForEmail sends a password recovery email
+    const { data, error } = await supabase.auth.resetPasswordForEmail(trimmedEmail);
+
+    if (error) {
+        return res.status(400).json({ error: error.message });
+    }
+
+    res.json({ success: true, data });
+});
+
 // GET /api/auth/me
 router.get('/me', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];

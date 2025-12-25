@@ -50,6 +50,10 @@ console.log(`[Supabase] Using ${isServiceKey ? 'SERVICE_ROLE' : 'ANON'} key for 
 // Use the key we resolved (Service Role preferred, or Anon if missing)
 const finalKey = supabaseKey || process.env.SUPABASE_KEY;
 
+if (finalKey) {
+    console.log(`[SupabaseService] Final Key (first 10 chars): ${finalKey.substring(0, 10)}...`);
+}
+
 if (!supabaseUrl || !finalKey) {
     console.error('[SupabaseService] Missing Supabase credentials in .env');
 }
@@ -57,6 +61,12 @@ if (!supabaseUrl || !finalKey) {
 export const supabase = createClient(supabaseUrl!, finalKey!, {
     auth: {
         autoRefreshToken: false,
-        persistSession: false
+        persistSession: false,
+        detectSessionInUrl: false
+    },
+    global: {
+        headers: {
+            Authorization: `Bearer ${finalKey}`
+        }
     }
 });

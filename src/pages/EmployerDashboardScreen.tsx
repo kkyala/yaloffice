@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { PlusIcon, BriefcaseIcon, UsersIcon, TargetIcon, CheckCircleIcon, FilePlusIcon, CalendarIcon } from '../components/Icons';
+import { PlusIcon, BriefcaseIcon, UsersIcon, TargetIcon, CheckCircleIcon, FilePlusIcon } from '../components/Icons';
 
-// Type definitions to ensure data consistency
+// Type definitions
 type Job = { id: number; title: string; employer: string; status: string };
 type CandidateApplication = { id: number; jobId: number; name: string; role: string; status: string; created_at: string; };
 type User = { name: string };
@@ -14,28 +14,59 @@ type EmployerDashboardProps = {
     onPipelineJobFilterChange: (filterValue: string | number) => void;
 };
 
-// --- Doughnut Chart Component (Embedded for simplicity) ---
-const DoughnutChart = ({ data }) => {
+// --- Helper Components ---
+
+const MetricCard = ({ title, value, icon, borderLeftColor, onClick }) => (
+    <div className="metric-card" style={{ borderLeftColor: borderLeftColor, cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
+        <div>
+            <h3>{title}</h3>
+            <p>{value}</p>
+        </div>
+        <div style={{
+            width: '48px', height: '48px', borderRadius: '8px',
+            background: 'var(--background-color)', color: 'var(--primary-color)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+            {icon}
+        </div>
+    </div>
+);
+
+// Simple Donut Chart Representation
+const DonutChart = ({ data }) => {
     const total = data.reduce((acc, item) => acc + item.value, 0);
-    if (total === 0) {
-        return <div className="no-data-message" style={{height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>No offer data available.</div>;
-    }
-    let cumulativePercentage = 0;
-    const gradientParts = data.map(item => {
-        const percentage = (item.value / total) * 100;
-        const part = `${item.color} ${cumulativePercentage}% ${cumulativePercentage + percentage}%`;
-        cumulativePercentage += percentage;
-        return part;
-    });
-    const conicGradient = `conic-gradient(${gradientParts.join(', ')})`;
+    if (total === 0) return <div className="text-secondary" style={{ textAlign: 'center', padding: '2rem' }}>No data available</div>;
+
+    let cumulative = 0;
+    const gradient = data.map(item => {
+        const start = cumulative;
+        const end = cumulative + (item.value / total) * 100;
+        cumulative = end;
+        return `${item.color} ${start}% ${end}%`;
+    }).join(', ');
+
+    const conic = `conic-gradient(${gradient})`;
+
     return (
-        <div className="doughnut-chart-container">
-            <div className="doughnut-chart" style={{ background: conicGradient }} role="img" aria-label="Doughnut chart showing offer status breakdown"></div>
-            <div className="doughnut-chart-legend">
-                {data.map(item => (
-                    <div key={item.name} className="legend-item">
-                        <div className="legend-color-box" style={{ backgroundColor: item.color }}></div>
-                        <span>{item.name} ({item.value})</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <div style={{
+                width: '160px', height: '160px', borderRadius: '50%',
+                background: conic, position: 'relative'
+            }}>
+                <div style={{
+                    position: 'absolute', inset: '25%', background: 'white',
+                    borderRadius: '50%', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <strong style={{ fontSize: '1.5rem', color: 'var(--text-primary)' }}>{total}</strong>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Offers</span>
+                </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {data.map(d => (
+                    <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: d.color }}></span>
+                        <span>{d.name}: <strong>{d.value}</strong></span>
                     </div>
                 ))}
             </div>
@@ -43,8 +74,10 @@ const DoughnutChart = ({ data }) => {
     );
 };
 
-export default function EmployerDashboardScreen({ jobsData, candidatesData, currentUser, onCreateNewJob, onNavigate, onPipelineJobFilterChange }: EmployerDashboardProps) {
-    
+export default function EmployerDashboardScreen(props: EmployerDashboardProps) {
+    const { jobsData = [], candidatesData = [], currentUser, onCreateNewJob, onNavigate, onPipelineJobFilterChange } = props;
+
+    // --- Data Logic ---
     const jobsMap = useMemo(() => new Map(jobsData.map(job => [job.id, job.title])), [jobsData]);
 
     const employerJobs = useMemo(() => {
@@ -54,37 +87,25 @@ export default function EmployerDashboardScreen({ jobsData, candidatesData, curr
 
     const employerJobIds = useMemo(() => new Set(employerJobs.map(j => j.id)), [employerJobs]);
 
-    // CORRECT: Use 'candidates' table as the source of truth for applications data.
     const employerApplications = useMemo(() => {
         if (!candidatesData || employerJobIds.size === 0) return [];
         return candidatesData.filter(app => employerJobIds.has(app.jobId));
     }, [candidatesData, employerJobIds]);
 
-    // --- DATA CALCULATIONS BASED ON CORRECTED DATA SOURCE ---
     const totalVacancies = employerJobs.filter(j => j.status === 'Active').length;
     const candidatesInPipeline = employerApplications.filter(app => app.status !== 'Hired').length;
     const hiredCandidates = employerApplications.filter(app => app.status === 'Hired').length;
 
-    const offerAcceptanceRate = useMemo(() => {
-        const offersMade = employerApplications.filter(app => app.status === 'Offer' || app.status === 'Hired').length;
-        const accepted = hiredCandidates;
-        if (offersMade === 0) return 0;
-        return ((accepted / offersMade) * 100).toFixed(0);
-    }, [employerApplications, hiredCandidates]);
-
-    const funnelData = useMemo(() => {
-        const stages = { Screening: 0, Interviewing: 0, Offer: 0, Hired: 0 };
-        employerApplications.forEach(app => {
-            if (stages[app.status] !== undefined) stages[app.status]++;
-        });
-        const maxCandidatesInStage = Math.max(1, ...Object.values(stages));
-        return Object.entries(stages).map(([name, value]) => ({ name, value, percentage: (value / maxCandidatesInStage) * 100 }));
-    }, [employerApplications]);
+    const offerAcceptanceVal = useMemo(() => {
+        const offers = employerApplications.filter(app => ['Offer', 'Hired'].includes(app.status)).length;
+        if (offers === 0) return 0;
+        return Math.round((hiredCandidates / offers) * 100);
+    }, [hiredCandidates, employerApplications]);
 
     const offerStatusData = [
-        { name: 'Sent', value: employerApplications.filter(app => app.status === 'Offer').length, color: 'var(--status-on-hold)' },
-        { name: 'Accepted', value: hiredCandidates, color: 'var(--status-offer)' },
-        { name: 'Rejected', value: 0, color: 'var(--status-closed)' }, // Hardcoded 0 as we don't track this yet
+        { name: 'Sent', value: employerApplications.filter(a => a.status === 'Offer').length, color: 'var(--gold-color)' },
+        { name: 'Accepted', value: hiredCandidates, color: 'var(--success-color)' },
+        { name: 'Rejected', value: 0, color: 'var(--error-color)' }
     ];
 
     const recruitmentHotspots = useMemo(() => {
@@ -95,111 +116,125 @@ export default function EmployerDashboardScreen({ jobsData, candidatesData, curr
         }).sort((a, b) => b.candidateCount - a.candidateCount).slice(0, 5);
     }, [employerJobs, employerApplications]);
 
-    const candidatesAwaitingReview = useMemo(() => {
-        return employerApplications
-            .filter(app => app.status === 'Applied' || app.status === 'Screening')
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .slice(0, 5);
-    }, [employerApplications]);
-
-    const recentActivity = useMemo(() => {
-        return employerApplications
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-            .slice(0, 3)
-            .map(app => {
-                const timeDiffHours = Math.round((new Date().getTime() - new Date(app.created_at).getTime()) / (1000 * 60 * 60));
-                const timeAgo = timeDiffHours > 24 ? `${Math.round(timeDiffHours/24)} days ago` : `${timeDiffHours} hours ago`;
-                return { 
-                    id: app.id, 
-                    type: 'application', 
-                    text: `New application from ${app.name || 'a candidate'} for ${jobsMap.get(app.jobId)}.`,
-                    time: timeAgo,
-                };
-            });
-    }, [employerApplications, jobsMap]);
-    
-    const handleHotspotClick = (jobId) => {
-        onPipelineJobFilterChange(jobId);
-        onNavigate('recruitment-pipeline', 'recruitment');
-    };
-
     return (
-        <>
-            <div className="dashboard-container">
-                <div className="kpi-grid">
-                    <div className="kpi-card-new"><div className="kpi-icon"><BriefcaseIcon /></div><div className="kpi-content"><h3>Total Vacancies</h3><p>{totalVacancies}</p></div></div>
-                    <div className="kpi-card-new"><div className="kpi-icon"><UsersIcon /></div><div className="kpi-content"><h3>Candidates in Pipeline</h3><p>{candidatesInPipeline}</p></div></div>
-                    <div className="kpi-card-new"><div className="kpi-icon"><CheckCircleIcon /></div><div className="kpi-content"><h3>Total Hired</h3><p>{hiredCandidates}</p></div></div>
-                    <div className="kpi-card-new"><div className="kpi-icon"><TargetIcon /></div><div className="kpi-content"><h3>Offer Acceptance Rate</h3><p>{offerAcceptanceRate}%</p></div></div>
+        <div className="dashboard-container">
+            <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1>Employer Dashboard</h1>
+                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Welcome back, {currentUser?.name || 'User'}</p>
+                </div>
+                <button className="btn btn-primary" onClick={onCreateNewJob}>
+                    <PlusIcon /> Post New Job
+                </button>
+            </header>
+
+            <div className="metrics-grid">
+                <MetricCard
+                    title="Total Vacancies"
+                    value={totalVacancies}
+                    icon={<BriefcaseIcon />}
+                    borderLeftColor="var(--primary-color)"
+                    onClick={() => onNavigate('employer-jobs-list', 'recruitment')}
+                />
+                <MetricCard
+                    title="Active Candidates"
+                    value={candidatesInPipeline}
+                    icon={<UsersIcon />}
+                    borderLeftColor="var(--secondary-color)"
+                    onClick={() => onNavigate('recruitment-pipeline', 'recruitment')}
+                />
+                <MetricCard
+                    title="Total Hired"
+                    value={hiredCandidates}
+                    icon={<CheckCircleIcon />}
+                    borderLeftColor="var(--success-color)"
+                    onClick={() => onNavigate('recruitment-pipeline', 'recruitment')}
+                />
+                <MetricCard
+                    title="Offer Acceptance"
+                    value={`${offerAcceptanceVal}%`}
+                    icon={<TargetIcon />}
+                    borderLeftColor="var(--gold-color)"
+                    onClick={() => onNavigate('recruitment-pipeline', 'recruitment')}
+                />
+            </div>
+
+            <div className="dashboard-grid">
+                {/* Chart Section */}
+                <div className="chart-card">
+                    <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Offer Status</h3>
+                    </div>
+                    <DonutChart data={offerStatusData} />
                 </div>
 
-                <div className="dashboard-main-grid">
-                    <div className="dashboard-widget grid-col-span-2">
-                        <h3>Offer Status Breakdown</h3>
-                        <DoughnutChart data={offerStatusData} />
+                {/* Hotspots Section */}
+                <div className="chart-card">
+                    <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Recruitment Hotspots</h3>
                     </div>
-                    
-                    <div className="dashboard-widget grid-col-span-2">
-                        <h3>Recruitment Hotspots</h3>
-                        <div className="hotspots-list">
-                            {recruitmentHotspots.length > 0 ? recruitmentHotspots.map(job => (
-                                <div key={job.id} className="hotspot-item" onClick={() => handleHotspotClick(job.id)} role="button" tabIndex={0}>
-                                    <div className="hotspot-info"><strong>{job.title}</strong><span>{job.candidateCount} Candidates</span></div>
-                                </div>
-                            )) : <p className="no-data-message">Post jobs to see candidate activity.</p>}
-                        </div>
-                    </div>
-
-                    <div className="dashboard-widget grid-col-span-2">
-                        <h3>Candidates Awaiting Review</h3>
-                        <div className="candidate-review-list">
-                             {candidatesAwaitingReview.length > 0 ? candidatesAwaitingReview.map(candidate => (
-                                <div key={candidate.id} className="candidate-review-item">
-                                    <img src={`https://i.pravatar.cc/40?u=${candidate.name}`} alt={candidate.name} />
-                                    <div className="candidate-review-item-info">
-                                        <strong>{candidate.name}</strong>
-                                        <span>Applied for {jobsMap.get(candidate.jobId) || candidate.role}</span>
-                                    </div>
-                                </div>
-                            )) : <p className="no-data-message">No new candidates to review.</p>}
-                        </div>
-                    </div>
-
-                     <div className="dashboard-widget grid-col-span-3">
-                        <h3>Candidate Funnel</h3>
-                        <div className="funnel-chart">
-                            {funnelData.map(stage => (
-                                <div key={stage.name} className="funnel-stage">
-                                    <div className="funnel-labels">
-                                        <span>{stage.name}</span>
-                                        <strong>{stage.value}</strong>
-                                    </div>
-                                    <div className="funnel-bar">
-                                        <div className="funnel-bar-fill" style={{ width: `${stage.percentage}%` }}></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="dashboard-widget grid-col-span-3">
-                         <h3>Recent Activity</h3>
-                         <div className="activity-feed-v2">
-                            {recentActivity.length > 0 ? recentActivity.map(item => (
-                                <div key={item.id} className="activity-item-v2">
-                                    <div className={`activity-icon-v2 ${item.type}`}>
-                                        <FilePlusIcon />
-                                    </div>
-                                    <p>{item.text}<br/><span>{item.time}</span></p>
-                                </div>
-                            )) : <p className="no-data-message">No recent activity to show.</p>}
-                        </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {recruitmentHotspots.length > 0 ? recruitmentHotspots.map(job => (
+                            <div key={job.id}
+                                onClick={() => { onPipelineJobFilterChange(job.id); onNavigate('recruitment-pipeline', 'recruitment'); }}
+                                style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    padding: '0.75rem', borderRadius: 'var(--border-radius-sm)',
+                                    background: 'var(--background-color)', cursor: 'pointer',
+                                    transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-subtle)'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'var(--background-color)'}
+                            >
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{job.title}</span>
+                                <span className="text-success" style={{ fontWeight: 700 }}>{job.candidateCount}</span>
+                            </div>
+                        )) : (
+                            <p className="text-secondary">No active jobs found.</p>
+                        )}
                     </div>
                 </div>
             </div>
-            <button className="fab" onClick={onCreateNewJob} aria-label="Create New Job">
-                <PlusIcon />
-            </button>
-        </>
+
+            <div className="chart-card" style={{ marginTop: 'var(--spacing-lg)' }}>
+                <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                    <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Recent Applications</h3>
+                </div>
+                <div className="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Candidate</th>
+                                <th>Job Role</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {employerApplications.slice(0, 5).map(app => (
+                                <tr key={app.id}>
+                                    <td style={{ fontWeight: 600 }}>{app.name}</td>
+                                    <td>{jobsMap.get(app.jobId) || app.role}</td>
+                                    <td>{new Date(app.created_at).toLocaleDateString()}</td>
+                                    <td>
+                                        <span style={{
+                                            padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem',
+                                            background: app.status === 'Hired' ? 'rgba(46, 204, 113, 0.15)' : 'rgba(52, 152, 219, 0.15)',
+                                            color: app.status === 'Hired' ? 'var(--success-color)' : 'var(--info-color)',
+                                            fontWeight: 700
+                                        }}>
+                                            {app.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            {employerApplications.length === 0 && (
+                                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>No applications yet.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     );
 }

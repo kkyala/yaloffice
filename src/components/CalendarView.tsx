@@ -36,8 +36,8 @@ export default function CalendarView({ events }: CalendarViewProps) {
 
     const isSameDay = (d1: Date, d2: Date) => {
         return d1.getFullYear() === d2.getFullYear() &&
-               d1.getMonth() === d2.getMonth() &&
-               d1.getDate() === d2.getDate();
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate();
     };
 
     const handlePrev = () => {
@@ -63,6 +63,7 @@ export default function CalendarView({ events }: CalendarViewProps) {
     const handleToday = () => setCurrentDate(new Date());
 
     const formatMonthYear = (date: Date) => {
+        // Returns "December 2025" format
         return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     };
 
@@ -75,6 +76,7 @@ export default function CalendarView({ events }: CalendarViewProps) {
         const startDayIndex = firstDayOfMonth.getDay(); // 0 = Sun
 
         const days = [];
+        // Empty cells for days before start of month
         for (let i = 0; i < startDayIndex; i++) {
             days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
         }
@@ -84,19 +86,31 @@ export default function CalendarView({ events }: CalendarViewProps) {
             const dayEvents = events.filter(e => isSameDay(e.start, date));
             const isToday = isSameDay(date, new Date());
 
+            // For demo purposes, if today is the 19th (based on screenshot), or just highlight actual today.
+            // Screenshot highlights 19th. We will rely on actual today.
+
             days.push(
                 <div key={d} className={`calendar-day ${isToday ? 'today' : ''}`}>
                     <div className="day-number">{d}</div>
                     <div className="day-events">
                         {dayEvents.map((ev, idx) => (
-                            <div key={idx} className="calendar-event-badge" title={`${ev.title} at ${ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}>
-                                <span className="event-time">{ev.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>{' '}
+                            <div key={idx} className="calendar-event-badge" title={`${ev.title} at ${ev.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}>
+                                <span className="event-time">{ev.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>{' '}
                                 <span className="event-title">{ev.title}</span>
                             </div>
                         ))}
                     </div>
                 </div>
             );
+        }
+
+        // Fill remaining cells for grid consistency if needed (optional)
+        const totalCells = days.length;
+        const remaining = 7 - (totalCells % 7);
+        if (remaining < 7) {
+            for (let i = 0; i < remaining; i++) {
+                days.push(<div key={`empty-end-${i}`} className="calendar-day empty"></div>);
+            }
         }
 
         return (
@@ -130,7 +144,7 @@ export default function CalendarView({ events }: CalendarViewProps) {
                             {weekDays.map((day, i) => {
                                 const cellDate = new Date(day);
                                 cellDate.setHours(hour, 0, 0, 0);
-                                const cellEvents = events.filter(e => 
+                                const cellEvents = events.filter(e =>
                                     isSameDay(e.start, cellDate) && e.start.getHours() === hour
                                 );
 
@@ -155,19 +169,23 @@ export default function CalendarView({ events }: CalendarViewProps) {
         <div className="calendar-component">
             <div className="calendar-toolbar">
                 <div className="calendar-nav">
-                    <button className="btn btn-secondary btn-sm" onClick={handlePrev} aria-label="Previous month/week"><ChevronLeftIcon /></button>
-                    <button className="btn btn-secondary btn-sm" onClick={handleNext} aria-label="Next month/week"><ChevronRightIcon /></button>
-                    <button className="btn btn-secondary btn-sm" onClick={handleToday}>Today</button>
+                    <button className="btn btn-secondary btn-sm" onClick={handlePrev} aria-label="Previous" style={{ borderRadius: '50%', width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ChevronLeftIcon />
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handleNext} aria-label="Next" style={{ borderRadius: '50%', width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ChevronRightIcon />
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handleToday} style={{ borderRadius: '20px', padding: '0.4rem 1rem' }}>Today</button>
                     <h2>{formatMonthYear(currentDate)}</h2>
                 </div>
                 <div className="view-switcher">
-                    <button 
+                    <button
                         className={viewMode === 'month' ? 'active' : ''}
                         onClick={() => setViewMode('month')}
                     >
                         Month
                     </button>
-                    <button 
+                    <button
                         className={viewMode === 'week' ? 'active' : ''}
                         onClick={() => setViewMode('week')}
                     >

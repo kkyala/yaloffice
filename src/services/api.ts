@@ -108,6 +108,13 @@ class ApiService {
         return { data, error };
     }
 
+    async resetPassword(email: string) {
+        return this.request('/auth/reset-password', {
+            method: 'POST',
+            body: JSON.stringify({ email }),
+        }).catch(err => ({ data: null, error: err }));
+    }
+
     async logout() {
         await this.request('/auth/logout', { method: 'POST' }).catch(() => { });
         this.setToken(null);

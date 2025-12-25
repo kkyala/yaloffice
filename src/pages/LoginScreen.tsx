@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { YaalOfficeLogo } from '../components/Icons';
 
-export default function LoginScreen({ onLogin, onSignup }) {
+export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
     const [isSigningUp, setIsSigningUp] = useState(false);
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
@@ -25,7 +26,20 @@ export default function LoginScreen({ onLogin, onSignup }) {
         setSuccessMessage('');
         const trimmedEmail = email.trim();
 
-        if (isSigningUp) {
+        if (isResettingPassword) {
+            if (!trimmedEmail) {
+                setAuthError('Please enter your email address.');
+                setIsLoading(false);
+                return;
+            }
+            const result = await onForgotPassword(trimmedEmail);
+            if (result && result.success) {
+                setSuccessMessage('Password reset link has been sent to your email.');
+                // Optionally switch back to login after a delay, or just let them see the message
+            } else {
+                setAuthError(result?.error || 'Failed to send reset link.');
+            }
+        } else if (isSigningUp) {
             // Explicit validation to ensure all fields are filled for signup.
             if (!fullName.trim() || !trimmedEmail || !password || !role || !mobile.trim()) {
                 setAuthError('All fields are required. Please complete the form to sign up.');
@@ -66,14 +80,31 @@ export default function LoginScreen({ onLogin, onSignup }) {
     const handleToggleForm = (e) => {
         e.preventDefault();
         setIsSigningUp(!isSigningUp);
+        setIsResettingPassword(false);
+        setAuthError('');
+        setSuccessMessage('');
+    };
+
+    const handleForgotPasswordClick = (e) => {
+        e.preventDefault();
+        setIsResettingPassword(true);
+        setIsSigningUp(false);
+        setAuthError('');
+        setSuccessMessage('');
+    };
+
+    const handleBackToLogin = (e) => {
+        e.preventDefault();
+        setIsResettingPassword(false);
+        setIsSigningUp(false);
         setAuthError('');
         setSuccessMessage('');
     };
 
     return (
         <div className="login-container" style={{
-            background: 'radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)',
-            position: 'fixed', /* Use fixed to cover everything */
+            background: '#ffffff',
+            position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
@@ -84,74 +115,74 @@ export default function LoginScreen({ onLogin, onSignup }) {
             justifyContent: 'center',
             alignItems: 'center',
             overflow: 'hidden',
-            zIndex: 1000 /* Ensure it's on top */
         }}>
-            {/* Ambient Background Effects */}
-            <div style={{
-                position: 'absolute',
-                top: '-10%',
-                left: '-10%',
-                width: '50%',
-                height: '50%',
-                background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)',
-                filter: 'blur(60px)',
-                borderRadius: '50%'
-            }} />
-            <div style={{
-                position: 'absolute',
-                bottom: '-10%',
-                right: '-10%',
-                width: '50%',
-                height: '50%',
-                background: 'radial-gradient(circle, rgba(236, 72, 153, 0.15) 0%, transparent 70%)',
-                filter: 'blur(60px)',
-                borderRadius: '50%'
-            }} />
-
-            <div className="login-box glass-panel" style={{
-                maxWidth: '380px',
+            <div className="login-box" style={{
+                maxWidth: '420px',
                 width: '90%',
-                padding: '2.5rem',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                backdropFilter: 'blur(20px)',
-                backgroundColor: 'rgba(30, 41, 59, 0.7)'
+                padding: '3rem',
+                backgroundColor: '#ffffff',
+                /* No borders or shadows needed for flat clean look, but adding subtle one based on image */
+                /* The image has a very faint border/shadow? Actually it looks like a clean white page. */
+                /* Let's add a card effect if the background is slightly off-white, or just center it. */
+                /* If background is pure white #ffffff, a border helps. */
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
             }}>
-                <div className="login-header" style={{ marginBottom: '2rem' }}>
+                <div className="login-header" style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
                     <div className="login-logo-container" style={{
                         marginBottom: '1.5rem',
                         display: 'flex',
                         justifyContent: 'center'
                     }}>
-                        <div style={{
-                            padding: '12px',
-                            background: 'rgba(255, 255, 255, 0.1)',
-                            borderRadius: '16px',
-                            display: 'flex'
-                        }}>
-                            <YaalOfficeLogo style={{ width: '40px', height: '40px' }} />
-                        </div>
+                        <YaalOfficeLogo style={{ width: '60px', height: '60px' }} />
                     </div>
                     <h1 style={{
                         fontSize: '1.75rem',
                         fontWeight: '700',
-                        color: '#fff',
-                        marginBottom: '0.5rem'
+                        color: '#0f172a',
+                        marginBottom: '0.75rem',
+                        letterSpacing: '-0.025em'
                     }}>
-                        {isSigningUp ? 'Create Account' : 'Welcome Back'}
+                        {isResettingPassword ? 'Reset Password' : (isSigningUp ? 'Create Account' : 'Welcome to AI Recruitment QuikHire')}
                     </h1>
-                    <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-                        {isSigningUp ? 'Join Yāl Office today.' : 'Sign in to continue to Yāl Office.'}
+                    <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
+                        {isResettingPassword
+                            ? 'Enter your email to receive a password reset link.'
+                            : (isSigningUp ? 'Please complete the form to create your account.' : 'Please login to access the dashboard.')}
                     </p>
                 </div>
                 <form onSubmit={handleSubmit}>
-                    {successMessage && <div className="success-message" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)' }}>{successMessage}</div>}
-                    {authError && <div className="login-error" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>{authError}</div>}
+                    {successMessage && (
+                        <div className="success-message" style={{
+                            background: '#ecfdf5',
+                            color: '#059669',
+                            border: '1px solid #a7f3d0',
+                            padding: '0.75rem',
+                            borderRadius: '6px',
+                            marginBottom: '1.5rem',
+                            fontSize: '0.9rem'
+                        }}>
+                            {successMessage}
+                        </div>
+                    )}
+                    {authError && (
+                        <div className="login-error" style={{
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            padding: '0.75rem',
+                            borderRadius: '6px',
+                            marginBottom: '1.5rem',
+                            fontSize: '0.9rem'
+                        }}>
+                            {authError}
+                        </div>
+                    )}
 
-                    {isSigningUp && (
-                        <div className="form-group">
-                            <label htmlFor="full-name" style={{ color: '#e2e8f0' }}>Full Name</label>
+                    {isSigningUp && !isResettingPassword && (
+                        <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                            <label htmlFor="full-name" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Full Name</label>
                             <input
                                 id="full-name"
                                 name="name"
@@ -159,14 +190,27 @@ export default function LoginScreen({ onLogin, onSignup }) {
                                 type="text"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
-                                placeholder="e.g., Alex Bennett"
+                                placeholder="e.g. Adam Luis"
                                 required
-                                style={{ background: 'rgba(15, 23, 42, 0.6)', borderColor: 'rgba(255,255,255,0.1)', color: 'white' }}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0',
+                                    background: '#f8fafc',
+                                    color: '#0f172a',
+                                    outline: 'none',
+                                    fontSize: '0.95rem',
+                                    transition: 'all 0.2s'
+                                }}
+                                onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                             />
                         </div>
                     )}
-                    <div className="form-group">
-                        <label htmlFor="email" style={{ color: '#e2e8f0' }}>Email address</label>
+
+                    <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                        <label htmlFor="email" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>{isSigningUp ? 'Email Address' : 'Username'}</label>
                         <input
                             id="email"
                             name="email"
@@ -174,29 +218,62 @@ export default function LoginScreen({ onLogin, onSignup }) {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
+                            placeholder={isSigningUp ? "you@example.com" : "e.g. adam.luis@yaloffice.com"}
                             required
-                            style={{ background: 'rgba(15, 23, 42, 0.6)', borderColor: 'rgba(255,255,255,0.1)', color: 'white' }}
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem 1rem',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                background: '#f8fafc',
+                                color: '#0f172a',
+                                outline: 'none',
+                                fontSize: '0.95rem',
+                                transition: 'all 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                         />
                     </div>
-                    <div className="form-group">
-                        <label htmlFor="password" style={{ color: '#e2e8f0' }}>Password</label>
-                        <input
-                            id="password"
-                            name="password"
-                            autoComplete="new-password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                            style={{ background: 'rgba(15, 23, 42, 0.6)', borderColor: 'rgba(255,255,255,0.1)', color: 'white' }}
-                        />
-                    </div>
-                    {isSigningUp && (
+
+                    {!isResettingPassword && (
+                        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                <label htmlFor="password" style={{ color: '#334155', fontWeight: '500', fontSize: '0.9rem' }}>Password</label>
+                                {!isSigningUp && (
+                                    <a href="#" onClick={handleForgotPasswordClick} style={{ color: 'var(--primary-color)', fontSize: '0.85rem', textDecoration: 'none' }}>Forgot Password?</a>
+                                )}
+                            </div>
+                            <input
+                                id="password"
+                                name="password"
+                                autoComplete="new-password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder={isSigningUp ? "Create a password" : "Enter Password"}
+                                required
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0',
+                                    background: '#f8fafc',
+                                    color: '#0f172a',
+                                    outline: 'none',
+                                    fontSize: '0.95rem',
+                                    transition: 'all 0.2s'
+                                }}
+                                onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                            />
+                        </div>
+                    )}
+
+                    {isSigningUp && !isResettingPassword && (
                         <>
-                            <div className="form-group">
-                                <label htmlFor="mobile-number" style={{ color: '#e2e8f0' }}>Mobile Number</label>
+                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                                <label htmlFor="mobile-number" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Mobile Number</label>
                                 <input
                                     id="mobile-number"
                                     name="mobile"
@@ -206,17 +283,41 @@ export default function LoginScreen({ onLogin, onSignup }) {
                                     onChange={(e) => setMobile(e.target.value)}
                                     placeholder="e.g., (555) 123-4567"
                                     required
-                                    style={{ background: 'rgba(15, 23, 42, 0.6)', borderColor: 'rgba(255,255,255,0.1)', color: 'white' }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e2e8f0',
+                                        background: '#f8fafc',
+                                        color: '#0f172a',
+                                        outline: 'none',
+                                        fontSize: '0.95rem',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                                 />
                             </div>
-                            <div className="form-group">
-                                <label htmlFor="role-select" style={{ color: '#e2e8f0' }}>Sign up as:</label>
+                            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                <label htmlFor="role-select" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Sign up as:</label>
                                 <select
                                     id="role-select"
                                     value={role}
                                     onChange={(e) => setRole(e.target.value)}
                                     required
-                                    style={{ background: 'rgba(15, 23, 42, 0.6)', borderColor: 'rgba(255,255,255,0.1)', color: 'white' }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e2e8f0',
+                                        background: '#f8fafc',
+                                        color: '#0f172a',
+                                        outline: 'none',
+                                        fontSize: '0.95rem',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                                 >
                                     <option value="Admin">Admin</option>
                                     <option value="Candidate">Candidate</option>
@@ -228,16 +329,41 @@ export default function LoginScreen({ onLogin, onSignup }) {
                         </>
                     )}
 
-                    <button type="submit" className="btn btn-primary btn-full" disabled={isLoading} style={{ marginTop: '1rem', padding: '0.85rem' }}>
-                        {isLoading ? 'Processing...' : (isSigningUp ? 'Sign Up' : 'Log In')}
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        style={{
+                            width: '100%',
+                            marginTop: '0.5rem',
+                            padding: '0.85rem',
+                            backgroundColor: 'var(--primary-color)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            boxShadow: '0 4px 6px -1px var(--primary-glow)'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(110%)'}
+                        onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
+                    >
+                        {isLoading ? 'Processing...' : (isResettingPassword ? 'Send Reset Link' : (isSigningUp ? 'Sign Up' : 'Sign In'))}
                     </button>
                 </form>
-                <div className="login-footer" style={{ marginTop: '2rem' }}>
-                    <p style={{ color: '#94a3b8' }}>
-                        {isSigningUp ? 'Already have an account?' : "Don't have an account?"}
-                        <a href="#" onClick={handleToggleForm} style={{ color: '#818cf8', marginLeft: '0.5rem' }}>
-                            {isSigningUp ? 'Log In' : 'Sign Up'}
-                        </a>
+                <div className="login-footer" style={{ marginTop: '2rem', textAlign: 'center' }}>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                        {isResettingPassword ? (
+                            <a href="#" onClick={handleBackToLogin} style={{ color: 'var(--primary-color)', fontWeight: '600', textDecoration: 'none' }}>Back to Sign In</a>
+                        ) : (
+                            <>
+                                {isSigningUp ? 'Already have an account?' : "Don't have an account?"}
+                                <a href="#" onClick={handleToggleForm} style={{ color: 'var(--primary-color)', fontWeight: '600', marginLeft: '0.5rem', textDecoration: 'none' }}>
+                                    {isSigningUp ? 'Sign In' : 'Sign Up'}
+                                </a>
+                            </>
+                        )}
                     </p>
                 </div>
             </div>

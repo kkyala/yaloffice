@@ -16,6 +16,7 @@ type CandidateApplication = {
         interviewType?: 'audio' | 'video' | 'livekit'; // Audio, Video (Gemini), or AI Avatar (Tavus+LiveKit)
         [key: string]: any;
     };
+    linkedin_url?: string;
 };
 type Job = {
     id: number;
@@ -33,6 +34,7 @@ type EnrichedApplication = {
     candidateName: string;
     jobTitle: string;
     aiScore: number | null;
+    linkedin_url?: string;
 };
 type CandidatesScreenProps = {
     candidatesData: CandidateApplication[];
@@ -54,15 +56,17 @@ const SetupInterviewModal = ({ candidateName, application, onSave, onCancel }) =
     const [questionCount, setQuestionCount] = useState(application?.interview_config?.questionCount || 5);
     const [difficulty, setDifficulty] = useState(application?.interview_config?.difficulty || 'Medium');
     const [duration, setDuration] = useState(application?.interview_config?.duration || 15);
-    // NEW: State for interview type selection (audio, video, or livekit)
-    const [interviewType, setInterviewType] = useState<'audio' | 'video' | 'livekit'>(application?.interview_config?.interviewType || 'audio');
+    // User requested to force LiveKit/Audio Agent mode
+    const interviewType = 'livekit';
+    const isScreening = application?.status === 'Screening';
+    const title = isScreening ? `Setup AI Screening for ${candidateName}` : `Setup AI Interview for ${candidateName}`;
 
     const handleSave = () => {
         onSave({
             questionCount,
             difficulty,
             duration,
-            interviewType, // Pass the selected interview type
+            interviewType,
             interviewStatus: 'assessment_pending',
         });
     };
@@ -70,43 +74,28 @@ const SetupInterviewModal = ({ candidateName, application, onSave, onCancel }) =
     return (
         <div className="modal-overlay">
             <div className="modal-content" style={{ maxWidth: '500px' }}>
-                <div className="modal-header"><h2>Setup AI Interview for {candidateName}</h2></div>
+                <div className="modal-header"><h2>{title}</h2></div>
                 <div className="modal-body">
                     <div className="form-group"><label>Number of Questions</label><input type="number" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))} /></div>
                     <div className="form-group"><label>Difficulty</label><select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
                     <div className="form-group"><label>Duration (minutes)</label><input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value, 10))} /></div>
-                    {/* NEW: Interview Type Selection */}
+
+                    {/* Fixed Interview Type Display */}
                     <div className="form-group">
-                        <label>Interview Type</label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <input
-                                    type="radio"
-                                    name="interviewType"
-                                    value="audio"
-                                    checked={interviewType === 'audio'}
-                                    onChange={() => setInterviewType('audio')}
-                                /> Audio Only (Gemini AI)
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <input
-                                    type="radio"
-                                    name="interviewType"
-                                    value="video"
-                                    checked={interviewType === 'video'}
-                                    onChange={() => setInterviewType('video')}
-                                /> Video (Gemini AI)
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <input
-                                    type="radio"
-                                    name="interviewType"
-                                    value="livekit"
-                                    checked={interviewType === 'livekit'}
-                                    onChange={() => setInterviewType('livekit')}
-                                /> AI Avatar Interview (Tavus + LiveKit)
-                            </label>
+                        <label>Interview Mode</label>
+                        <div style={{
+                            padding: '0.75rem',
+                            background: 'var(--light-bg)',
+                            borderRadius: 'var(--border-radius-sm)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)',
+                            fontWeight: '500'
+                        }}>
+                            AI Voice Agent (LiveKit)
                         </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                            The AI agent will conducting the interview via voice.
+                        </p>
                     </div>
                 </div>
                 <div className="modal-footer"><button className="btn btn-secondary" onClick={onCancel}>Cancel</button><button className="btn btn-primary" onClick={handleSave}>Save & Schedule</button></div>
@@ -239,7 +228,11 @@ const CandidateProfileModal = ({ application, screeningData, isLoading, onClose 
                 <div className="modal-body">
                     <div style={{ marginBottom: '1.5rem' }}>
                         <p><strong>Job:</strong> {application.jobTitle}</p>
+                        <p><strong>Job:</strong> {application.jobTitle}</p>
                         <p><strong>Status:</strong> {application.status}</p>
+                        {application.linkedin_url && (
+                            <p><strong>LinkedIn:</strong> <a href={application.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>{application.linkedin_url}</a></p>
+                        )}
                     </div>
 
                     <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Initial Screening Results</h3>
@@ -486,6 +479,7 @@ export default function CandidatesScreen({
                 candidateName: candidateApp.name,
                 jobTitle: job.title,
                 aiScore: candidateApp.interview_config?.aiScore ?? null,
+                linkedin_url: candidateApp.linkedin_url,
             };
         }).filter((app): app is EnrichedApplication => app !== null);
     }, [candidatesData, jobsData, currentUser, jobsForFilter, pipelineJobFilter]);
