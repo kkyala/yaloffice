@@ -30,35 +30,48 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
     const [otp, setOtp] = useState('');
     const [showOtpVerify, setShowOtpVerify] = useState(false);
 
+    const handleBackToLogin = (e) => {
+        if (e) e.preventDefault();
+        setIsResettingPassword(false);
+        setIsSigningUp(false);
+        setShowOtpVerify(false);
+        setOtp('');
+        setAuthError('');
+        setSuccessMessage('');
+    };
+
+    const handleToggleForm = (e) => {
+        e.preventDefault();
+        setIsSigningUp(!isSigningUp);
+        setIsResettingPassword(false);
+        setShowOtpVerify(false);
+        setOtp('');
+        setAuthError('');
+        setSuccessMessage('');
+    };
+
+    const handleForgotPasswordClick = (e) => {
+        e.preventDefault();
+        setIsResettingPassword(true);
+        setIsSigningUp(false);
+        setShowOtpVerify(false);
+        setAuthError('');
+        setSuccessMessage('');
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (showOtpVerify) {
+            // In verification link flow, the button acts as "Back to Sign In"
+            handleBackToLogin(e);
+            return;
+        }
+
         setIsLoading(true);
         setAuthError('');
         setSuccessMessage('');
         const trimmedEmail = email.trim();
-
-        if (showOtpVerify) {
-            // Verify OTP
-            if (!otp.trim()) {
-                setAuthError('Please enter the verification code.');
-                setIsLoading(false);
-                return;
-            }
-            if (!onVerifyOtp) {
-                setAuthError("Verification not supported in this version.");
-                setIsLoading(false);
-                return;
-            }
-
-            const result = await onVerifyOtp({ email: trimmedEmail, token: otp.trim(), type: 'signup' });
-            if (result && result.success) {
-                // Success! The updated onVerifyOtp in App.tsx will set session and redirect
-            } else {
-                setAuthError(result?.error || 'Verification failed. Invalid code.');
-            }
-            setIsLoading(false);
-            return;
-        }
 
         if (isResettingPassword) {
             if (!trimmedEmail) {
@@ -94,7 +107,7 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
                 // Need verification
                 setIsSigningUp(false);
                 setShowOtpVerify(true);
-                setSuccessMessage('Sign up successful! Please check your email for the verification code.');
+                // Success message is handled by render below
             } else if (result) {
                 setAuthError(result.error);
             }
@@ -112,35 +125,6 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
             }
         }
         setIsLoading(false);
-    };
-
-    const handleToggleForm = (e) => {
-        e.preventDefault();
-        setIsSigningUp(!isSigningUp);
-        setIsResettingPassword(false);
-        setShowOtpVerify(false);
-        setOtp('');
-        setAuthError('');
-        setSuccessMessage('');
-    };
-
-    const handleForgotPasswordClick = (e) => {
-        e.preventDefault();
-        setIsResettingPassword(true);
-        setIsSigningUp(false);
-        setShowOtpVerify(false);
-        setAuthError('');
-        setSuccessMessage('');
-    };
-
-    const handleBackToLogin = (e) => {
-        e.preventDefault();
-        setIsResettingPassword(false);
-        setIsSigningUp(false);
-        setShowOtpVerify(false);
-        setOtp('');
-        setAuthError('');
-        setSuccessMessage('');
     };
 
     return (
@@ -163,10 +147,6 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
                 width: '90%',
                 padding: '3rem',
                 backgroundColor: '#ffffff',
-                /* No borders or shadows needed for flat clean look, but adding subtle one based on image */
-                /* The image has a very faint border/shadow? Actually it looks like a clean white page. */
-                /* Let's add a card effect if the background is slightly off-white, or just center it. */
-                /* If background is pure white #ffffff, a border helps. */
                 border: '1px solid #e2e8f0',
                 borderRadius: '12px',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
@@ -177,7 +157,7 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
                         display: 'flex',
                         justifyContent: 'center'
                     }}>
-                        <YaalOfficeLogo style={{ width: '60px', height: '60px' }} />
+                        <YaalOfficeLogo style={{ width: '120px', height: '120px' }} />
                     </div>
                     <h1 style={{
                         fontSize: '1.75rem',
@@ -186,7 +166,7 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
                         marginBottom: '0.75rem',
                         letterSpacing: '-0.025em'
                     }}>
-                        {isResettingPassword ? 'Reset Password' : (isSigningUp ? 'Create Account' : 'Welcome to AI Recruitment QuikHire')}
+                        {isResettingPassword ? 'Reset Password' : (isSigningUp ? 'Create Account' : 'Welcome to AI Recruitment Yal Hire')}
                     </h1>
                     <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
                         {isResettingPassword
@@ -251,43 +231,17 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
                         </div>
                     )}
 
-                    <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                        <label htmlFor="email" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>{isSigningUp ? 'Email Address' : 'Username'}</label>
-                        <input
-                            id="email"
-                            name="email"
-                            autoComplete="off"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder={isSigningUp ? "you@example.com" : "e.g. adam.luis@yaloffice.com"}
-                            required
-                            style={{
-                                width: '100%',
-                                padding: '0.75rem 1rem',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                background: '#f8fafc',
-                                color: '#0f172a',
-                                outline: 'none',
-                                fontSize: '0.95rem',
-                                transition: 'all 0.2s'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
-                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                        />
-                    </div>
-
-                    {showOtpVerify && (
+                    {!isResettingPassword && (
                         <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                            <label htmlFor="otp-input" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Verification Code</label>
+                            <label htmlFor="email" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>{isSigningUp ? 'Email Address' : 'Username'}</label>
                             <input
-                                id="otp-input"
-                                name="otp"
-                                type="text"
-                                value={otp}
-                                onChange={(e) => setOtp(e.target.value)}
-                                placeholder="Enter 6-digit code from email"
+                                id="email"
+                                name="email"
+                                autoComplete="off"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder={isSigningUp ? "you@example.com" : "e.g. adam.luis@yaloffice.com"}
                                 required
                                 style={{
                                     width: '100%',
@@ -297,17 +251,34 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
                                     background: '#f8fafc',
                                     color: '#0f172a',
                                     outline: 'none',
-                                    fontSize: '1.2rem',
-                                    letterSpacing: '0.2rem',
-                                    textAlign: 'center',
+                                    fontSize: '0.95rem',
                                     transition: 'all 0.2s'
                                 }}
                                 onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
                                 onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                             />
-                            <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem', textAlign: 'center' }}>
-                                A code has been sent to <strong>{email}</strong>
-                            </p>
+                        </div>
+                    )}
+
+                    {showOtpVerify && (
+                        <div className="form-group" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
+                            <div style={{
+                                background: '#f0f9ff',
+                                padding: '1.5rem',
+                                borderRadius: '12px',
+                                border: '1px solid #bae6fd'
+                            }}>
+                                <svg style={{ width: '48px', height: '48px', color: '#0284c7', marginBottom: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                <h3 style={{ color: '#0c4a6e', fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>Check your email</h3>
+                                <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: '1.5' }}>
+                                    We've sent a verification link to <strong>{email}</strong>
+                                </p>
+                                <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '1rem' }}>
+                                    Click the link in the email to activate your account and sign in.
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -437,7 +408,7 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVer
                         onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
                     >
                         {isLoading ? 'Processing...' : (
-                            showOtpVerify ? 'Verify Code' :
+                            showOtpVerify ? 'Back to Sign In' :
                                 isResettingPassword ? 'Send Reset Link' :
                                     (isSigningUp ? 'Sign Up' : 'Sign In')
                         )}

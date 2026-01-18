@@ -69,14 +69,35 @@ class EmailService {
         }
     }
 
-    // 1. Signup Verification / Welcome
+    // 1. Signup Verification (Replaces default Supabase email)
+    async sendVerificationEmail(to: string, verificationLink: string, name: string): Promise<boolean> {
+        const subject = 'Verify your email - Yāl Office';
+        const html = `
+      <div style="font-family: Arial, sans-serif; color: #333;">
+        <h2>Welcome to Yāl Office, ${name}!</h2>
+        <p>Thank you for signing up. Please verify your email address by clicking the link below:</p>
+        <p>
+            <a href="${verificationLink}" style="display:inline-block; background-color: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Verify Email
+            </a>
+        </p>
+        <p style="font-size: 0.9em; color: #666;">Or copy and paste this link into your browser:</p>
+        <p style="font-size: 0.9em; color: #666; word-break: break-all;">${verificationLink}</p>
+        <br/>
+        <p>Best regards,</p>
+        <p>The Yāl Office Team</p>
+      </div>
+    `;
+        return this.sendEmail(to, subject, html);
+    }
+
+    // 2. Welcome Email (Post-verification)
     async sendWelcomeEmail(to: string, name: string): Promise<boolean> {
         const subject = 'Welcome to Yāl Office!';
         const html = `
       <div style="font-family: Arial, sans-serif; color: #333;">
         <h2>Welcome to Yāl Office, ${name}!</h2>
-        <p>Thank you for signing up. We are excited to have you on board.</p>
-        <p>If you haven't already, please verify your email address by clicking the link in the verification email sent by Supabase.</p>
+        <p>Thank you for verify your email. We are excited to have you on board.</p>
         <br/>
         <p>Best regards,</p>
         <p>The Yāl Office Team</p>

@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 import datetime 
 from dotenv import load_dotenv
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm, RoomInputOptions
 from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import deepgram, openai, google, silero
 
@@ -80,7 +80,7 @@ async def save_interview_results(application_id: str, transcript: str):
                 "analysis": {
                     "summary": "Interview completed. Transcript successfully saved.",
                     "score": float(f"{mock_score:.1f}"),
-                    "strengths": ["Communication", "Technicial Knowledge"],
+                    "strengths": ["Communication", "Technical Knowledge"],
                     "improvements": ["Elaborate more on specific examples"]
                 }
             }
@@ -96,8 +96,16 @@ async def save_interview_results(application_id: str, transcript: str):
             logger.error(f"Error saving interview results: {e}")
 
 async def entrypoint(ctx: JobContext):
+    
     logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+
+    # Set Agent Name
+    try:
+        if ctx.room and ctx.room.local_participant:
+             await ctx.room.local_participant.set_name("AI Avatar")
+    except Exception as e:
+        logger.warning(f"Failed to set agent name: {e}")
 
     # Parse Application ID from Room Name (format: interview-{id})
     application_id = None
@@ -196,7 +204,18 @@ async def entrypoint(ctx: JobContext):
         llm=llm_provider,
         tts=tts_provider,
     )
+    # Prevent panic on disconnect by disabling auto-close
+    if hasattr(session, 'close_on_disconnect'):
+         session.close_on_disconnect = False
+    elif hasattr(session, 'room_input'):
+         # In some versions it might be nested
+         pass
 
+    # Fallback/Newer API might use properties. 
+    # The log message explicitly said "disable via RoomInputOptions.close_on_disconnect=False"
+    # This implies RoomInputOptions object.
+    # But passing it failed. 
+    
     agent = Interviewer(system_instruction)
     
     # 4. Run Session

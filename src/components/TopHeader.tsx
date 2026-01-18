@@ -158,7 +158,7 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
                     </button>
                 )}
                 <div className="breadcrumbs" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
-                    <span onClick={onNavigateToDashboard} style={{ cursor: 'pointer', fontWeight: '600', color: 'var(--primary-color)' }}>Yāl Office</span>
+                    <span onClick={onNavigateToDashboard} style={{ cursor: 'pointer', fontWeight: '600', color: 'var(--primary-color)' }}>Yāl Hire</span>
                     {pageInfo?.parent && (
                         <>
                             <ChevronRightIcon style={{ width: 14, height: 14, color: '#94a3b8' }} />

@@ -20,6 +20,8 @@ import {
     RoomAudioRenderer,
     DisconnectButton,
     useRoomContext,
+    ParticipantName,
+    VideoTrack,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { livekitService } from '../services/livekitService';
@@ -229,13 +231,72 @@ const RoomContent = ({ jobTitle }: { jobTitle: string }) => {
             <SessionTimer maxSeconds={900} /> {/* 15 Minutes */}
 
             <div className="participant-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem', padding: '1rem', marginTop: '4rem' }}>
-                {tracks.map((track) => (
-                    <ParticipantTile
-                        key={track.participant.identity}
-                        trackRef={track}
-                        style={{ borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                    />
-                ))}
+                {tracks.map((track) => {
+                    const isAgent = !track.participant.isLocal;
+                    // Check if this is a Camera track and if it is muted or unpublished
+                    const isVideoOff = !track.publication || track.publication.isMuted;
+                    const AGENT_IMG = "/ai-avatar.png";
+                    // Using a professional business portrait instead of a 3D avatar
+                    const CANDIDATE_IMG = "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=800&q=80";
+
+                    return (
+                        <ParticipantTile
+                            key={track.participant.identity}
+                            trackRef={track}
+                            style={{ borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', position: 'relative' }}
+                        >
+                            {isVideoOff ? (
+                                <div style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a' }}>
+                                    {isAgent ? (
+                                        <img
+                                            src={AGENT_IMG}
+                                            alt="AI Interviewer"
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 1 }}
+                                        />
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{
+                                                width: '100px',
+                                                height: '100px',
+                                                borderRadius: '50%',
+                                                background: 'var(--primary-color)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '2.5rem',
+                                                fontWeight: 'bold',
+                                                color: 'white',
+                                                boxShadow: '0 4px 6px rgba(0,0,0,0.2)'
+                                            }}>
+                                                {track.participant.name ? track.participant.name.charAt(0).toUpperCase() : 'C'}
+                                            </div>
+                                            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: '600' }}>
+                                                {track.participant.name || 'Candidate'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <VideoTrack
+                                    trackRef={track}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                            )}
+
+                            {/* Always Overlay Participant Name */}
+                            <div style={{ position: 'absolute', bottom: '10px', left: '10px', zIndex: 10 }}>
+                                <ParticipantName style={{
+                                    color: 'white',
+                                    backgroundColor: 'rgba(0,0,0,0.5)',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    fontWeight: '500',
+                                    fontSize: '0.9rem'
+                                }} />
+                            </div>
+                        </ParticipantTile>
+                    );
+                })}
             </div>
             <CustomControls />
             <RoomAudioRenderer />

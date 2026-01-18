@@ -22,20 +22,36 @@ router.post('/signup', async (req, res) => {
     try {
         const { email, password, options } = req.body;
         const trimmedEmail = email?.trim();
-        const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password, options });
+
+        // Use admin.generateLink to get the verification link directly
+        // this avoids Supabase sending the default email and allows us to send a custom one
+        const { data, error } = await supabase.auth.admin.generateLink({
+            type: 'signup',
+            email: trimmedEmail,
+            password: password,
+            options: options // Pass metadata (data: { name, role... })
+        });
 
         if (error) {
             return res.status(400).json({ error: error.message });
         }
 
-        res.json({ session: data.session, user: data.user });
+        const user = data.user;
+        const actionLink = data.properties?.action_link;
 
-        // Send Welcome Email (Supabase will also send verification email if configured)
-        if (data.user && data.user.email) {
+        // Send Verification Email
+        if (user && user.email && actionLink) {
             // Use metadata name or part of email
-            const name = data.user.user_metadata?.name || data.user.user_metadata?.full_name || trimmedEmail.split('@')[0];
-            emailService.sendWelcomeEmail(trimmedEmail, name).catch(err => console.error('Failed to send welcome email:', err));
+            const name = user.user_metadata?.name || user.user_metadata?.full_name || trimmedEmail.split('@')[0];
+
+            // Send our custom verification email
+            emailService.sendVerificationEmail(trimmedEmail, actionLink, name)
+                .catch(err => console.error('Failed to send verification email:', err));
         }
+
+        // Return user. Session is null because email is not verified yet.
+        res.json({ session: null, user: user });
+
     } catch (error: any) {
         console.error('Signup error:', error);
         res.status(500).json({ error: 'Internal Server Error during signup' });

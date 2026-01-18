@@ -138,16 +138,30 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        api.getSession().then(({ data: { session } }) => {
+        const handleHash = async () => {
+            const hash = window.location.hash;
+            if (hash && hash.includes('access_token')) {
+                const params = new URLSearchParams(hash.substring(1));
+                const accessToken = params.get('access_token');
+                if (accessToken) {
+                    console.log('Detected access token in hash, verifying...', accessToken.substring(0, 10));
+                    api.setToken(accessToken);
+                    window.history.replaceState(null, '', window.location.pathname);
+                }
+            }
+
+            // After checking hash (and setting token if found), load session
+            const { data: { session } } = await api.getSession();
             setSession(session);
             if (!session) {
                 setCurrentUser(null);
                 setResumeList([]);
                 setCurrentPage('');
             }
-        });
+        };
+
+        handleHash();
         // No subscription for now, we rely on manual updates or polling if needed
-        // Or we could implement a simple event emitter in api service
     }, []);
 
     useEffect(() => {
@@ -496,6 +510,28 @@ export default function App() {
         } catch (err) {
             console.warn('Could not trigger job-specific screening:', err);
             // Continue anyway
+        }
+
+        // Auto-Allocate LiveKit Interview if configured
+        if (import.meta.env.VITE_AUTO_ALLOCATE_LIVEKIT_INTERVIEW === 'true' && newApp?.id) {
+            try {
+                const autoConfig = {
+                    interviewType: 'livekit',
+                    interviewStatus: 'assessment_pending',
+                    questionCount: 5,
+                    difficulty: 'Medium',
+                    duration: 15,
+                    scheduledAt: new Date().toISOString()
+                };
+
+                await api.put(`/candidates/${newApp.id}`, {
+                    interview_config: autoConfig,
+                    status: 'Interviewing'
+                });
+                console.log(`[Auto-Allocate] Candidate ${newApp.id} moved to Interviewing/LiveKit`);
+            } catch (autoErr) {
+                console.error("Auto-allocation failed:", autoErr);
+            }
         }
 
         await refetchCandidates();

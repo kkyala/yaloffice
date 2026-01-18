@@ -17,6 +17,14 @@ router.get('/', async (req, res) => {
     res.json(data);
 });
 
+// GET /api/jobs/:id
+router.get('/:id', async (req, res) => {
+    const { data, error } = await supabase.from('jobs').select('*').eq('id', req.params.id).single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Job not found' });
+    res.json(data);
+});
+
 // POST /api/jobs
 router.post('/', async (req, res) => {
     const { data, error } = await supabase.from('jobs').insert(req.body).select().single();

@@ -19,7 +19,7 @@ const Icon = (props) => (
 export const YaalOfficeLogo = (props) => (
     <img
         src="https://storage.googleapis.com/yalassest/logo_updated.png"
-        alt="Yāl Office Logo"
+        alt="Yāl Hire Logo"
         width="54"
         height="54"
         style={{ objectFit: 'contain' }}

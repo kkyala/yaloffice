@@ -139,9 +139,17 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
 
         if (interviewStatus === 'finished') {
             return (
-                <button className="btn btn-secondary btn-sm" onClick={() => handleViewReport(app)}>
-                    View Report
-                </button>
+                <span style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    color: '#0284c7',
+                    background: '#e0f2fe',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '20px',
+                    border: '1px solid #bae6fd'
+                }}>
+                    In Employer Review
+                </span>
             );
         }
 

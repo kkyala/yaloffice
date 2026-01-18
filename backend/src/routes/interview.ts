@@ -342,7 +342,11 @@ router.get('/screening-status/:userId', async (req, res) => {
       return res.json({
         completed: true,
         score: screeningData[0].overall_score,
-        date: screeningData[0].created_at
+        date: screeningData[0].created_at,
+        summary: screeningData[0].summary,
+        strengths: screeningData[0].strengths,
+        weaknesses: screeningData[0].weaknesses,
+        skillsAnalysis: screeningData[0].skills_analysis
       });
     }
 
@@ -362,7 +366,11 @@ router.get('/screening-status/:userId', async (req, res) => {
         return res.json({
           completed: true,
           score: interview.analysis.score,
-          date: interview.created_at
+          date: interview.created_at,
+          summary: interview.analysis.summary,
+          strengths: interview.analysis.strengths,
+          weaknesses: interview.analysis.weaknesses,
+          skillsAnalysis: interview.analysis.skills_analysis
         });
       }
     }

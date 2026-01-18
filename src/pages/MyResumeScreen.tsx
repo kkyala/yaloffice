@@ -627,7 +627,7 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                 resumeText={formatResumeAsText(parsedData)}
                 onComplete={() => {
                     setShowScreeningChat(false);
-                    onNavigate('dashboard', 'dashboard');
+                    onNavigate('find-jobs', 'find-jobs');
                 }}
             />
         );

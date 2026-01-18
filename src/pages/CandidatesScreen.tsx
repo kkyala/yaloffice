@@ -256,14 +256,38 @@ const CandidateProfileModal = ({ application, screeningData, isLoading, onClose 
                                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Completed on {new Date(screeningData.date).toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            {/* We might not have summary here if the endpoint only returns score/date. 
-                                Let's check the endpoint. It returns score, date. 
-                                If we want summary, we need to update the endpoint or fetch it differently.
-                                For now, let's show what we have. 
-                            */}
-                            <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>
-                                Detailed screening report is available in the Screening phase.
-                            </p>
+
+
+                            {screeningData.summary && (
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <strong>Summary</strong>
+                                    <p style={{ marginTop: '0.25rem', color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                                        {screeningData.summary}
+                                    </p>
+                                </div>
+                            )}
+
+                            {screeningData.strengths && screeningData.strengths.length > 0 && (
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <strong>Key Strengths</strong>
+                                    <ul style={{ paddingLeft: '1.5rem', marginTop: '0.25rem', color: 'var(--text-primary)' }}>
+                                        {screeningData.strengths.map((str: string, i: number) => (
+                                            <li key={i}>{str}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {screeningData.weaknesses && screeningData.weaknesses.length > 0 && (
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <strong>Areas for Improvement</strong>
+                                    <ul style={{ paddingLeft: '1.5rem', marginTop: '0.25rem', color: 'var(--text-primary)' }}>
+                                        {screeningData.weaknesses.map((weak: string, i: number) => (
+                                            <li key={i}>{weak}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <p>No screening data available for this candidate.</p>
@@ -273,7 +297,7 @@ const CandidateProfileModal = ({ application, screeningData, isLoading, onClose 
                     <button className="btn btn-secondary" onClick={onClose}>Close</button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
