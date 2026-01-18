@@ -75,9 +75,15 @@ export default function AIInterviewReportScreen({ interviewingCandidate, jobsDat
         if (!interviewingCandidate) {
             console.warn("No candidate data found for report, redirecting...");
             // Use a short timeout to allow render if needed, or immediate
-            onNavigate('recruitment', 'recruitment');
+            if (currentUser?.role === 'Candidate') {
+                onNavigate('dashboard', 'dashboard');
+            } else if (currentUser?.role === 'Employer') {
+                onNavigate('recruitment-pipeline', 'recruitment');
+            } else {
+                onNavigate('dashboard', 'dashboard');
+            }
         }
-    }, [interviewingCandidate, onNavigate]);
+    }, [interviewingCandidate, onNavigate, currentUser]);
 
     if (!interviewingCandidate) {
         return <div className="loading-screen">Loading report info...</div>;

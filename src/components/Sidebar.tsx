@@ -80,11 +80,11 @@ export default function Sidebar({ user, navItems = [], currentPage, activeParent
 
     return (
         <aside className={sidebarClasses}>
-            <div className="sidebar-header" onClick={onNavigateToDashboard} style={{ cursor: 'pointer' }}>
+            <div className="sidebar-header" onClick={onNavigateToDashboard} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <YaalOfficeLogo className="logo-icon" />
-                <div className="sidebar-header-text">
-                    <h1>Yāl Office</h1>
-                    <p>AI Recruitment</p>
+                <div className="sidebar-header-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <h1 style={{ margin: 0, lineHeight: '1', fontSize: '1.25rem', fontWeight: '800', color: 'var(--primary-color)' }}>Yāl Office</h1>
+                    <p style={{ margin: 0, lineHeight: '1.2', fontSize: '0.75rem', color: '#64748b', fontWeight: '500', marginTop: '2px' }}>AI Recruitment</p>
                 </div>
             </div>
             <nav className="sidebar-nav">

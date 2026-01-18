@@ -147,14 +147,16 @@ body {
 /* 4. SIDEBAR */
 .sidebar {
   width: 260px;
-  background-color: var(--surface-color);
-  border-right: 1px solid var(--border-color);
+  background-color: #f8fafc;
+  /* Slate 50 - Distinct from white content */
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   transition: all var(--transition-bounce);
   flex-shrink: 0;
   z-index: 50;
-  box-shadow: var(--box-shadow-sm);
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03);
+  /* Subtle depth */
 }
 
 .sidebar.collapsed {
@@ -170,9 +172,16 @@ body {
 .sidebar-header {
   display: flex;
   align-items: center;
-  padding: var(--spacing-lg);
+  padding: 0 var(--spacing-lg);
+  /* Remove vertical padding to fit 70px height */
   gap: var(--spacing-md);
-  height: 80px;
+  height: 70px;
+  /* Match Top Header Height */
+  background: white;
+  /* Highlighted Logo Rectangle */
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  /* Slight elevation */
 }
 
 .sidebar-header h1 {
@@ -194,7 +203,8 @@ body {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  /* Slightly increased gap */
 }
 
 .sidebar-nav a {
@@ -202,22 +212,42 @@ body {
   align-items: center;
   gap: var(--spacing-md);
   padding: 0.75rem var(--spacing-md);
-  color: var(--text-secondary);
+  color: #64748b;
+  /* Slate 500 */
   text-decoration: none;
-  font-weight: 500;
-  border-radius: var(--border-radius-sm);
-  transition: all var(--transition-fast);
+  font-weight: 600;
+  border-radius: 12px;
+  /* Modern rounded corners */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  position: relative;
 }
 
 .sidebar-nav a:hover {
-  background-color: var(--primary-subtle);
+  background-color: white;
   color: var(--primary-color);
+  transform: translateX(4px);
+  /* Hover slide effect */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.03);
 }
 
 .sidebar-nav a.active {
-  background-color: var(--primary-subtle);
-  color: var(--primary-color);
-  font-weight: 600;
+  background: linear-gradient(135deg, var(--primary-color), #ff6b6b);
+  /* Gradient active state */
+  color: white;
+  /* White text on primary */
+  font-weight: 700;
+  box-shadow: 0 8px 16px -4px rgba(231, 76, 60, 0.4);
+  /* Colored shadow glow */
+  border-color: transparent;
+  transform: translateX(0);
+}
+
+.sidebar-nav a.active svg {
+  stroke: white;
+  /* Ensure icons are white on active */
 }
 
 .sidebar-nav a svg {
@@ -225,18 +255,20 @@ body {
   height: 20px;
   flex-shrink: 0;
   stroke-width: 2px;
+  transition: stroke 0.2s;
 }
 
 .sidebar-footer {
   padding: var(--spacing-md);
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #e2e8f0;
   display: flex;
   justify-content: center;
+  background: #f8fafc;
 }
 
 .collapse-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
+  background: white;
+  border: 1px solid #e2e8f0;
   border-radius: 50%;
   width: 36px;
   height: 36px;
@@ -244,22 +276,31 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: #64748b;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
+}
+
+.collapse-btn:hover {
+  color: var(--primary-color);
+  transform: scale(1.05);
 }
 
 /* 5. TOP HEADER */
 .top-header {
   height: 70px;
-  background-color: var(--surface-color);
-  border-bottom: 1px solid var(--border-color);
+  background-color: white;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--spacing-xl);
+  padding: 0 2rem;
   flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 40;
+  box-shadow: 0 4px 20px -10px rgba(0, 0, 0, 0.05);
+  /* Soft float */
 }
 
 .header-left {
@@ -555,14 +596,14 @@ body {
   box-shadow: var(--box-shadow);
   border: 1px solid var(--border-color);
   overflow: hidden;
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md);
 }
 
 .calendar-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 .calendar-nav {
@@ -630,11 +671,11 @@ body {
 }
 
 .calendar-day {
-  min-height: 120px;
+  min-height: 90px;
   background: white;
   border-bottom: 1px solid var(--border-color);
   border-right: 1px solid var(--border-color);
-  padding: 0.75rem;
+  padding: 0.5rem;
   position: relative;
   transition: background 0.15s;
 }

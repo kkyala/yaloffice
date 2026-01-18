@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../services/supabaseService.js';
 import { aiService } from '../services/aiService.js';
 import { interviewStore } from '../services/interviewStore.js';
+import { emailService } from '../services/emailService.js';
 
 const router = Router();
 
@@ -92,6 +93,12 @@ router.post('/', async (req, res) => {
         .single();
 
       if (userData) {
+        // Send Profile Uploaded Email
+        if (userData.email) {
+          emailService.sendProfileUploadedEmail(userData.email, userData.name || 'Candidate')
+            .catch(err => console.error('[Resume Routes] Failed to send profile upload email:', err));
+        }
+
         // Process screening asynchronously (don't wait for it)
         processResumeScreeningAsync(
           parsed_data,

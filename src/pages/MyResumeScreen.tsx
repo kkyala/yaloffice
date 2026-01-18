@@ -153,8 +153,9 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
     }, [parsedData]);
 
     const getInputStyle = (errorKey: string) => ({
-        borderColor: fieldErrors[errorKey] ? 'var(--error-color)' : '',
-        borderWidth: fieldErrors[errorKey] ? '2px' : '1px'
+        borderColor: fieldErrors[errorKey] ? '#ef4444' : '', // Explicit red
+        borderWidth: fieldErrors[errorKey] ? '2px' : '1px',
+        backgroundColor: fieldErrors[errorKey] ? '#fef2f2' : 'var(--bg-field, #f8fafc)' // Light red background for visibility
     });
 
     const handleVersionSelect = (resume: any) => {
@@ -660,8 +661,15 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                                 setParsingStatus('idle'); // Reset status on cancel
                                 setError('');
                                 setSuccessMessage('');
+                                setFieldErrors({}); // Clear validation errors
                             }}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
+                            <button className="btn btn-primary" onClick={async () => {
+                                const success = await handleSave();
+                                if (!success) {
+                                    // Optional: alert user if they missed the red text
+                                    // alert("Please fix validation errors.");
+                                }
+                            }} disabled={isSaving}>
                                 {isSaving ? <span className="spin-loader"></span> : null}
                                 {isSaving ? 'Saving...' : 'Save & Publish'}
                             </button>
@@ -761,18 +769,34 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                         <button
                             className="btn btn-primary"
                             onClick={async () => {
-                                if (file) {
+                                // If we have a new file or we are in edit mode, we MUST save first
+                                if (file || editMode) {
                                     const success = await handleSave();
                                     if (success) {
                                         setShowScreeningChat(true);
+                                    } else {
+                                        // Validation failed - use safeParse to get issues consistently
+                                        const result = resumeSchema.safeParse(formData);
+                                        if (!result.success) {
+                                            const missing = result.error.issues.map(issue => {
+                                                const path = issue.path[issue.path.length - 1];
+                                                return typeof path === 'string' ? path.charAt(0).toUpperCase() + path.slice(1) : path;
+                                            });
+                                            const uniqueMissing = Array.from(new Set(missing)).join(', ');
+
+                                            alert(`Unable to proceed. Please correct the following required fields:\n\n${uniqueMissing}\n\nThese fields have been highlighted in red.`);
+                                        }
+                                        // If validation passed but save failed, handleSave handles the UI error message.
                                     }
                                 } else {
+                                    // Just viewing existing data
                                     setShowScreeningChat(true);
                                 }
                             }}
                             style={{ width: '100%', marginBottom: '2rem', padding: '0.8rem', borderRadius: '8px', fontWeight: '600' }}
                         >
-                            {successMessage ? 'Start AI Screening' : 'Save & Start AI Screening'}
+                            {/* Logic: If just parsed successfully, user wants to start. If editing specific fields, user also wants to start. */}
+                            {successMessage && !editMode ? 'Start AI Screening' : (editMode || file ? 'Save & Start AI Screening' : 'Start AI Screening')}
                         </button>
                     )}
 

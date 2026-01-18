@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { YaalOfficeLogo } from '../components/Icons';
 
-export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
+export default function LoginScreen({ onLogin, onSignup, onForgotPassword, onVerifyOtp }) {
     const [isSigningUp, setIsSigningUp] = useState(false);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
     const [email, setEmail] = useState('');
@@ -13,11 +13,22 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
     const [authError, setAuthError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
-    // Clear fields on mount to prevent browser autofill from populating the state
+    const [rememberMe, setRememberMe] = useState(false);
+
+    // Clear fields on mount to prevent browser autofill from populating the state, or load saved email
     React.useEffect(() => {
-        setEmail('');
+        const savedEmail = localStorage.getItem('savedEmail');
+        if (savedEmail) {
+            setEmail(savedEmail);
+            setRememberMe(true);
+        } else {
+            setEmail('');
+        }
         setPassword('');
     }, []);
+
+    const [otp, setOtp] = useState('');
+    const [showOtpVerify, setShowOtpVerify] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -25,6 +36,29 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
         setAuthError('');
         setSuccessMessage('');
         const trimmedEmail = email.trim();
+
+        if (showOtpVerify) {
+            // Verify OTP
+            if (!otp.trim()) {
+                setAuthError('Please enter the verification code.');
+                setIsLoading(false);
+                return;
+            }
+            if (!onVerifyOtp) {
+                setAuthError("Verification not supported in this version.");
+                setIsLoading(false);
+                return;
+            }
+
+            const result = await onVerifyOtp({ email: trimmedEmail, token: otp.trim(), type: 'signup' });
+            if (result && result.success) {
+                // Success! The updated onVerifyOtp in App.tsx will set session and redirect
+            } else {
+                setAuthError(result?.error || 'Verification failed. Invalid code.');
+            }
+            setIsLoading(false);
+            return;
+        }
 
         if (isResettingPassword) {
             if (!trimmedEmail) {
@@ -35,7 +69,6 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
             const result = await onForgotPassword(trimmedEmail);
             if (result && result.success) {
                 setSuccessMessage('Password reset link has been sent to your email.');
-                // Optionally switch back to login after a delay, or just let them see the message
             } else {
                 setAuthError(result?.error || 'Failed to send reset link.');
             }
@@ -52,23 +85,27 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
                 return;
             }
             const result = await onSignup({ email: trimmedEmail, password, fullName: fullName.trim(), role, mobileNumber: mobile.trim() });
+
             if (result && result.success) {
                 if (result.autoLogin) {
-                    // App.tsx will handle redirection by updating state, causing this component to unmount.
+                    // Already logged in (e.g. Email Confirm disabled in backend)
                     return;
                 }
-                // After successful signup (without auto-login), switch to the login view and show a success message.
+                // Need verification
                 setIsSigningUp(false);
-                setSuccessMessage('Sign up successful! Please check your email for a confirmation link before logging in.');
-                // Clear form fields for a clean login experience
-                setFullName('');
-                setEmail('');
-                setPassword('');
-                setMobile('');
+                setShowOtpVerify(true);
+                setSuccessMessage('Sign up successful! Please check your email for the verification code.');
             } else if (result) {
                 setAuthError(result.error);
             }
         } else {
+            // LOGIN
+            if (rememberMe) {
+                localStorage.setItem('savedEmail', trimmedEmail);
+            } else {
+                localStorage.removeItem('savedEmail');
+            }
+
             const result = await onLogin({ email: trimmedEmail, password });
             if (result && !result.success) {
                 setAuthError(result.error);
@@ -81,6 +118,8 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
         e.preventDefault();
         setIsSigningUp(!isSigningUp);
         setIsResettingPassword(false);
+        setShowOtpVerify(false);
+        setOtp('');
         setAuthError('');
         setSuccessMessage('');
     };
@@ -89,6 +128,7 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
         e.preventDefault();
         setIsResettingPassword(true);
         setIsSigningUp(false);
+        setShowOtpVerify(false);
         setAuthError('');
         setSuccessMessage('');
     };
@@ -97,6 +137,8 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
         e.preventDefault();
         setIsResettingPassword(false);
         setIsSigningUp(false);
+        setShowOtpVerify(false);
+        setOtp('');
         setAuthError('');
         setSuccessMessage('');
     };
@@ -236,22 +278,16 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
                         />
                     </div>
 
-                    {!isResettingPassword && (
-                        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                <label htmlFor="password" style={{ color: '#334155', fontWeight: '500', fontSize: '0.9rem' }}>Password</label>
-                                {!isSigningUp && (
-                                    <a href="#" onClick={handleForgotPasswordClick} style={{ color: 'var(--primary-color)', fontSize: '0.85rem', textDecoration: 'none' }}>Forgot Password?</a>
-                                )}
-                            </div>
+                    {showOtpVerify && (
+                        <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                            <label htmlFor="otp-input" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Verification Code</label>
                             <input
-                                id="password"
-                                name="password"
-                                autoComplete="new-password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder={isSigningUp ? "Create a password" : "Enter Password"}
+                                id="otp-input"
+                                name="otp"
+                                type="text"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                                placeholder="Enter 6-digit code from email"
                                 required
                                 style={{
                                     width: '100%',
@@ -261,16 +297,67 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
                                     background: '#f8fafc',
                                     color: '#0f172a',
                                     outline: 'none',
-                                    fontSize: '0.95rem',
+                                    fontSize: '1.2rem',
+                                    letterSpacing: '0.2rem',
+                                    textAlign: 'center',
                                     transition: 'all 0.2s'
                                 }}
                                 onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
                                 onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                             />
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem', textAlign: 'center' }}>
+                                A code has been sent to <strong>{email}</strong>
+                            </p>
                         </div>
                     )}
 
-                    {isSigningUp && !isResettingPassword && (
+                    {!isResettingPassword && !showOtpVerify && (
+                        <>
+                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                <label htmlFor="password" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Password</label>
+                                <input
+                                    id="password"
+                                    name="password"
+                                    autoComplete="new-password"
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder={isSigningUp ? "Create a password" : "Enter Password"}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e2e8f0',
+                                        background: '#f8fafc',
+                                        color: '#0f172a',
+                                        outline: 'none',
+                                        fontSize: '0.95rem',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
+                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                />
+                            </div>
+
+                            {!isSigningUp && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '0.9rem', color: '#64748b' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={rememberMe}
+                                            onChange={(e) => setRememberMe(e.target.checked)}
+                                            style={{ marginRight: '0.5rem', accentColor: 'var(--primary-color)', width: '16px', height: '16px' }}
+                                        />
+                                        Remember Me
+                                    </label>
+                                    <a href="#" onClick={handleForgotPasswordClick} style={{ color: 'var(--primary-color)', fontSize: '0.9rem', fontWeight: '500', textDecoration: 'none' }}>Forgot Password?</a>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {isSigningUp && !isResettingPassword && !showOtpVerify && (
                         <>
                             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                                 <label htmlFor="mobile-number" style={{ display: 'block', color: '#334155', fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Mobile Number</label>
@@ -349,7 +436,11 @@ export default function LoginScreen({ onLogin, onSignup, onForgotPassword }) {
                         onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(110%)'}
                         onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
                     >
-                        {isLoading ? 'Processing...' : (isResettingPassword ? 'Send Reset Link' : (isSigningUp ? 'Sign Up' : 'Sign In'))}
+                        {isLoading ? 'Processing...' : (
+                            showOtpVerify ? 'Verify Code' :
+                                isResettingPassword ? 'Send Reset Link' :
+                                    (isSigningUp ? 'Sign Up' : 'Sign In')
+                        )}
                     </button>
                 </form>
                 <div className="login-footer" style={{ marginTop: '2rem', textAlign: 'center' }}>

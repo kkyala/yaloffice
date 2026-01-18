@@ -108,6 +108,21 @@ class ApiService {
         return { data, error };
     }
 
+    async verifyOtp(payload: { email: string; token: string; type: string }) {
+        const { data, error } = await this.request('/auth/verify', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        }).catch(err => ({ data: null, error: err }));
+
+        if (data?.session?.access_token) {
+            this.setToken(data.session.access_token);
+            if (data.user) {
+                this.logAudit(data.user.id, 'OTP_VERIFY', { email: payload.email });
+            }
+        }
+        return { data, error };
+    }
+
     async resetPassword(email: string) {
         return this.request('/auth/reset-password', {
             method: 'POST',

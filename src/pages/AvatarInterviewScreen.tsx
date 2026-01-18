@@ -18,7 +18,8 @@ import {
     useTracks,
     ParticipantTile,
     RoomAudioRenderer,
-    DisconnectButton, // Added
+    DisconnectButton,
+    useRoomContext,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { livekitService } from '../services/livekitService';
@@ -53,6 +54,53 @@ type AvatarInterviewScreenProps = {
 
 type InterviewState = 'setup' | 'connecting' | 'active' | 'analyzing' | 'finished';
 
+// Timer Component
+const SessionTimer = ({ maxSeconds = 900 }: { maxSeconds?: number }) => {
+    const room = useRoomContext();
+    const [secondsLeft, setSecondsLeft] = useState(maxSeconds);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setSecondsLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    room.disconnect(); // Auto-close
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [room]);
+
+    const formatTime = (s: number) => {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return `${m}:${sec < 10 ? '0' : ''}${sec}`;
+    };
+
+    const isUrgent = secondsLeft < 60; // Red if < 1 min
+
+    return (
+        <div style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '1rem',
+            background: isUrgent ? '#ef4444' : 'rgba(0,0,0,0.6)',
+            color: 'white',
+            padding: '0.5rem 1rem',
+            borderRadius: '20px',
+            fontWeight: 'bold',
+            fontSize: '1.2rem',
+            backdropFilter: 'blur(4px)',
+            zIndex: 10,
+            transition: 'background 0.3s'
+        }}>
+            Time Remaining: {formatTime(secondsLeft)}
+        </div>
+    );
+};
+
 // Setup/Welcome Screen
 const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) => {
     const [checks, setChecks] = useState({ mic: false, cam: false, permissions: false });
@@ -61,21 +109,14 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
     useEffect(() => {
         const checkDevices = async () => {
             try {
-                // Check if browser supports media devices
                 if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
                     throw new Error("Browser does not support media devices.");
                 }
-
-                // Request permissions first to populate labels (otherwise labels are empty and some browsers hide devices)
-                // We'll try to get a stream briefly then stop it.
-                // Note: specific constraints might fail if one device is missing, so try separately if needed.
-                // For simplicity, we check generally.
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
                     stream.getTracks().forEach(t => t.stop());
                     setChecks(prev => ({ ...prev, permissions: true }));
                 } catch (err) {
-                    // Try audio only if video failed
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                         stream.getTracks().forEach(t => t.stop());
@@ -84,24 +125,19 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
                         console.warn("Permissions denied or device missing", e);
                     }
                 }
-
-                // Enumerate devices (LiveKit's Room.getLocalDevices helper calls enumerateDevices internally)
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const hasMic = devices.some(d => d.kind === 'audioinput');
                 const hasCam = devices.some(d => d.kind === 'videoinput');
-
                 setChecks(prev => ({ ...prev, mic: hasMic, cam: hasCam }));
-
             } catch (err: any) {
                 console.error("Device check error:", err);
                 setDeviceError(err.message || "Could not access media devices.");
             }
         };
-
         checkDevices();
     }, []);
 
-    const isReady = checks.mic && checks.permissions; // Cam is optional for audio-only fallback
+    const isReady = checks.mic && checks.permissions;
 
     return (
         <div className="interview-welcome-container">
@@ -112,48 +148,22 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
 
             <div className="device-check-panel glass-panel">
                 <h2 style={{ marginBottom: '2rem', fontSize: '1.5rem' }}>System Check</h2>
-
                 <div className="device-check-item">
-                    {checks.mic ? (
-                        <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} />
-                    ) : (
-                        <span style={{ color: 'var(--error-color)', fontSize: '1.5rem' }}>❌</span>
-                    )}
+                    {checks.mic ? <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} /> : <span style={{ color: 'var(--error-color)', fontSize: '1.5rem' }}>❌</span>}
                     <span style={{ fontSize: '1.1rem' }}>Microphone {checks.mic ? 'Detected' : 'Not Found'}</span>
                 </div>
-
                 <div className="device-check-item" style={{ margin: '1rem 0' }}>
-                    {checks.cam ? (
-                        <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} />
-                    ) : (
-                        // Warn but allow if audio mode, or show X
-                        <span style={{ color: checks.cam ? 'var(--success-color)' : 'var(--warning-color)', fontSize: '1.5rem' }}>
-                            {checks.cam ? '✓' : '⚠️'}
-                        </span>
-                    )}
+                    {checks.cam ? <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} /> : <span style={{ color: checks.cam ? 'var(--success-color)' : 'var(--warning-color)', fontSize: '1.5rem' }}>{checks.cam ? '✓' : '⚠️'}</span>}
                     <span style={{ fontSize: '1.1rem' }}>Camera {checks.cam ? 'Detected' : 'Not Found (Audio Only)'}</span>
                 </div>
-
                 <div className="device-check-item">
-                    {checks.permissions ? (
-                        <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} />
-                    ) : (
-                        <span style={{ color: 'var(--error-color)', fontSize: '1.5rem' }}>❌</span>
-                    )}
+                    {checks.permissions ? <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} /> : <span style={{ color: 'var(--error-color)', fontSize: '1.5rem' }}>❌</span>}
                     <span style={{ fontSize: '1.1rem' }}>Permissions {checks.permissions ? 'Granted' : 'Needed'}</span>
                 </div>
             </div>
 
             {(error || deviceError || !checks.permissions) && (
-                <div className="error-banner" style={{
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid var(--error-color)',
-                    color: 'var(--error-color)',
-                    padding: '1rem',
-                    borderRadius: 'var(--border-radius)',
-                    marginBottom: '2rem',
-                    textAlign: 'left'
-                }}>
+                <div className="error-banner" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error-color)', color: 'var(--error-color)', padding: '1rem', borderRadius: 'var(--border-radius)', marginBottom: '2rem', textAlign: 'left' }}>
                     <p style={{ margin: 0, fontWeight: 'bold' }}>Issues Detected:</p>
                     <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
                         {error && <li>{error}</li>}
@@ -164,19 +174,14 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
                 </div>
             )}
 
-            <button
-                className="btn btn-primary btn-lg"
-                onClick={() => onStart(checks.cam)} // Pass cam availability
-                disabled={isLoading || !isReady}
-                style={{ width: '100%', maxWidth: '300px', padding: '1rem', fontSize: '1.2rem' }}
-            >
+            <button className="btn btn-primary btn-lg" onClick={() => onStart(checks.cam)} disabled={isLoading || !isReady} style={{ width: '100%', maxWidth: '300px', padding: '1rem', fontSize: '1.2rem' }}>
                 {isLoading ? 'Connecting...' : 'Start Interview Session'}
             </button>
         </div>
     );
 };
 
-// Custom minimal controls to avoid localStorage crash in prebuilt ControlBar
+// Custom minimal controls
 const CustomControls = () => {
     return (
         <div className="livekit-control-bar" style={{ padding: '1rem', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '1rem' }}>
@@ -187,8 +192,9 @@ const CustomControls = () => {
     );
 };
 
-// Room Component (unchanged)
-const RoomContent = () => {
+// Room Component
+// Room Component
+const RoomContent = ({ jobTitle }: { jobTitle: string }) => {
     // Render the room layout with participants
     const tracks = useTracks(
         [
@@ -199,8 +205,30 @@ const RoomContent = () => {
     );
 
     return (
-        <div className="room-layout" style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
-            <div className="participant-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem', padding: '1rem' }}>
+        <div className="room-layout" style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+            {/* Header Overlay */}
+            <div style={{
+                position: 'absolute',
+                top: '1rem',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(255, 255, 255, 0.9)',
+                padding: '0.5rem 1.5rem',
+                borderRadius: '20px',
+                zIndex: 10,
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                backdropFilter: 'blur(5px)'
+            }}>
+                <span style={{ fontSize: '0.9rem', color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Interviewing For</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>{jobTitle}</span>
+            </div>
+
+            <SessionTimer maxSeconds={900} /> {/* 15 Minutes */}
+
+            <div className="participant-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem', padding: '1rem', marginTop: '4rem' }}>
                 {tracks.map((track) => (
                     <ParticipantTile
                         key={track.participant.identity}
@@ -264,12 +292,56 @@ export default function AvatarInterviewScreen({
 
     const handleLeave = useCallback(async () => {
         setState('analyzing');
-        // Trigger generic analysis or save
+
         if (currentApplicationId) {
-            // onSaveInterviewResults... 
+            let attempts = 0;
+            const maxAttempts = 20; // 40 seconds max (2s interval)
+
+            // Poll for the Agent to update the DB
+            while (attempts < maxAttempts) {
+                try {
+                    // Fetch directly to bypass stale props
+                    const { data: latestCandidate } = await api.get(`/candidates/${currentApplicationId}`);
+
+                    if (latestCandidate?.interview_config?.interviewStatus === 'finished') {
+                        // Found the results!
+                        // We must trigger a refresh in App.tsx so the "View Report" button
+                        // will lead to a configured report.
+                        // We can use a dummy call to onSaveInterviewResults to trigger refetch,
+                        // or better yet, we should add a refresh callback. 
+                        // But since we don't have one, we can call onSaveInterviewResults with nulls
+                        // to just trigger the refetch logic if possible, or assume onNavigate handles it?
+                        // No, onNavigate doesn't refetch.
+                        // Let's rely on the fact that if we just wait, the user clicking "View" 
+                        // will navigate, but the data in App state is STALE.
+
+                        // HACK: Re-triggering a "save" identical to what's there is safe,
+                        // but inefficient. 
+                        // A better way: The App receives candidatesData.
+                        // We really need App.tsx's refetchCandidates to run.
+
+                        // Calling onSaveInterviewResults with the *just fetched* data updates the state *and* DB.
+                        const config = latestCandidate.interview_config;
+                        await onSaveInterviewResults(
+                            currentApplicationId,
+                            config.aiScore || 0,
+                            config.transcript || '',
+                            config.analysis,
+                            config.audioRecordingUrl
+                        );
+                        break;
+                    }
+                } catch (e) {
+                    console.warn("Polling error:", e);
+                }
+
+                await new Promise(r => setTimeout(r, 2000));
+                attempts++;
+            }
         }
+
         setState('finished');
-    }, [currentApplicationId]);
+    }, [currentApplicationId, onSaveInterviewResults]);
 
     const handleError = (err: Error) => {
         console.error("LiveKit Room Error:", err);
@@ -297,7 +369,7 @@ export default function AvatarInterviewScreen({
                 data-lk-theme="default"
                 style={{ height: '100vh', backgroundColor: 'var(--bg-primary)' }}
             >
-                <RoomContent />
+                <RoomContent jobTitle={jobTitle} />
             </LiveKitRoom>
         );
     }

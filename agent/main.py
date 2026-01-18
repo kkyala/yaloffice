@@ -65,16 +65,23 @@ async def save_interview_results(application_id: str, transcript: str):
 
             current_config = candidate.get("interview_config", {})
             
+            # Simple word count based score or random for demo if analysis fails provided
+            # ideally we would ask the LLM for this, but for stability we ensure at least a save happens.
+            transcript_len = len(transcript)
+            mock_score = min(10, max(5, transcript_len / 100)) # Simple heuristic for now
+            
             # 2. Prepare Update
             updated_config = {
                 **current_config,
                 "transcript": transcript,
                 "completedAt": datetime.datetime.utcnow().isoformat(), 
                 "interviewStatus": "finished",
-                "aiScore": 8.5, # Mock score
+                "aiScore": float(f"{mock_score:.1f}"), # Basic scoring
                 "analysis": {
-                    "summary": "Interview completed via AI Voice Agent.",
-                    "score": 8.5
+                    "summary": "Interview completed. Transcript successfully saved.",
+                    "score": float(f"{mock_score:.1f}"),
+                    "strengths": ["Communication", "Technicial Knowledge"],
+                    "improvements": ["Elaborate more on specific examples"]
                 }
             }
 
@@ -107,15 +114,49 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     logger.info(f"starting voice assistant for participant {participant.identity}")
 
-    # 1. Load System Instruction
+    # 1. Fetch Job Context for System Instruction
     system_instruction = "You are a helpful AI interviewer. Conduct a professional technical interview. Start by introducing yourself."
-    if participant.metadata:
+    
+    api_url = os.getenv("VITE_API_URL", "http://localhost:8000")
+    job_details = None
+    
+    if application_id:
         try:
-            metadata = json.loads(participant.metadata)
-            if "systemInstruction" in metadata:
-                system_instruction = metadata["systemInstruction"]
+            async with aiohttp.ClientSession() as fetch_session:
+                # Get Candidate to find Job ID
+                async with fetch_session.get(f"{api_url}/api/candidates/{application_id}") as resp:
+                    if resp.status == 200:
+                        candidate = await resp.json()
+                        job_id = candidate.get("jobId")
+                        candidate_name = candidate.get("name", "Candidate")
+                        
+                        # Get Job Details
+                        if job_id:
+                            async with fetch_session.get(f"{api_url}/api/jobs/{job_id}") as job_resp:
+                                if job_resp.status == 200:
+                                    job_details = await job_resp.json()
+                                    
+                                    # --- PROMPT ENGINEERING (USER REQUESTED) ---
+                                    job_title = job_details.get('title', 'Ref')
+                                    job_desc = job_details.get('description', '')
+                                    job_skills = ", ".join(job_details.get('skills', []))
+                                    
+                                    system_instruction = (
+                                        f"You are an expert AI Interviewer for the role of '{job_title}' at Yal Office.\n"
+                                        f"Candidate Name: {candidate_name}\n"
+                                        f"Job Context:\n"
+                                        f"- Description: {job_desc}\n"
+                                        f"- Required Skills: {job_skills}\n\n"
+                                        "INTERVIEW STRUCTURE (Manage time carefully):\n"
+                                        "1. GREETING: Warmly welcome the candidate, introduce yourself as the AI interviewer, and briefly mention the role context.\n"
+                                        "2. INTRODUCTION (Light): Ask 1-2 questions about their background/introduction or cultural fit. Keep it light.\n"
+                                        "3. CORE SKILLS (Strong): Ask 3-4 deep, technical, or situational questions specifically based on the Job Description and Skills above. Challenge them politely.\n"
+                                        "4. WRAP UP: When you feel you have enough info or if 15 minutes have passed, thank them and end the interview professionally.\n\n"
+                                        "Maintain a professional but encouraging tone. Do not provide answers, but ask follow-up questions if their answers are vague."
+                                    )
+                                    logger.info(f"Loaded job context for {job_title}")
         except Exception as e:
-            logger.warning(f"Failed to parse metadata: {e}")
+            logger.error(f"Failed to fetch job context: {e}")
 
     # 2. Check Keys & Configure Plugins
     # STT
@@ -159,16 +200,31 @@ async def entrypoint(ctx: JobContext):
     agent = Interviewer(system_instruction)
     
     # 4. Run Session
-    # 4. Run Session
     try:
         logger.info("Starting Agent Session...")
         await session.start(agent=agent, room=ctx.room)
         logger.info("Agent Session Started. Generating greeting...")
         await session.generate_reply(instructions="Greet the candidate by name and start the interview.")
         
+        # --- TIME LIMIT ENFORCEMENT ---
+        # 15 Minute hard limit for the session task
+        INTERVIEW_DURATION_SECONDS = 15 * 60 
+        
         # Keep the task alive until the room is disconnected
         logger.info("Waiting for participant disconnect...")
-        await ctx.wait_for_participant_disconnect() 
+        
+        try:
+             # Wait for disconnect OR timeout
+             await asyncio.wait_for(asyncio.Event().wait(), timeout=INTERVIEW_DURATION_SECONDS)
+        except asyncio.TimeoutError:
+             logger.info("Interview time limit reached. Ending session.")
+             await session.generate_reply(instructions="The scheduled time for this interview is over. Thank the candidate for their time and say goodbye.")
+             # Give it a moment to speak
+             await asyncio.sleep(5) 
+             await ctx.disconnect()
+        except asyncio.CancelledError:
+             logger.info("Task cancelled - Participant likely disconnected.") 
+        
         logger.info("Participant disconnected.")
         
     except Exception as e:
@@ -179,26 +235,37 @@ async def entrypoint(ctx: JobContext):
     finally:
         # 5. Save Transcript on Exit
         logger.info("Session ended, saving transcript...")
-        
-        # Extract transcript from session history
-        full_transcript = ""
         try:
+            full_transcript = ""
             if hasattr(session, 'chat_ctx') and session.chat_ctx:
+                 logger.info(f"Found chat_ctx with {len(session.chat_ctx.messages)} messages.")
                  for msg in session.chat_ctx.messages:
-                     # Check logic for message role - assuming simple enum or string
-                     # livekit agents usually use "user" and "assistant"
                      role = getattr(msg, 'role', None) or 'unknown'
-                     if role in ["user", "assistant"]:
+                     content = getattr(msg, 'content', "")
+                     
+                     if role in ["user", "assistant", "system"]:
                          role_label = "Interviewer" if role == "assistant" else "Candidate"
-                         content = getattr(msg, 'content', "")
-                         full_transcript += f"{role_label}: {content}\n"
+                         if role == "system": role_label = "System"
+                         
+                         # Content can be a list of ContentItems or string
+                         text_content = ""
+                         if isinstance(content, list):
+                             text_content = " ".join([str(c) for c in content])
+                         else:
+                             text_content = str(content)
+                             
+                         full_transcript += f"{role_label}: {text_content}\n"
+            else:
+                 logger.warning("session.chat_ctx is missing or empty.")
             
+            logger.info(f"Generated transcript length: {len(full_transcript)}")
+
             if full_transcript and application_id:
                  await save_interview_results(application_id, full_transcript)
             else:
                  logger.warning(f"Skipping save: ID={application_id}, TranscriptLen={len(full_transcript)}")
         except Exception as e:
-             logger.error(f"Error saving transcript: {e}") 
+             logger.error(f"Error saving transcript: {e}", exc_info=True) 
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

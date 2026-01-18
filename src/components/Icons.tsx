@@ -18,22 +18,17 @@ const Icon = (props) => (
 
 export const YaalOfficeLogo = (props) => (
     <img
-        src="https://storage.googleapis.com/yalimages/ChatGPT%20Image%20Nov%2019%2C%202025%2C%2007_09_42%20AM.png"
+        src="https://storage.googleapis.com/yalassest/logo_updated.png"
         alt="Yāl Office Logo"
-        width="70"
-        height="70"
+        width="54"
+        height="54"
         style={{ objectFit: 'contain' }}
         {...props}
     />
 );
 
 export const DashboardIcon = (props) => (
-    <Icon {...props}>
-        <rect x="3" y="3" width="7" height="7"></rect>
-        <rect x="14" y="3" width="7" height="7"></rect>
-        <rect x="14" y="14" width="7" height="7"></rect>
-        <rect x="3" y="14" width="7" height="7"></rect>
-    </Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/control-panel.png" alt="Dashboard" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const ChevronLeftIcon = (props) => (
@@ -49,15 +44,15 @@ export const PlusIcon = (props) => (
 );
 
 export const UsersIcon = (props) => (
-    <Icon {...props}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/conference-call.png" alt="Users" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const JobsIcon = (props) => (
-    <Icon {...props}><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/briefcase.png" alt="Jobs" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const CandidatesIcon = (props) => (
-    <Icon {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/management.png" alt="Candidates" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const InterviewIcon = (props) => (
@@ -69,11 +64,11 @@ export const OnboardingIcon = (props) => (
 );
 
 export const SettingsIcon = (props) => (
-    <Icon {...props}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/gear.png" alt="Settings" width="28" height="28" style={{ objectFit: 'contain', cursor: 'pointer' }} {...props} />
 );
 
 export const RecruitmentIcon = (props) => (
-    <Icon {...props}><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/find-user-male.png" alt="Recruitment" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const ScreenShareIcon = (props) => (
@@ -85,11 +80,11 @@ export const ScreenShareIcon = (props) => (
 );
 
 export const SearchIcon = (props) => (
-    <Icon {...props}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/search.png" alt="Search" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const TargetIcon = (props) => (
-    <Icon {...props}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/target.png" alt="Target" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const MicOnIcon = (props) => (
@@ -113,7 +108,11 @@ export const PhoneOffIcon = (props) => (
 );
 
 export const LogoutIcon = (props) => (
-    <Icon {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></Icon>
+    <Icon {...props}>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+        <polyline points="16 17 21 12 16 7"></polyline>
+        <line x1="21" y1="12" x2="9" y2="12"></line>
+    </Icon>
 );
 
 export const SendIcon = (props) => (
@@ -129,11 +128,18 @@ export const MenuIcon = (props) => (
 );
 
 export const BellIcon = (props) => (
-    <Icon {...props}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/bell.png" alt="Notifications" width="28" height="28" style={{ objectFit: 'contain', cursor: 'pointer' }} {...props} />
 );
 
 export const GlobeIcon = (props) => (
-    <Icon {...props}><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 1.5 0 0 1-4 10 15.3 1.5 0 0 1-4-10 15.3 1.5 0 0 1 4-10z"></path></Icon>
+    <img
+        src="https://img.icons8.com/3d-fluency/94/globe.png"
+        alt="Language"
+        width="28"
+        height="28"
+        style={{ objectFit: 'contain', cursor: 'pointer' }}
+        {...props}
+    />
 );
 
 export const BuildingIcon = (props) => (
@@ -141,7 +147,7 @@ export const BuildingIcon = (props) => (
 );
 
 export const ChatIcon = (props) => (
-    <Icon {...props}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/chat-message.png" alt="Chat" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const AudioWaveIcon = (props) => (
@@ -169,16 +175,11 @@ export const Volume2Icon = (props) => (
 );
 
 export const RobotIcon = (props) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M12,2A2,2 0 0,1 14,4C14,4.24 13.95,4.47 13.87,4.68C16.95,5.5 19.5,8.23 19.5,11.5V12A1,1 0 0,1 18.5,13H5.5A1,1 0 0,1 4.5,12V11.5C4.5,8.23 7.05,5.5 10.13,4.68C10.05,4.47 10,4.24 10,4A2,2 0 0,1 12,2M9,14H15A1,1 0 0,1 16,15V18A1,1 0 0,1 15,19H9A1,1 0 0,1 8,18V15A1,1 0 0,1 9,14M12,15.5A1.5,1.5 0 0,0 10.5,17A1.5,1.5 0 0,0 12,18.5A1.5,1.5 0 0,0 13.5,17A1.5,1.5 0 0,0 12,15.5Z" />
-    </svg>
+    <img src="https://img.icons8.com/3d-fluency/94/robot-2.png" alt="AI Robot" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const BriefcaseIcon = (props) => (
-    <Icon {...props}>
-        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-    </Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/briefcase.png" alt="Briefcase" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const CheckCircleIcon = (props) => (
@@ -198,11 +199,18 @@ export const SparklesIcon = (props) => (
 );
 
 export const FileTextIcon = (props) => (
-    <Icon {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></Icon>
+    <img src="https://img.icons8.com/3d-fluency/94/document.png" alt="File" width="28" height="28" style={{ objectFit: 'contain' }} {...props} />
 );
 
 export const CalendarIcon = (props) => (
-    <Icon {...props}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></Icon>
+    <img
+        src="https://img.icons8.com/3d-fluency/94/calendar.png"
+        alt="Calendar"
+        width="28"
+        height="28"
+        style={{ objectFit: 'contain', cursor: 'pointer' }}
+        {...props}
+    />
 );
 
 export const FilePlusIcon = (props) => (

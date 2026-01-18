@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3001,
       host: '0.0.0.0',
-      allowedHosts: ["stasia-mediastinal-fathomlessly.ngrok-free.dev", "unmerchantable-lorina-broodily.ngrok-free.dev", "ai-dream-machin", "100.78.55.80", "localhost", "ai-dream-machin.taild234f9.ts.net"],
+      allowedHosts: ["demo.yalhire.ai", "lk.yalhire.ai", "stasia-mediastinal-fathomlessly.ngrok-free.dev", "unmerchantable-lorina-broodily.ngrok-free.dev", "ai-dream-machin", "100.78.55.80", "localhost", "ai-dream-machin.taild234f9.ts.net"],
       proxy: {
         "/api": {
           target: "http://127.0.0.1:8000",

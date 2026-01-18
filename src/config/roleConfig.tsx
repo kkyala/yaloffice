@@ -117,6 +117,7 @@ export const roleConfig = {
             dashboard: AdminDashboardScreen,
             users: UserManagementScreen,
             settings: SettingsScreen,
+            'interview-report': AIInterviewReportScreen,
         },
     },
     Agent: {

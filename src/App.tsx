@@ -9,7 +9,7 @@ import Sidebar from './components/Sidebar';
 import TopHeader from './components/TopHeader';
 import ProfileModal from './components/ProfileModal';
 import { AIProvider } from './context/AIProvider';
-import FeedbackBanner from './components/FeedbackBanner';
+
 import FloatingAIChatWidget from './components/FloatingAIChatWidget';
 import AvatarInterviewScreen from './pages/AvatarInterviewScreen';
 
@@ -30,7 +30,7 @@ export default function App() {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
     const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768);
     const [profileModalTab, setProfileModalTab] = useState<string | null>(null);
-    const [showFeedbackBanner, setShowFeedbackBanner] = useState<boolean>(true);
+
     const [usersData, setUsersData] = useState<any[]>([]);
     const [jobsData, setJobsData] = useState<any[]>([]);
     const [candidatesData, setCandidatesData] = useState<any[]>([]);
@@ -565,13 +565,48 @@ export default function App() {
         return { success: !error, error: error ? getErrorMessage(error) : undefined };
     };
 
+    const handleVerifyOtp = async (payload: { email: string; token: string; type: string }) => {
+        const { data, error } = await api.verifyOtp(payload);
+        if (error) {
+            handleError(error, 'verifying otp');
+            return { success: false, error: getErrorMessage(error) };
+        }
+        if (data?.session) {
+            setSession(data.session);
+            const { data: userProfile } = await api.get(`/users/${data.user.id}`);
+            setCurrentUser(userProfile || { id: data.user.id, email: data.user.email, role: 'Candidate', status: 'Active' });
+
+            // Set initial page
+            const role = userProfile?.role || 'Candidate';
+            const initialPage = roleConfig[role]?.defaultPage || 'dashboard';
+            setCurrentPage(initialPage);
+            setActiveParent(initialPage);
+            return { success: true };
+        }
+        return { success: false, error: 'Verification succeeded but no session returned.' };
+    };
+
     if (isLoading) return <div className="loading-overlay"><h2>Loading Yāl Office...</h2></div>;
-    if (!currentUser) return <LoginScreen onLogin={handleLogin} onSignup={handleSignup} onForgotPassword={handleForgotPassword} />;
+    if (!currentUser) return <LoginScreen onLogin={handleLogin} onSignup={handleSignup} onForgotPassword={handleForgotPassword} onVerifyOtp={handleVerifyOtp} />;
 
     const PageComponent = currentRoleConfig?.pages[currentPage];
-    if (!PageComponent) return <div className="loading-overlay"><h2>Page not found or role not configured.</h2></div>;
+    if (!PageComponent) return (
+        <div className="loading-overlay" style={{ flexDirection: 'column', gap: '1rem', color: 'white' }}>
+            <h2 style={{ color: '#ef4444' }}>Page not found or role not configured.</h2>
+            <div style={{ background: '#1e293b', padding: '1rem', borderRadius: '8px', maxWidth: '600px', width: '90%' }}>
+                <p><strong>Debug Information:</strong></p>
+                <p>Target Page: <code style={{ color: '#facc15' }}>{currentPage}</code></p>
+                <p>Current Role: <code style={{ color: '#60a5fa' }}>{currentUser?.role}</code> (Mapped to: {currentRoleConfig ? Object.keys(roleConfig).find(k => roleConfig[k] === currentRoleConfig) : 'None'})</p>
+                <p>Available Pages for Role:</p>
+                <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.8rem', marginTop: '0.5rem', border: '1px solid #334155', padding: '0.5rem' }}>
+                    {currentRoleConfig ? Object.keys(currentRoleConfig.pages).join(', ') : 'No config found for this role'}
+                </div>
+            </div>
+            <button className="btn btn-secondary" onClick={() => setCurrentPage(currentRoleConfig?.defaultPage || 'dashboard')}>Go to Dashboard</button>
+        </div>
+    );
 
-    const interviewingCandidate = interviewingContext?.candidateId ? candidatesData.find(c => c.id === interviewingContext.candidateId) : null;
+    const interviewingCandidate = (interviewingContext?.candidateId || interviewingContext?.applicationId) ? candidatesData.find(c => c.id === (interviewingContext.candidateId || interviewingContext.applicationId)) : null;
     const currentApplicationId = interviewingContext?.applicationId ?? null;
     const jobToEditForPage = (currentPage === 'employer-edit-job') ? selectedJob : null;
 
@@ -582,7 +617,7 @@ export default function App() {
             return AvatarInterviewScreen;
         }
         // Default to audio interview
-        return currentPage === 'interview' ? roleConfig[currentUser.role].pages['interview'] : PageComponent;
+        return currentPage === 'interview' ? currentRoleConfig?.pages['interview'] : PageComponent;
     };
     const InterviewComponentToRender = getInterviewComponent();
 
@@ -615,7 +650,7 @@ export default function App() {
                         candidatesData={candidatesData}
                         jobsData={jobsData}
                     />
-                    {showFeedbackBanner && <FeedbackBanner onClose={() => setShowFeedbackBanner(false)} />}
+
                     <main className="page-content">
                         {currentPage === 'interview' || currentPage === 'ai-video-interview' ? (
                             <InterviewComponentToRender

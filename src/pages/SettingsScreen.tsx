@@ -91,82 +91,224 @@ export default function SettingsScreen({ currentUser, onUpdateUserProfile, onCle
     };
 
     return (
-        <>
-            <header className="page-header">
-                <h1>Settings</h1>
-                <div className="header-actions">
-                    <button type="submit" form="settings-form" className="btn btn-primary" disabled={isSaving}>
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                    </button>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1rem' }}>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '2.5rem'
+            }}>
+                <div>
+                    <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Account Settings</h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Manage your personal profile and preferences</p>
                 </div>
-            </header>
-            <div className="settings-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+                <button
+                    type="submit"
+                    form="settings-form"
+                    className="btn btn-primary"
+                    disabled={isSaving}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        fontSize: '1rem',
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
+                        borderRadius: '8px'
+                    }}
+                >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+            </div>
+
+            <div style={{
+                background: 'var(--bg-surface, #ffffff)', // Fallback to white if variable missing
+                borderRadius: '16px',
+                padding: '2.5rem',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.04)', // Modern soft shadow
+                border: '1px solid rgba(0,0,0,0.05)' // Very subtle border
+            }}>
                 <form id="settings-form" onSubmit={handleSaveChanges}>
-                    <div className="form-section">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <div>
-                                <h2 style={{ margin: 0 }}>Account Information</h2>
-                                <p style={{ color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>Manage your personal and contact details.</p>
-                            </div>
+                    <div style={{ marginBottom: '2rem' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ width: '4px', height: '24px', background: 'var(--primary-color)', borderRadius: '2px', display: 'inline-block' }}></span>
+                            Personal Information
+                        </h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginLeft: '1rem' }}>
+                            Update your public profile details.
+                        </p>
+                    </div>
+
+                    {feedback.message && (
+                        <div style={{
+                            marginBottom: '2rem',
+                            padding: '1rem 1.25rem',
+                            borderRadius: '8px',
+                            background: feedback.type === 'error' ? '#fef2f2' : '#f0fdf4',
+                            color: feedback.type === 'error' ? '#ef4444' : '#16a34a',
+                            border: `1px solid ${feedback.type === 'error' ? '#fecaca' : '#bbf7d0'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            fontWeight: '500'
+                        }}>
+                            {feedback.type === 'success' && <span>✓</span>}
+                            {feedback.type === 'error' && <span>⚠</span>}
+                            {feedback.message}
                         </div>
+                    )}
 
-                        {feedback.message && (
-                            <div className={feedback.type === 'error' ? 'login-error' : 'success-message'} style={{ marginBottom: '1.5rem' }}>
-                                {feedback.message}
-                            </div>
-                        )}
+                    <fieldset disabled={isSaving} style={{ border: 'none', padding: 0, margin: 0 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
 
-                        <fieldset disabled={isSaving}>
-                            <div className="form-grid-2-col">
-                                <div className="form-group">
-                                    <label>Full Name</label>
+                            {/* Left Column */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Full Name</label>
                                     <input
                                         type="text"
                                         value={name}
                                         onChange={e => setName(e.target.value)}
                                         className={fieldErrors.name ? 'input-error' : ''}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem 1rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-secondary)',
+                                            fontSize: '0.95rem',
+                                            transition: 'border-color 0.2s',
+                                        }}
+                                        placeholder="John Doe"
                                     />
-                                    {fieldErrors.name && <span className="error-text">{fieldErrors.name}</span>}
+                                    {fieldErrors.name && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.25rem', display: 'block' }}>{fieldErrors.name}</span>}
                                 </div>
-                                <div className="form-group">
-                                    <label>Mobile</label>
+
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={currentUser?.email || ''}
+                                        readOnly disabled
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem 1rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid transparent',
+                                            background: 'var(--bg-secondary)',
+                                            color: 'var(--text-disabled)',
+                                            cursor: 'not-allowed',
+                                            opacity: 0.7
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Mobile Number</label>
                                     <input
                                         type="tel"
                                         value={mobile}
                                         onChange={e => setMobile(e.target.value)}
-                                        placeholder="e.g., (555) 123-4567"
+                                        placeholder="+1 (555) 000-0000"
                                         className={fieldErrors.mobile ? 'input-error' : ''}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem 1rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-secondary)',
+                                            fontSize: '0.95rem',
+                                        }}
                                     />
-                                    {fieldErrors.mobile && <span className="error-text">{fieldErrors.mobile}</span>}
+                                    {fieldErrors.mobile && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.25rem', display: 'block' }}>{fieldErrors.mobile}</span>}
                                 </div>
-                                <div className="form-group"><label>Email</label><input type="email" value={currentUser?.email || ''} readOnly disabled style={{ cursor: 'not-allowed', backgroundColor: 'var(--light-bg)' }} /></div>
-                                <div className="form-group"><label>Role</label><input type="text" value={currentUser?.role || ''} readOnly disabled style={{ cursor: 'not-allowed', backgroundColor: 'var(--light-bg)' }} /></div>
-                                <div className="form-group grid-col-span-2">
-                                    <label>LinkedIn Profile URL</label>
+                            </div>
+
+                            {/* Right Column */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Role</label>
+                                    <input
+                                        type="text"
+                                        value={currentUser?.role || ''}
+                                        readOnly disabled
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem 1rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid transparent',
+                                            background: 'var(--bg-secondary)',
+                                            color: 'var(--text-disabled)',
+                                            cursor: 'not-allowed',
+                                            opacity: 0.7
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>City</label>
+                                        <input
+                                            type="text"
+                                            value={city}
+                                            onChange={e => setCity(e.target.value)}
+                                            placeholder="New York"
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.875rem 1rem',
+                                                borderRadius: '8px',
+                                                border: '1px solid var(--border-color)',
+                                                background: 'var(--bg-secondary)',
+                                                fontSize: '0.95rem',
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>State</label>
+                                        <input
+                                            type="text"
+                                            value={state}
+                                            onChange={e => setState(e.target.value)}
+                                            placeholder="NY"
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.875rem 1rem',
+                                                borderRadius: '8px',
+                                                border: '1px solid var(--border-color)',
+                                                background: 'var(--bg-secondary)',
+                                                fontSize: '0.95rem',
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>LinkedIn URL</label>
                                     <input
                                         type="url"
                                         value={linkedin}
                                         onChange={e => setLinkedin(e.target.value)}
-                                        placeholder="https://linkedin.com/in/yourprofile"
+                                        placeholder="https://linkedin.com/in/username"
                                         className={fieldErrors.linkedin ? 'input-error' : ''}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem 1rem',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-secondary)',
+                                            fontSize: '0.95rem',
+                                        }}
                                     />
-                                    {fieldErrors.linkedin && <span className="error-text">{fieldErrors.linkedin}</span>}
+                                    {fieldErrors.linkedin && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.25rem', display: 'block' }}>{fieldErrors.linkedin}</span>}
                                 </div>
-                                <div className="form-group"><label>City</label><input type="text" value={city} onChange={e => setCity(e.target.value)} /></div>
-                                <div className="form-group"><label>State</label><input type="text" value={state} onChange={e => setState(e.target.value)} /></div>
                             </div>
-                        </fieldset>
-
-                        <div className="modal-footer" style={{ padding: '1.5rem 0 0', borderTop: '1px solid var(--border-color)', marginTop: '1.5rem' }}>
-                            {/* Button moved to header */}
                         </div>
-                    </div>
+                    </fieldset>
                 </form>
 
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }}>
-                    To change your password, click your name in the top-right corner.
-                </p>
+                <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border-color)' }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textAlign: 'center' }}>
+                        Need to change your password? <a href="#" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>Update it here</a> or click your profile icon.
+                    </p>
+                </div>
             </div>
-        </>
+        </div>
     );
 }

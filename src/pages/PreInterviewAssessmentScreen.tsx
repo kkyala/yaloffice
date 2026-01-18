@@ -84,65 +84,147 @@ export default function PreInterviewAssessmentScreen({
     };
 
     return (
-        <>
-            <header className="page-header">
-                <h1>Pre-Interview Assessment</h1>
-            </header>
-            <div className="form-panel" style={{ maxWidth: '800px', margin: '0 auto' }}>
-                <h2 style={{ fontSize: '1.25rem' }}>For: {job.title}</h2>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-                    Please complete this short questionnaire before your AI interview. Your answers will help us understand your profile better.
+        <div style={{ maxWidth: '900px', margin: '3rem auto', padding: '0 2rem' }}>
+            <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-primary)' }}>Pre-Interview Assessment</h1>
+                <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>
+                    Application for <span style={{ color: 'var(--primary-color)', fontWeight: '600' }}>{job.title}</span>
                 </p>
+            </div>
 
-                <form onSubmit={handleSubmit}>
-                    <fieldset disabled={isLoading}>
-                        <div className="form-group">
-                            <label htmlFor="notice-period">What is your notice period?</label>
-                            <select id="notice-period" value={noticePeriod} onChange={(e) => setNoticePeriod(e.target.value)} required>
-                                <option value="" disabled>Select...</option>
-                                <option>Immediately available</option>
-                                <option>2 weeks</option>
-                                <option>1 month</option>
-                                <option>More than 1 month</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="salary-expectation">What is your annual salary expectation (USD)?</label>
-                            <input id="salary-expectation" type="text" value={salaryExpectation} onChange={(e) => setSalaryExpectation(e.target.value)} placeholder="e.g., $120,000" required />
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="work-authorization">What is your work authorization in the US?</label>
-                            <select id="work-authorization" value={workAuthorization} onChange={(e) => setWorkAuthorization(e.target.value)} required>
-                                <option value="" disabled>Select...</option>
-                                <option>US Citizen</option>
-                                <option>Green Card Holder</option>
-                                <option>H1-B Visa</option>
-                                <option>Other (requires sponsorship)</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Are you willing to relocate for this position?</label>
-                            <div style={{ display: 'flex', gap: '1rem' }}>
-                                <label><input type="radio" name="relocate" value="Yes" checked={canRelocate === 'Yes'} onChange={(e) => setCanRelocate(e.target.value)} required /> Yes</label>
-                                <label><input type="radio" name="relocate" value="No" checked={canRelocate === 'No'} onChange={(e) => setCanRelocate(e.target.value)} /> No</label>
-                                <label><input type="radio" name="relocate" value="Maybe" checked={canRelocate === 'Maybe'} onChange={(e) => setCanRelocate(e.target.value)} /> Maybe / Open to discussion</label>
+            <form onSubmit={handleSubmit} style={{ animation: 'fade-in 0.5s ease-out' }}>
+                <fieldset disabled={isLoading} style={{ border: 'none', padding: 0, margin: 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2.5rem', marginBottom: '2.5rem' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label htmlFor="notice-period" style={{ display: 'block', fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>What is your notice period?</label>
+                            <div className="select-wrapper">
+                                <select
+                                    id="notice-period"
+                                    value={noticePeriod}
+                                    onChange={(e) => setNoticePeriod(e.target.value)}
+                                    required
+                                    style={{ width: '100%', padding: '1rem', fontSize: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--background-color)', transition: 'border-color 0.2s' }}
+                                >
+                                    <option value="" disabled>Select option...</option>
+                                    <option>Immediately available</option>
+                                    <option>2 weeks</option>
+                                    <option>1 month</option>
+                                    <option>More than 1 month</option>
+                                </select>
                             </div>
                         </div>
-                        <div className="form-group">
-                            <label htmlFor="interest-reason">Why are you interested in this role?</label>
-                            <textarea id="interest-reason" value={interestReason} onChange={(e) => setInterestReason(e.target.value)} rows={5} placeholder="Briefly describe your motivation..." required />
+
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label htmlFor="salary-expectation" style={{ display: 'block', fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Annual salary expectation (USD)</label>
+                            <input
+                                id="salary-expectation"
+                                type="text"
+                                value={salaryExpectation}
+                                onChange={(e) => setSalaryExpectation(e.target.value)}
+                                placeholder="e.g. 120,000"
+                                required
+                                style={{ width: '100%', padding: '1rem', fontSize: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--background-color)' }}
+                            />
                         </div>
 
-                        {error && <p className="login-error" style={{ marginBottom: '1rem' }}>{error}</p>}
-
-                        <div style={{ textAlign: 'right', marginTop: '1.5rem' }}>
-                            <button type="submit" className="btn btn-primary btn-lg" disabled={isLoading}>
-                                {isLoading ? 'Submitting...' : 'Submit Assessment'}
-                            </button>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label htmlFor="work-authorization" style={{ display: 'block', fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Work authorization in the US</label>
+                            <div className="select-wrapper">
+                                <select
+                                    id="work-authorization"
+                                    value={workAuthorization}
+                                    onChange={(e) => setWorkAuthorization(e.target.value)}
+                                    required
+                                    style={{ width: '100%', padding: '1rem', fontSize: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--background-color)' }}
+                                >
+                                    <option value="" disabled>Select option...</option>
+                                    <option>US Citizen</option>
+                                    <option>Green Card Holder</option>
+                                    <option>H1-B Visa</option>
+                                    <option>Other (requires sponsorship)</option>
+                                </select>
+                            </div>
                         </div>
-                    </fieldset>
-                </form>
-            </div>
-        </>
+
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ display: 'block', fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Willingness to relocate</label>
+                            <div style={{ display: 'flex', gap: '1rem', padding: '0.75rem 0' }}>
+                                {['Yes', 'No', 'Maybe'].map((option) => (
+                                    <label key={option} style={{
+                                        flex: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0.8rem',
+                                        borderRadius: '10px',
+                                        border: `1px solid ${canRelocate === option ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                                        backgroundColor: canRelocate === option ? 'var(--primary-light-color)' : 'transparent',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        fontWeight: canRelocate === option ? '600' : '400',
+                                        color: canRelocate === option ? 'var(--primary-dark-color)' : 'var(--text-primary)'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="relocate"
+                                            value={option}
+                                            checked={canRelocate === option}
+                                            onChange={(e) => setCanRelocate(e.target.value)}
+                                            required
+                                            style={{ display: 'none' }}
+                                        />
+                                        {option}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '2.5rem' }}>
+                        <label htmlFor="interest-reason" style={{ display: 'block', fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>Why are you interested in this role?</label>
+                        <textarea
+                            id="interest-reason"
+                            value={interestReason}
+                            onChange={(e) => setInterestReason(e.target.value)}
+                            rows={6}
+                            placeholder="Tell us about your motivation and how your skills align with this position..."
+                            required
+                            style={{ width: '100%', padding: '1rem', fontSize: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--background-color)', resize: 'vertical', lineHeight: '1.6' }}
+                        />
+                    </div>
+
+                    {error && (
+                        <div style={{ padding: '1rem', borderRadius: '8px', backgroundColor: '#fee2e2', color: '#b91c1c', marginBottom: '1.5rem', textAlign: 'center' }}>
+                            {error}
+                        </div>
+                    )}
+
+                    <div style={{ textAlign: 'center' }}>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            style={{
+                                padding: '1rem 3rem',
+                                fontSize: '1.1rem',
+                                fontWeight: '600',
+                                borderRadius: '12px',
+                                border: 'none',
+                                backgroundColor: 'var(--primary-color)',
+                                color: 'white',
+                                cursor: isLoading ? 'not-allowed' : 'pointer',
+                                opacity: isLoading ? 0.7 : 1,
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                transition: 'all 0.2s',
+                                transform: isLoading ? 'none' : 'translateY(0)'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            {isLoading ? 'Submitting...' : 'Submit Assessment'}
+                        </button>
+                    </div>
+                </fieldset>
+            </form>
+        </div>
     );
 }

@@ -593,7 +593,9 @@ Return JSON only.`;
       text += `Name: ${resumeData.personalInfo.name || 'N/A'}\n`;
       text += `Email: ${resumeData.personalInfo.email || 'N/A'}\n`;
       text += `Phone: ${resumeData.personalInfo.phone || 'N/A'}\n`;
-      text += `Location: ${resumeData.personalInfo.location || 'N/A'}\n`;
+      const loc = resumeData.personalInfo.location ||
+        (resumeData.personalInfo.city ? `${resumeData.personalInfo.city}, ${resumeData.personalInfo.state || ''}` : '') || 'N/A';
+      text += `Location: ${loc}\n`;
       text += `LinkedIn: ${resumeData.personalInfo.linkedin || 'N/A'}\n\n`;
     }
 
@@ -617,7 +619,7 @@ Return JSON only.`;
     if (resumeData.education && Array.isArray(resumeData.education)) {
       text += `Education:\n`;
       resumeData.education.forEach((edu: any, idx: number) => {
-        text += `${idx + 1}. ${edu.degree || 'N/A'} from ${edu.school || 'N/A'}`;
+        text += `${idx + 1}. ${edu.degree || 'N/A'} from ${edu.school || edu.institution || 'N/A'}`;
         if (edu.year) text += ` (${edu.year})`;
         text += '\n';
       });

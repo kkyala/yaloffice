@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../services/supabaseService.js';
 import { pdfService } from '../services/pdfService.js';
 import { auditLogger } from '../services/auditLogger.js';
+import { emailService } from '../services/emailService.js';
 
 const router = Router();
 
@@ -269,6 +270,20 @@ async function processInterviewReportGenerationAsync(candidate: any) {
             .eq('id', id);
 
         console.log(`[Report Gen] Successfully generated and linked PDFs for candidate ${id}`);
+
+        // 5. Send Email to Candidate
+        if (candidate.user_id) {
+            const { data: user } = await supabase.from('users').select('email').eq('id', candidate.user_id).single();
+            if (user && user.email) {
+                await emailService.sendInterviewReportEmail(
+                    user.email,
+                    name,
+                    jobTitle,
+                    analysis,
+                    transcript
+                );
+            }
+        }
 
     } catch (error) {
         console.error('[Report Gen] Error:', error);
