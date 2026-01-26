@@ -271,7 +271,19 @@ export default function App() {
 
         return { success: true, autoLogin: false };
     };
-    const handleLogout = async () => { await api.logout(); setCurrentUser(null); setCurrentPage(''); };
+    const handleLogout = async () => {
+        await api.logout();
+        setCurrentUser(null);
+        setCurrentPage('');
+        window.location.reload();
+    };
+
+    // Refetch data when navigating to key pages
+    useEffect(() => {
+        if (currentPage === 'dashboard' || currentPage === 'my-applications') {
+            refetchCandidates();
+        }
+    }, [currentPage, refetchCandidates]);
 
     const handleNavigate = useCallback((page: string, parent: string, context: { applicationId?: number; candidateId?: number } = {}) => {
         setCurrentPage(page);
@@ -476,7 +488,7 @@ export default function App() {
         if (appCheckError) return { success: false, error: getErrorMessage(appCheckError) };
         if (existingApps && existingApps.length > 0) return { success: false, error: 'You have already applied for this job.' };
 
-        const applicationPayload = { jobId: job.id, name: profileData.name, dob: profileData.dob, role: job.title, status: 'Applied', resumeSummary: profileData.summary, source: profileData.source, user_id: currentUser.id };
+        const applicationPayload = { jobId: job.id, name: profileData.name, dob: profileData.dob, role: job.title, status: 'Applied', resumeSummary: profileData.summary, source: profileData.source, user_id: currentUser.id, notice_period: profileData.notice_period };
         const { data: newApp, error: appError } = await api.post('/candidates', applicationPayload);
         if (appError) return { success: false, error: getErrorMessage(appError) };
 

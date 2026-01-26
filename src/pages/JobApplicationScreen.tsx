@@ -9,6 +9,7 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
     const [linkedin, setLinkedin] = useState(user.linkedin_url || '');
     const [auth, setAuth] = useState(user.work_authorization || '');
     const [source, setSource] = useState('');
+    const [noticePeriod, setNoticePeriod] = useState(user.notice_period || 'Immediate');
     const [dob, setDob] = useState(''); // NEW: Date of Birth to match schema
 
     // Application-specific
@@ -60,6 +61,7 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
             linkedin_url: linkedin,
             work_authorization: auth,
             source,
+            notice_period: noticePeriod,
             dob,
         };
 
@@ -230,6 +232,16 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
                             </select>
                         </div>
                         <div className="form-group">
+                            <label htmlFor="applicant-notice-period" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Notice Period*</label>
+                            <select id="applicant-notice-period" value={noticePeriod} onChange={(e) => setNoticePeriod(e.target.value)} required style={compactInputStyle}>
+                                <option value="Immediate">Immediate</option>
+                                <option value="15 Days">15 Days</option>
+                                <option value="30 Days">30 Days</option>
+                                <option value="60 Days">60 Days</option>
+                                <option value="90 Days">90 Days</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
                             <label htmlFor="applicant-linkedin" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>LinkedIn Profile URL</label>
                             <input id="applicant-linkedin" type="url" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/..." style={compactInputStyle} />
                         </div>
@@ -247,7 +259,7 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
                         />
                     </div>
                 </div>
-            </form>
-        </div>
+            </form >
+        </div >
     );
 }

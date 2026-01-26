@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 import datetime 
 from dotenv import load_dotenv
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm, RoomInputOptions
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
 from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import deepgram, openai, google, silero
 
@@ -76,13 +76,8 @@ async def save_interview_results(application_id: str, transcript: str):
                 "transcript": transcript,
                 "completedAt": datetime.datetime.utcnow().isoformat(), 
                 "interviewStatus": "finished",
-                "aiScore": float(f"{mock_score:.1f}"), # Basic scoring
-                "analysis": {
-                    "summary": "Interview completed. Transcript successfully saved.",
-                    "score": float(f"{mock_score:.1f}"),
-                    "strengths": ["Communication", "Technical Knowledge"],
-                    "improvements": ["Elaborate more on specific examples"]
-                }
+                # "aiScore": float(f"{mock_score:.1f}"), # Let frontend AI calculate this
+                # Remove mock analysis so frontend triggers real AI analysis
             }
 
             # 3. Send Update
@@ -222,8 +217,20 @@ async def entrypoint(ctx: JobContext):
     try:
         logger.info("Starting Agent Session...")
         await session.start(agent=agent, room=ctx.room)
+        
+        # Explicitly publish data to confirm presence/logs
+        # await ctx.room.local_participant.publish_data("Agent Connected")
+
         logger.info("Agent Session Started. Generating greeting...")
         await session.generate_reply(instructions="Greet the candidate by name and start the interview.")
+        
+        @session.on("agent_speech_committed")
+        def on_agent_speech_committed(msg):
+            logger.info(f"Agent starting to speak: {msg.content}")
+
+        @session.on("agent_speech_stopped")
+        def on_agent_speech_stopped(msg):
+             logger.info("Agent stopped speaking.")
         
         # --- TIME LIMIT ENFORCEMENT ---
         # 15 Minute hard limit for the session task

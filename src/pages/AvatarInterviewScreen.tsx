@@ -22,6 +22,7 @@ import {
     useRoomContext,
     ParticipantName,
     VideoTrack,
+    TrackReference,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { livekitService } from '../services/livekitService';
@@ -278,7 +279,7 @@ const RoomContent = ({ jobTitle }: { jobTitle: string }) => {
                                 </div>
                             ) : (
                                 <VideoTrack
-                                    trackRef={track}
+                                    trackRef={track as TrackReference}
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 />
                             )}
@@ -381,8 +382,8 @@ export default function AvatarInterviewScreen({
                         // A better way: The App receives candidatesData.
                         // We really need App.tsx's refetchCandidates to run.
 
-                        // Calling onSaveInterviewResults with the *just fetched* data updates the state *and* DB.
                         const config = latestCandidate.interview_config;
+                        // Save local state update just in case, but navigating away
                         await onSaveInterviewResults(
                             currentApplicationId,
                             config.aiScore || 0,
@@ -390,7 +391,10 @@ export default function AvatarInterviewScreen({
                             config.analysis,
                             config.audioRecordingUrl
                         );
-                        break;
+
+                        // Auto-navigate to report
+                        onNavigate('interview-report', 'dashboard', { applicationId: currentApplicationId });
+                        return; // Exit function
                     }
                 } catch (e) {
                     console.warn("Polling error:", e);
@@ -401,6 +405,7 @@ export default function AvatarInterviewScreen({
             }
         }
 
+        // If time out, fallback to finished screen
         setState('finished');
     }, [currentApplicationId, onSaveInterviewResults]);
 
@@ -423,7 +428,7 @@ export default function AvatarInterviewScreen({
                 serverUrl={roomUrl}
                 token={token}
                 connect={true}
-                video={false}
+                video={enableVideo}
                 audio={true}
                 onDisconnected={handleLeave}
                 onError={handleError}

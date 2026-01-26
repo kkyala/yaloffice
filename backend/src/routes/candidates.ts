@@ -46,7 +46,9 @@ router.post('/', async (req, res) => {
     }
 
     // Insert candidate first
-    const { data: candidate, error } = await supabase.from('candidates').insert(req.body).select().single();
+    // TEMPORARY: Filter out notice_period until DB schema is updated
+    const { notice_period, ...insertData } = req.body;
+    const { data: candidate, error } = await supabase.from('candidates').insert(insertData).select().single();
     if (error) return res.status(500).json({ error: error.message });
 
     // Check for existing screening assessment
