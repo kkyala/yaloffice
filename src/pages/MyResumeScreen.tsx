@@ -62,11 +62,12 @@ const resumeSchema = z.object({
     })).optional(),
     skills: z.array(z.string()).optional(),
     certifications: z.array(z.string()).optional(),
+    suggestedJobRole: z.string().optional(),
 });
 
 type TabType = 'profile' | 'experience' | 'projects' | 'education' | 'skills';
 
-export default function MyResumeScreen({ currentUser, onSaveResume, resumeList = [], onNavigate }) {
+export default function MyResumeScreen({ currentUser, onSaveResume, resumeList = [], onNavigate, onDeleteResume }) {
     const [file, setFile] = useState<File | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -91,7 +92,8 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
         education: [],
         skills: [],
         projects: [],
-        certifications: []
+        certifications: [],
+        suggestedJobRole: ''
     });
 
     useEffect(() => {
@@ -137,7 +139,8 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                     description: p.description || '',
                     technologies: p.technologies || []
                 })),
-                certifications: parsedData.certifications || []
+                certifications: parsedData.certifications || [],
+                suggestedJobRole: parsedData.suggestedJobRole || ''
             });
         } else {
             setFormData({
@@ -147,7 +150,8 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                 education: [],
                 skills: [],
                 projects: [],
-                certifications: []
+                certifications: [],
+                suggestedJobRole: ''
             });
         }
     }, [parsedData]);
@@ -822,10 +826,38 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                                         }}
                                     >
                                         <div>
-                                            <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.2rem' }}>Version {resume.version}</div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.2rem' }}>
+                                                {(() => {
+                                                    const data = resume.parsed_data;
+                                                    if (!data) return `Version ${resume.version}`;
+
+                                                    if (data.suggestedJobRole) return data.suggestedJobRole;
+                                                    if (data.experience?.[0]?.role) return data.experience[0].role;
+                                                    if (data.skills?.length > 0) return `${data.skills.slice(0, 2).join(' & ')} Candidate`;
+
+                                                    return `Version ${resume.version}`;
+                                                })()}
+                                            </div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{formatDate(resume.created_at)}</div>
                                         </div>
-                                        {resume.is_current && <span className="status-badge status-active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Active</span>}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            {resume.is_current && <span className="status-badge status-active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Active</span>}
+                                            <button
+                                                className="btn-icon"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (window.confirm('Delete this version?')) {
+                                                        onDeleteResume && onDeleteResume(resume.id);
+                                                    }
+                                                }}
+                                                title="Delete"
+                                                style={{ color: 'var(--text-secondary)', opacity: 0.5, padding: '4px' }}
+                                                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                                                onMouseOut={(e) => e.currentTarget.style.opacity = '0.5'}
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -1015,7 +1047,7 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         </>
     );
 }

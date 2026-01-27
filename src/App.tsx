@@ -357,6 +357,19 @@ export default function App() {
         }
     };
 
+    const handleDeleteResume = async (resumeId: number) => {
+        if (!currentUser) return { success: false, error: 'User not logged in' };
+        try {
+            const { error } = await api.delete(`/resumes/${resumeId}`);
+            if (error) throw error;
+            await refetchResume(currentUser.id);
+            return { success: true };
+        } catch (err) {
+            handleError(err, 'deleting resume');
+            return { success: false, error: getErrorMessage(err) };
+        }
+    };
+
     const handleSaveInterviewResults = async (applicationId: number, score: number, transcript: string, analysis?: any, audioUrl?: string) => {
         const { data: appData, error: fetchError } = await api.get(`/candidates/${applicationId}`);
         if (fetchError) { handleError(fetchError, 'fetching candidate for interview save'); return; }
@@ -717,7 +730,7 @@ export default function App() {
                                 onCreateNewJob={handleCreateNewJob} onCancelJobAction={handleCancelJobAction} onEditJob={handleEditJob} onPublishJob={handlePublishJob}
                                 onViewJob={(job: any) => { setSelectedJob(job); setJobScreenView('detail'); }} onStartApplication={(job: any) => { setSelectedJob(job); handleNavigate('apply-for-job', 'find-jobs'); }}
                                 onMoveCandidates={handleMoveCandidatesToPipeline} onSaveAIConfig={handleSaveAIConfig} onUpdateUserProfile={handleUpdateUserProfile}
-                                onSaveResume={handleSaveResume} resumeList={resumeList}
+                                onSaveResume={handleSaveResume} onDeleteResume={handleDeleteResume} resumeList={resumeList}
                                 jobToEdit={jobToEditForPage}
                             />
                         )}

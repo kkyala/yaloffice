@@ -18,6 +18,24 @@ router.get('/:userId', async (req, res) => {
   res.json(data);
 });
 
+// DELETE /api/resumes/:id
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from('resumes')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // POST /api/resumes
 router.post('/', async (req, res) => {
   const { user_id, parsed_data, file_content, file_type, file_name } = req.body;
@@ -68,6 +86,17 @@ router.post('/', async (req, res) => {
       .eq('user_id', user_id);
 
     // Insert new
+    // Recalculate AI Job Role if parsed_data is provided
+    if (parsed_data) {
+      try {
+        const role = await aiService.determineJobRole(parsed_data);
+        parsed_data.suggestedJobRole = role;
+        console.log(`[Resume Routes] Determined new job role: ${role}`);
+      } catch (err) {
+        console.error('[Resume Routes] Failed to determine job role:', err);
+      }
+    }
+
     const { data, error } = await supabase
       .from('resumes')
       .insert({

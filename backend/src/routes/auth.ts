@@ -45,6 +45,9 @@ router.post('/signup', async (req, res) => {
             const name = user.user_metadata?.name || user.user_metadata?.full_name || trimmedEmail.split('@')[0];
 
             // Send our custom verification email
+            console.log('---------------------------------------------------');
+            console.log('VERIFICATION LINK (DEV):', actionLink);
+            console.log('---------------------------------------------------');
             emailService.sendVerificationEmail(trimmedEmail, actionLink, name)
                 .catch(err => console.error('Failed to send verification email:', err));
         }

@@ -4,10 +4,17 @@ import { SearchIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Ico
 
 const ITEMS_PER_PAGE = 10;
 
-export default function CandidateJobsScreen({ jobsData = [], candidatesData = [], currentUser, onStartApplication }) {
+export default function CandidateJobsScreen({ jobsData = [], candidatesData = [], currentUser, onStartApplication, resumeList = [] }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'title', direction: 'asc' });
+
+    // Identify current active resume role
+    const activeJobRole = useMemo(() => {
+        const activeResume = resumeList.find(r => r.is_current);
+        if (!activeResume) return null;
+        return activeResume.parsed_data?.suggestedJobRole || activeResume.parsed_data?.experience?.[0]?.role || null;
+    }, [resumeList]);
 
     // 1. Filter Active Jobs
     const activeJobs = useMemo(() => {
@@ -24,9 +31,54 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
         );
     }, [candidatesData, currentUser]);
 
+    // Identify skills for fallback matching
+    const candidateSkills = useMemo(() => {
+        const activeResume = resumeList.find(r => r.is_current);
+        return activeResume?.parsed_data?.skills || [];
+    }, [resumeList]);
+
     // 3. Filter & Sort Logic
     const processedJobs = useMemo(() => {
-        let data = [...activeJobs];
+        let initialData = activeJobs.map(job => {
+            const lowerTitle = job.title.toLowerCase();
+
+            // Primary Score: Role Match
+            let roleScore = activeJobRole ? (
+                lowerTitle.includes(activeJobRole.toLowerCase()) ||
+                    activeJobRole.toLowerCase().includes(lowerTitle) ? 100 : 0
+            ) : 0;
+
+            // Secondary Score: Skills Match (only if role doesn't match perfectly)
+            let skillScore = 0;
+            if (candidateSkills.length > 0) {
+                const matchedSkills = candidateSkills.filter(skill =>
+                    lowerTitle.includes(skill.toLowerCase())
+                );
+                skillScore = matchedSkills.length * 10; // 10 points per skill match
+            }
+
+            const totalScore = roleScore + skillScore;
+            return { ...job, roleScore, skillScore, totalScore, isMatch: totalScore > 0 };
+        });
+
+        // MULTI-LEVEL FILTER
+        let data = [];
+
+        // Try Level 1: Role matches
+        const roleMatches = initialData.filter(j => j.roleScore > 0);
+
+        if (roleMatches.length > 0) {
+            data = roleMatches;
+        } else {
+            // Level 2 Fallback: Skill matches (even if title doesn't match role exactly)
+            const skillMatches = initialData.filter(j => j.skillScore > 0);
+            data = skillMatches;
+        }
+
+        // If no matches at all and no role/skills defined, show everything (initial state)
+        if (data.length === 0 && !activeJobRole && candidateSkills.length === 0) {
+            data = initialData;
+        }
 
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
@@ -37,23 +89,20 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
             );
         }
 
-        if (sortConfig.key) {
-            data.sort((a, b) => {
-                const aValue = a[sortConfig.key];
-                const bValue = b[sortConfig.key];
+        // Custom sort
+        data.sort((a, b) => {
+            if (a.totalScore !== b.totalScore) return b.totalScore - a.totalScore;
 
-                if (aValue < bValue) {
-                    return sortConfig.direction === 'asc' ? -1 : 1;
-                }
-                if (aValue > bValue) {
-                    return sortConfig.direction === 'asc' ? 1 : -1;
-                }
-                return 0;
-            });
-        }
+            const aValue = a[sortConfig.key];
+            const bValue = b[sortConfig.key];
+
+            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
         return data;
-    }, [activeJobs, searchTerm, sortConfig]);
+    }, [activeJobs, searchTerm, sortConfig, activeJobRole, candidateSkills]);
 
     // Reset pagination when search changes
     useEffect(() => {
@@ -96,10 +145,27 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
         }
     }, [currentUser]);
 
+    // Check if we are showing fallback results
+    const isFallbackMode = useMemo(() => {
+        if (!activeJobRole) return false;
+        const roleMatches = activeJobs.filter(job =>
+            job.title.toLowerCase().includes(activeJobRole.toLowerCase()) ||
+            activeJobRole.toLowerCase().includes(job.title.toLowerCase())
+        );
+        return roleMatches.length === 0 && processedJobs.length > 0;
+    }, [activeJobs, activeJobRole, processedJobs]);
+
     return (
         <>
-            <header className="page-header">
-                <h1>Find Jobs</h1>
+            <header className="page-header" style={{ marginBottom: '1.5rem' }}>
+                <div>
+                    <h1>Find Jobs</h1>
+                    {activeJobRole && (
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                            Showing AI-powered suggestions for <strong style={{ color: 'var(--primary-color)' }}>{activeJobRole}</strong>
+                        </p>
+                    )}
+                </div>
             </header>
 
             <div className="table-controls" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -126,6 +192,26 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                 </div>
             </div>
 
+            {isFallbackMode && (
+                <div className="animate-fade-in" style={{
+                    backgroundColor: 'rgba(255, 152, 0, 0.08)',
+                    border: '1px solid rgba(255, 152, 0, 0.2)',
+                    borderRadius: '12px',
+                    padding: '1rem 1.25rem',
+                    marginBottom: '1.5rem',
+                    color: '#c2410c',
+                    fontSize: '0.9rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                }}>
+                    <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
+                    <div>
+                        There is no current opening for <strong>{activeJobRole}</strong>. We're showing jobs related to your <strong>Skills</strong> instead.
+                    </div>
+                </div>
+            )}
+
             <div className="table-container">
                 <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
                     <thead>
@@ -146,8 +232,25 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                         {currentItems.length > 0 ? currentItems.map(job => (
                             <tr key={job.id} className="animate-fade-in">
                                 <td>
-                                    <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{job.title}</strong>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0' }}>{job.employer}</p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                                        <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{job.title}</strong>
+                                        {job.isMatch && (
+                                            <span style={{
+                                                fontSize: '0.65rem',
+                                                backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
+                                                color: 'var(--primary-color)',
+                                                padding: '2px 8px',
+                                                borderRadius: '12px',
+                                                fontWeight: '600',
+                                                border: '1px solid rgba(var(--primary-rgb), 0.2)',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.5px'
+                                            }}>
+                                                AI Suggestion
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{job.employer}</p>
                                 </td>
                                 <td>
                                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--light-bg)', padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.8rem' }}>

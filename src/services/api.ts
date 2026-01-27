@@ -164,6 +164,11 @@ class ApiService {
             body: JSON.stringify(body),
         }).catch(err => ({ data: null, error: err }));
     }
+    async delete(endpoint: string) {
+        return this.request(endpoint, {
+            method: 'DELETE',
+        }).catch(err => ({ data: null, error: err }));
+    }
 }
 
 export const api = new ApiService();

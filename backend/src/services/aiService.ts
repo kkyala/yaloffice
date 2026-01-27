@@ -54,6 +54,7 @@ export interface ResumeData {
     technologies?: string[] | string;
   }>;
   certifications?: string[];
+  suggestedJobRole?: string;
 }
 
 export interface ResumeScreeningResult {
@@ -196,7 +197,8 @@ class AIService {
              "description": "string",
              "technologies": ["string"]
            }],
-           "certifications": ["string"]
+           "certifications": ["string"],
+           "suggestedJobRole": "string"
          }`;
 
     const prompt = isWord && extractedText
@@ -207,13 +209,27 @@ class AIService {
          Resume Content:
          ${extractedText}
          
-         Note: Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
+         Instructions:
+         1. Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
+         2. Determine a 'Suitable Job Role' (e.g. 'Senior React Developer', 'Data Scientist', 'Full Stack Engineer') using this priority:
+            - Priority 1: Tools and Technologies used in Projects.
+            - Priority 2: Listed Skills.
+            - Priority 3: Past experience titles.
+            Fill this in 'suggestedJobRole'.
+         
          Return ONLY the JSON.`
       : `Parse this resume (PDF/Image) into structured JSON.
          STRICTLY follow this schema:
          ${schema}
-
-         Note: Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
+         
+         Instructions:
+         1. Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
+         2. Determine a 'Suitable Job Role' (e.g. 'Senior React Developer', 'Data Scientist', 'Full Stack Engineer') using this priority:
+            - Priority 1: Tools and Technologies used in Projects.
+            - Priority 2: Listed Skills.
+            - Priority 3: Past experience titles.
+            Fill this in 'suggestedJobRole'.
+         
          Return ONLY the JSON.`;
 
     const model = this.genAI.getGenerativeModel({
@@ -692,6 +708,42 @@ Return JSON only.`;
 
     const result = await model.generateContent(prompt);
     return (await result.response).text();
+  }
+
+  /**
+   * Determine suitable job role based on resume data
+   */
+  async determineJobRole(resumeData: any): Promise<string> {
+    this.initialize();
+    if (!this.genAI) throw new Error('AI Service not initialized');
+
+    const skills = resumeData.skills ? resumeData.skills.join(', ') : '';
+    const projects = resumeData.projects ? resumeData.projects.map((p: any) =>
+      `${p.name} (Tools: ${Array.isArray(p.technologies) ? p.technologies.join(', ') : (p.technologies || 'N/A')})`
+    ).join('\n') : '';
+    const experience = resumeData.experience ? resumeData.experience.map((e: any) => e.role).join(', ') : '';
+
+    const prompt = `Analyze the candidate's profile to generate a specific 'Target Job Role' title (e.g. 'Full Stack Python Developer', 'DevOps Engineer', 'Product Manager').
+    
+    Skills: ${skills}
+    Projects & Tools Used: 
+    ${projects}
+    
+    Past Titles: ${experience}
+    
+    Instructions:
+    1. Determine the job role based on this specific priority order:
+       - **Priority 1**: Tools and Technologies used within Projects.
+       - **Priority 2**: Listed Skills.
+       - **Priority 3**: Past titles (only if they align with the above).
+    2. If the tools/skills suggest a career pivot, name them based on the NEW skills/tools (e.g. past role 'Sales' but projects use 'Python, React' -> 'Junior Full Stack Developer').
+    3. Be specific (e.g. use 'React Native Developer' if tools show React Native).
+    
+    Return ONLY the job title string. Do not include quotes or intro text.`;
+
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    const result = await model.generateContent(prompt);
+    return (await result.response).text().trim();
   }
 }
 

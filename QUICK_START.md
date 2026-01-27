@@ -47,7 +47,7 @@ npm run dev
 
 ## Test the Interview
 
-1. **Open Browser**: http://localhost:3000
+1. **Open Browser**: http://localhost:3001
 2. **Navigate to Interview**: Click "Start Interview" or go to AI interview page
 3. **Allow Microphone**: Browser will ask for permission
 4. **Check Status**:
