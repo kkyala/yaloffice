@@ -1,6 +1,6 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { SearchIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Icons';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { SearchIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, XIcon } from '../components/Icons';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -8,6 +8,20 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'title', direction: 'asc' });
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const [showAllJobs, setShowAllJobs] = useState(false);
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (filterRef.current && !filterRef.current.contains(event.target)) {
+                setShowFilterDropdown(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // Identify current active resume role
     const activeJobRole = useMemo(() => {
@@ -64,19 +78,13 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
         // MULTI-LEVEL FILTER
         let data = [];
 
-        // Try Level 1: Role matches
-        const roleMatches = initialData.filter(j => j.roleScore > 0);
-
-        if (roleMatches.length > 0) {
-            data = roleMatches;
+        if (showAllJobs) {
+            data = initialData;
+        } else if (activeJobRole) {
+            // ONLY Role matches
+            data = initialData.filter(j => j.roleScore > 0);
         } else {
-            // Level 2 Fallback: Skill matches (even if title doesn't match role exactly)
-            const skillMatches = initialData.filter(j => j.skillScore > 0);
-            data = skillMatches;
-        }
-
-        // If no matches at all and no role/skills defined, show everything (initial state)
-        if (data.length === 0 && !activeJobRole && candidateSkills.length === 0) {
+            // If no role/skills defined, show everything (initial state)
             data = initialData;
         }
 
@@ -102,12 +110,12 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
         });
 
         return data;
-    }, [activeJobs, searchTerm, sortConfig, activeJobRole, candidateSkills]);
+    }, [activeJobs, searchTerm, sortConfig, activeJobRole, candidateSkills, showAllJobs]);
 
     // Reset pagination when search changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, showAllJobs]);
 
     // 4. Pagination
     const totalPages = Math.ceil(processedJobs.length / ITEMS_PER_PAGE);
@@ -146,14 +154,10 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
     }, [currentUser]);
 
     // Check if we are showing fallback results
-    const isFallbackMode = useMemo(() => {
-        if (!activeJobRole) return false;
-        const roleMatches = activeJobs.filter(job =>
-            job.title.toLowerCase().includes(activeJobRole.toLowerCase()) ||
-            activeJobRole.toLowerCase().includes(job.title.toLowerCase())
-        );
-        return roleMatches.length === 0 && processedJobs.length > 0;
-    }, [activeJobs, activeJobRole, processedJobs]);
+    const noRoleMatches = useMemo(() => {
+        if (!activeJobRole || showAllJobs) return false;
+        return processedJobs.length === 0;
+    }, [activeJobRole, showAllJobs, processedJobs]);
 
     return (
         <>
@@ -162,7 +166,11 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                     <h1>Find Jobs</h1>
                     {activeJobRole && (
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                            Showing AI-powered suggestions for <strong style={{ color: 'var(--primary-color)' }}>{activeJobRole}</strong>
+                            {showAllJobs ? (
+                                "Showing all available job openings."
+                            ) : (
+                                <>Showing AI-powered suggestions for <strong style={{ color: 'var(--primary-color)' }}>{activeJobRole}</strong></>
+                            )}
                         </p>
                     )}
                 </div>
@@ -187,12 +195,126 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                         <SearchIcon style={{ width: '18px', height: '18px' }} />
                     </div>
                 </div>
-                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
-                    Showing <strong style={{ color: 'var(--text-primary)' }}>{currentItems.length}</strong> of {processedJobs.length} jobs
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                        Showing <strong style={{ color: 'var(--text-primary)' }}>{currentItems.length}</strong> of {processedJobs.length} jobs
+                    </div>
+
+                    {/* Filter Option */}
+                    <div style={{ position: 'relative' }} ref={filterRef}>
+                        <button
+                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                            className="btn btn-secondary"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.5rem 1rem',
+                                borderRadius: 'var(--border-radius)',
+                                border: showFilterDropdown ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                backgroundColor: showFilterDropdown ? 'var(--primary-subtle)' : 'white',
+                                color: showFilterDropdown ? 'var(--primary-dark-color)' : 'var(--text-primary)',
+                                fontWeight: '600',
+                                boxShadow: 'var(--box-shadow-sm)',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <FilterIcon style={{ width: '18px', height: '18px' }} />
+                            Filter
+                        </button>
+
+                        {showFilterDropdown && (
+                            <div className="glass-panel animate-fade-in" style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: 'calc(100% + 10px)',
+                                width: '320px',
+                                background: 'white',
+                                borderRadius: '12px',
+                                boxShadow: 'var(--box-shadow-lg)',
+                                padding: '1.5rem',
+                                zIndex: 1000,
+                                border: '1px solid var(--border-color)',
+                                backdropFilter: 'blur(10px)'
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>Job Filters</h3>
+                                    <button onClick={() => setShowFilterDropdown(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                                        <XIcon style={{ width: '18px', height: '18px' }} />
+                                    </button>
+                                </div>
+
+                                <div style={{ marginBottom: '1.25rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', userSelect: 'none' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={showAllJobs}
+                                            onChange={(e) => setShowAllJobs(e.target.checked)}
+                                            style={{ width: '20px', height: '20px', accentColor: 'var(--primary-color)' }}
+                                        />
+                                        <span style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.95rem' }}>Show All Jobs</span>
+                                    </label>
+                                    <p style={{ margin: '0.5rem 0 0 2rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                        Check this to see all available jobs regardless of your profile matches.
+                                    </p>
+                                </div>
+
+                                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+                                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Current Profile Data</h4>
+
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Resume Job Roles</div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                            {activeJobRole ? (
+                                                <span style={{
+                                                    fontSize: '0.8rem',
+                                                    backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
+                                                    color: 'var(--primary-color)',
+                                                    padding: '2px 10px',
+                                                    borderRadius: '20px',
+                                                    fontWeight: '500',
+                                                    border: '1px solid rgba(var(--primary-rgb), 0.1)'
+                                                }}>
+                                                    {activeJobRole}
+                                                </span>
+                                            ) : (
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No role detected</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Skills from Resume</div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                            {candidateSkills && candidateSkills.length > 0 ? (
+                                                candidateSkills.slice(0, 10).map((skill, index) => (
+                                                    <span key={index} style={{
+                                                        fontSize: '0.75rem',
+                                                        backgroundColor: 'var(--background-color)',
+                                                        color: 'var(--text-primary)',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '4px',
+                                                        border: '1px solid var(--border-color)'
+                                                    }}>
+                                                        {skill}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No skills detected</span>
+                                            )}
+                                            {candidateSkills && candidateSkills.length > 10 && (
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', paddingTop: '2px' }}>+{candidateSkills.length - 10} more</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {isFallbackMode && (
+            {noRoleMatches && (
                 <div className="animate-fade-in" style={{
                     backgroundColor: 'rgba(255, 152, 0, 0.08)',
                     border: '1px solid rgba(255, 152, 0, 0.2)',
@@ -207,7 +329,7 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                 }}>
                     <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
                     <div>
-                        There is no current opening for <strong>{activeJobRole}</strong>. We're showing jobs related to your <strong>Skills</strong> instead.
+                        There are currently no openings for <strong>{activeJobRole}</strong>. Use the <strong>Filter</strong> option to see all available jobs.
                     </div>
                 </div>
             )}
@@ -284,7 +406,9 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                         )) : (
                             <tr>
                                 <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {searchTerm ? 'No jobs match your search criteria.' : 'There are currently no active job openings.'}
+                                    {searchTerm ? 'No jobs match your search criteria.' :
+                                        (activeJobRole && !showAllJobs) ? `No current openings specifically for ${activeJobRole}.` :
+                                            'There are currently no active job openings.'}
                                 </td>
                             </tr>
                         )}

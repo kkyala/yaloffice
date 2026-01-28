@@ -263,3 +263,9 @@ export const CodeIcon = (props) => (
 export const AwardIcon = (props) => (
     <Icon {...props}><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></Icon>
 );
+
+export const FilterIcon = (props) => (
+    <Icon {...props}>
+        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+    </Icon>
+);
