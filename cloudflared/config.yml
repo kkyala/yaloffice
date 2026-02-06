@@ -1,7 +1,7 @@
 tunnel: 362fcdc8-74f2-4d26-84ad-7e6f3cebc483
-credentials-file: C:\Users\Yaluser\.cloudflared\362fcdc8-74f2-4d26-84ad-7e6f3cebc483.json
+credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
   - hostname: demo.yalhire.ai
-    service: http://127.0.0.1:3001
+    service: http://frontend-prod:3001
   - service: http_status:404

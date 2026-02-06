@@ -11,6 +11,7 @@ export interface InterviewSession {
   candidateId?: string;
   candidateName?: string;
   customQuestions: string[];
+  resumeText?: string; // Newly added
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   startedAt: string;
   endedAt?: string;
@@ -48,6 +49,17 @@ class InterviewStore {
       console.warn('[InterviewStore] Service Role Key missing, using default client. RLS errors may occur.');
     }
 
+    // Workaround: Store resumeText in custom_questions if available, prefixed
+    // This allows us to persist the resume text without altering the DB schema
+    const finalCustomQuestions = [...session.customQuestions];
+    if (session.resumeText) {
+      // Remove old resume entry if exists to avoid duplication
+      const idx = finalCustomQuestions.findIndex(q => q.startsWith('__RESUME__:'));
+      if (idx !== -1) finalCustomQuestions.splice(idx, 1);
+
+      finalCustomQuestions.push(`__RESUME__:${Buffer.from(session.resumeText).toString('base64')}`);
+    }
+
     const { error } = await client
       .from('interviews')
       .upsert({
@@ -56,15 +68,15 @@ class InterviewStore {
         job_title: session.jobTitle,
         candidate_id: session.candidateId,
         candidate_name: session.candidateName,
-        custom_questions: session.customQuestions,
+        custom_questions: finalCustomQuestions,
         status: session.status,
         started_at: session.startedAt,
         ended_at: session.endedAt,
         transcript: session.transcript,
         current_question_index: session.currentQuestionIndex,
         analysis: session.analysis,
-        question_count: session.questionCount, // Kept from original
-        difficulty: session.difficulty // Kept from original
+        question_count: session.questionCount,
+        difficulty: session.difficulty
       });
 
     if (error) {
@@ -125,6 +137,18 @@ class InterviewStore {
 
     if (error || !data) return undefined;
 
+    // Unpack resumeText
+    let resumeText: string | undefined = undefined;
+    const cleanCustomQuestions = (data.custom_questions || []).filter((q: string) => {
+      if (typeof q === 'string' && q.startsWith('__RESUME__:')) {
+        try {
+          resumeText = Buffer.from(q.replace('__RESUME__:', ''), 'base64').toString('utf-8');
+        } catch (e) { console.error('Error decoding resume text', e); }
+        return false;
+      }
+      return true;
+    });
+
     return {
       id: data.id,
       roomName: data.room_name,
@@ -135,11 +159,12 @@ class InterviewStore {
       questionCount: data.question_count,
       currentQuestionIndex: data.current_question_index,
       difficulty: data.difficulty,
-      customQuestions: data.custom_questions,
+      customQuestions: cleanCustomQuestions,
       transcript: data.transcript,
       analysis: data.analysis,
       startedAt: data.started_at,
-      endedAt: data.ended_at
+      endedAt: data.ended_at,
+      resumeText: resumeText
     };
   }
 

@@ -7,22 +7,23 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "8000:3000"
     environment:
       - PORT=3000
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=http://localhost:3001
       - LIVEKIT_URL=${LIVEKIT_URL}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash-live-001}
-      - GEMINI_VOICE=${GEMINI_VOICE:-Zephyr}
       - DATABASE_URL=${DATABASE_URL}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - RESUME_AI_URL=http://ollama-deepseek:11434
+      - INTERVIEW_AI_URL=http://ollama-gemma:11434
+      # - STT_URL=http://whisper:9000  <-- Removed
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
     volumes:
       - ./avatar_output:/app/avatar_output
-    restart: unless-stopped
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/health" ]
       interval: 30s
@@ -35,14 +36,44 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "5173:5173"
+      - "3001:3001"
     environment:
       - VITE_API_URL=http://backend:3000
       - VITE_WS_URL=ws://backend:3000
-      - VITE_LIVEKIT_URL=${LIVEKIT_URL}
+      - VITE_LIVEKIT_URL=${VITE_LIVEKIT_URL}
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
+
+  # Frontend (Production - Nginx)
+  frontend-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.prod
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: /ws
+        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL}
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+  # AI Agent (Python)
+  agent:
+    build: ./agent
+    environment:
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      - VITE_API_URL=http://backend:3000
+      - RESUME_AI_URL=http://ollama-deepseek:11434
+      - INTERVIEW_AI_URL=http://ollama-gemma:11434
+      - STT_URL=http://whisper:9000
+    depends_on:
+      - livekit
+      - backend
     restart: unless-stopped
 
   # Avatar Generator (Wav2Lip) - Requires NVIDIA GPU
@@ -72,15 +103,69 @@ services:
   # Optional: Self-hosted LiveKit
   livekit:
     image: livekit/livekit-server:latest
-    command: --config /livekit.yaml
+    command: --config /livekit-config.yaml
     ports:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
     volumes:
-      - ./livekit.yaml:/livekit.yaml
-    profiles:
-      - self-hosted
+      - ./livekit/livekit-config.yaml:/livekit-config.yaml
+
+  # Cloudflare Tunnel
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_ORIGIN_CERT=/etc/cloudflared/cert.pem
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+    depends_on:
+      - frontend-prod
+    restart: unless-stopped
+
+  # --- NEW SERVICES ---
+
+  ollama-deepseek:
+    image: ollama/ollama
+    container_name: ollama-deepseek
+    ports:
+      - "11435:11434"
+    environment:
+      - OLLAMA_NUM_GPU_LAYERS=999
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=24h
+    volumes:
+      - ollama-deepseek:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    restart: unless-stopped
+
+  ollama-gemma:
+    image: ollama/ollama
+    container_name: ollama-gemma
+    ports:
+      - "11436:11434"
+    environment:
+      - OLLAMA_NUM_GPU_LAYERS=999
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=24h
+    volumes:
+      - ollama-gemma:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    restart: unless-stopped
 
 volumes:
   avatar_output:
+  ollama-deepseek:
+  ollama-gemma:

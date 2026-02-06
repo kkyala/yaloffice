@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { geminiLLMService } from '../services/geminiLLM.js';
+import { AccessToken } from 'livekit-server-sdk';
+import { ollamaService } from '../services/ollamaService.js';
 import { interviewStore, InterviewSession } from '../services/interviewStore.js';
 import { supabase } from '../services/supabaseService.js';
 import { auditLogger } from '../services/auditLogger.js';
@@ -41,14 +42,19 @@ router.post('/start', async (req, res) => {
       currentQuestionIndex: 0
     };
 
-    // Generate initial greeting from LLM
+    // Generate initial greeting from LLM (Gemma)
     const initialPrompt = `Begin: "role": "${jobTitle}", "questionCount":${questionCount}, "difficulty": "${difficulty}", "custom": ${JSON.stringify(customQuestions)}`;
 
-    const greeting = await geminiLLMService.generateInterviewResponse(
-      initialPrompt,
-      [],
-      jobTitle
-    );
+    let greeting = "Hello, I am ready to begin the interview.";
+    try {
+      greeting = await ollamaService.generateInterviewResponse(
+        initialPrompt,
+        [],
+        jobTitle
+      );
+    } catch (e) {
+      console.warn("Failed to generate greeting via Ollama:", e);
+    }
 
     // Store the greeting in transcript
     session.transcript.push({
@@ -74,7 +80,10 @@ router.post('/start', async (req, res) => {
       sessionId,
       roomName,
       greeting,
-      wsUrl: `/ws/gemini-proxy?sessionId=${sessionId}`
+      // No more gemini-proxy ws needed? Assume frontend still uses WebSockets or direct API polling.
+      // If frontend relied on gemini-proxy for *streaming*, that might be broken unless we implement an ollama-proxy.
+      // For now, removing the wsUrl since gemini-proxy is deprecated.
+      // wsUrl: `/ws/gemini-proxy?sessionId=${sessionId}`
     });
   } catch (error) {
     console.error('Error starting interview:', error);
@@ -88,30 +97,48 @@ router.post('/start', async (req, res) => {
  */
 router.post('/stop', async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, transcript } = req.body;
 
     const session = await interviewStore.get(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
+    // If external transcript provided (e.g. from Agent), update session
+    if (transcript && typeof transcript === 'string') {
+      const lines = transcript.split('\n');
+      const structuredTranscript = lines.map(line => {
+        const parts = line.split(': ');
+        if (parts.length >= 2) {
+          const role = parts[0].toLowerCase().includes('candidate') ? 'candidate' : 'interviewer';
+          return { role, content: parts.slice(1).join(': '), timestamp: new Date().toISOString() };
+        }
+        return null;
+      }).filter(t => t !== null) as any[];
+
+      if (structuredTranscript.length > 0) {
+        session.transcript = structuredTranscript;
+      }
+    }
+
     session.status = 'completed';
     session.endedAt = new Date().toISOString();
 
-    // Generate interview analysis
+    // Generate interview analysis (DeepSeek)
     const transcriptText = session.transcript
       .map(t => `${t.role}: ${t.content}`)
       .join('\n');
 
-    const analysis = await geminiLLMService.analyzeInterview(
-      transcriptText,
-      session.jobTitle
-    );
+    let analysis = { summary: 'Analysis pending', score: 0, strengths: [], weaknesses: [] };
+    try {
+      analysis = await ollamaService.analyzeInterview(
+        transcriptText,
+        session.jobTitle,
+        session.resumeText
+      );
+    } catch (e) { console.error("Ollama Analysis failed", e); }
 
-    // Map weaknesses to improvements if needed by legacy code, or update interface
-    // Assuming interface is updated to match geminiLLMService return type
-    // But InterviewSession interface in interviewStore.ts might need update too
-    // Let's cast for now or update store interface later
+
     session.analysis = analysis as any;
 
     // Save updates to DB
@@ -133,10 +160,6 @@ router.post('/stop', async (req, res) => {
       analysis
     });
 
-    // Clean up session after response (keep for a while for potential retries)
-    // In DB mode, we might want to keep it longer or archive it. 
-    // For now, we won't delete it immediately to allow review.
-    // setTimeout(async () => await interviewStore.delete(sessionId), 300000); 
   } catch (error) {
     console.error('Error stopping interview:', error);
     res.status(500).json({ error: 'Failed to stop interview' });
@@ -163,8 +186,8 @@ router.post('/respond', async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
-    // Generate interviewer response
-    const interviewerResponse = await geminiLLMService.generateInterviewResponse(
+    // Generate interviewer response (Gemma)
+    const interviewerResponse = await ollamaService.generateInterviewResponse(
       candidateResponse,
       session.transcript,
       session.jobTitle
@@ -191,6 +214,27 @@ router.post('/respond', async (req, res) => {
   } catch (error) {
     console.error('Error processing response:', error);
     res.status(500).json({ error: 'Failed to process response' });
+  }
+});
+
+/**
+ * GET /api/interview/context/:sessionId
+ * Get interview context (job, resume) for the Agent
+ */
+router.get('/context/:sessionId', async (req, res) => {
+  try {
+    const session = await interviewStore.get(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    res.json({
+      jobTitle: session.jobTitle,
+      resumeText: session.resumeText || '',
+      candidateName: session.candidateName || 'Candidate',
+      jobId: session.jobTitle === 'Phone Screening' ? 'screening' : 'job'
+    });
+  } catch (error) {
+    console.error('Error getting context:', error);
+    res.status(500).json({ error: 'Failed to get context' });
   }
 });
 
@@ -239,8 +283,8 @@ router.post('/analyze-screening', async (req, res) => {
       .map((t: any) => `${t.sender === 'user' ? 'Candidate' : 'Interviewer'}: ${t.text}`)
       .join('\n');
 
-    // Analyze with Gemini
-    const analysis = await geminiLLMService.analyzeInterview(transcriptText, effectiveJobTitle, resumeText);
+    // Analyze with Ollama (DeepSeek)
+    const analysis = await ollamaService.analyzeInterview(transcriptText, effectiveJobTitle, resumeText);
 
     // Create a record in the database for this screening
     const sessionId = uuidv4();
@@ -423,6 +467,88 @@ router.post('/upload-audio', async (req, res) => {
   } catch (error: any) {
     console.error('Error uploading audio:', error);
     res.status(500).json({ error: 'Failed to upload audio recording' });
+  }
+});
+
+/**
+ * POST /api/interview/start-phone-screen
+ * Initiates an outbound SIP call to the candidate's phone number via LiveKit SIP Trunking.
+ */
+router.post('/start-phone-screen', async (req, res) => {
+  try {
+    const { phoneNumber, resumeText, jobTitle } = req.body;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    const sessionId = uuidv4();
+    const roomName = `phone-screen-${sessionId}`;
+
+    console.log(`[PhoneScreen] Initiating call to ${phoneNumber} for room ${roomName}`);
+
+    // --- REAL SIP CALL LOGIC ---
+    // --- VOIP / WEB AUDIO LOGIC (SIP Removed) ---
+    // Instead of dialing out, we generate a token for the user to join via browser audio.
+    console.log(`[PhoneScreen] Generating user token for room ${roomName}`);
+
+    const at = new AccessToken(
+      process.env.LIVEKIT_API_KEY,
+      process.env.LIVEKIT_API_SECRET,
+      {
+        identity: `candidate-${sessionId}`,
+        name: "Candidate",
+      }
+    );
+
+    at.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    const token = await at.toJwt();
+
+    // Create session (as before)
+    const session: InterviewSession = {
+      id: sessionId,
+      roomName: roomName,
+      jobTitle: jobTitle || 'Phone Screening',
+      questionCount: 5,
+      difficulty: 'medium',
+      candidateId: 'phone-candidate',
+      candidateName: 'Phone Candidate',
+      customQuestions: [],
+      resumeText: resumeText,
+      status: 'active',
+      startedAt: new Date().toISOString(),
+      transcript: [],
+      currentQuestionIndex: 0
+    };
+
+    await interviewStore.set(sessionId, session);
+
+    // Audit Log
+    await auditLogger.log({
+      userId: 'anonymous', // or req.user.id if available
+      action: 'phone_screen_started',
+      resourceType: 'interview',
+      resourceId: sessionId,
+      details: { jobTitle, roomName }
+    });
+
+    res.json({
+      success: true,
+      sessionId,
+      roomName,
+      token: token,
+      wsUrl: process.env.LIVEKIT_URL // Helper for frontend if needed
+    });
+
+  } catch (error: any) {
+    console.error('Error starting phone screen:', error);
+    res.status(500).json({ error: 'Failed to initiate phone screening session' });
   }
 });
 

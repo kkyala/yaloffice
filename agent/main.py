@@ -90,6 +90,31 @@ async def save_interview_results(application_id: str, transcript: str):
         except Exception as e:
             logger.error(f"Error saving interview results: {e}")
 
+async def save_phone_screen_results(session_id: str, transcript: str):
+    """Saves the phone screening transcript to the backend via /stop endpoint."""
+    if not session_id:
+        return
+
+    api_url = os.getenv("VITE_API_URL", "http://localhost:8000")
+    stop_url = f"{api_url}/api/interview/stop"
+    
+    logger.info(f"Finalizing Phone Screening Session: {session_id}")
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            # Call Stop endpoint with transcript
+            payload = {
+                "sessionId": session_id,
+                "transcript": transcript
+            }
+            async with session.post(stop_url, json=payload) as resp:
+                if resp.status == 200:
+                    logger.info("Successfully saved phone screening results.")
+                else:
+                    logger.error(f"Failed to save phone screening: {resp.status} {await resp.text()}")
+        except Exception as e:
+            logger.error(f"Error saving phone screening results: {e}")
+
 async def entrypoint(ctx: JobContext):
     
     logger.info(f"connecting to room {ctx.room.name}")
@@ -102,17 +127,24 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         logger.warning(f"Failed to set agent name: {e}")
 
-    # Parse Application ID from Room Name (format: interview-{id})
+    # Parse Application ID or Session ID from Room Name
     application_id = None
+    session_id = None
+    
     try:
-        if "interview-" in ctx.room.name:
-            parts = ctx.room.name.split("-")
+        room_name = ctx.room.name
+        if "interview-" in room_name:
+            # Format: interview-{application_id}
+            parts = room_name.split("-")
             for part in parts:
                 if part.isdigit():
                     application_id = part
-                    break 
+                    break
+        elif "phone-screen-" in room_name:
+            # Format: phone-screen-{uuid}
+            session_id = room_name.replace("phone-screen-", "")
     except Exception as e:
-        logger.warning(f"Failed to parse application ID from room name: {e}")
+        logger.warning(f"Failed to parse ID from room name: {e}")
 
     participant = await ctx.wait_for_participant()
     logger.info(f"starting voice assistant for participant {participant.identity}")
@@ -123,9 +155,35 @@ async def entrypoint(ctx: JobContext):
     api_url = os.getenv("VITE_API_URL", "http://localhost:8000")
     job_details = None
     
-    if application_id:
-        try:
-            async with aiohttp.ClientSession() as fetch_session:
+    async with aiohttp.ClientSession() as fetch_session:
+        # Case A: Phone Screening (Session ID)
+        if session_id:
+             try:
+                async with fetch_session.get(f"{api_url}/api/interview/context/{session_id}") as resp:
+                    if resp.status == 200:
+                        ctx_data = await resp.json()
+                        job_title = ctx_data.get('jobTitle', 'Role')
+                        candidate_name = ctx_data.get('candidateName', 'Candidate')
+                        resume_text = ctx_data.get('resumeText', '')
+                        
+                        system_instruction = (
+                            f"You are an expert AI Recruiter conducting a Phone Screening for the role of '{job_title}'.\n"
+                            f"Candidate Name: {candidate_name}\n"
+                            f"Resume Context (Do not read aloud, use for questions):\n{resume_text[:2000]}...\n\n"
+                            "SCREENING STRUCTURE (5-10 mins):\n"
+                            "1. GREETING: Introduce yourself as the AI Recruiter from Yal Office. Verify you are speaking to {candidate_name}.\n"
+                            "2. EXPERIENCE CHECK: Ask about their most recent role or a specific project from their resume.\n"
+                            "3. LOGISTICS: Ask about their notice period and salary expectations.\n"
+                            "4. WRAP UP: Thank them and explain the next steps (hiring manager review).\n\n"
+                            "Keep your tone professional, efficient, but friendly. Listen more than you talk."
+                        )
+                        logger.info(f"Loaded Phone Screening context for {job_title}")
+             except Exception as e:
+                logger.error(f"Failed to fetch phone context: {e}")
+
+        # Case B: Technical Interview (Application ID)
+        elif application_id:
+            try:
                 # Get Candidate to find Job ID
                 async with fetch_session.get(f"{api_url}/api/candidates/{application_id}") as resp:
                     if resp.status == 200:
@@ -139,7 +197,7 @@ async def entrypoint(ctx: JobContext):
                                 if job_resp.status == 200:
                                     job_details = await job_resp.json()
                                     
-                                    # --- PROMPT ENGINEERING (USER REQUESTED) ---
+                                    # --- PROMPT ENGINEERING ---
                                     job_title = job_details.get('title', 'Ref')
                                     job_desc = job_details.get('description', '')
                                     job_skills = ", ".join(job_details.get('skills', []))
@@ -158,8 +216,8 @@ async def entrypoint(ctx: JobContext):
                                         "Maintain a professional but encouraging tone. Do not provide answers, but ask follow-up questions if their answers are vague."
                                     )
                                     logger.info(f"Loaded job context for {job_title}")
-        except Exception as e:
-            logger.error(f"Failed to fetch job context: {e}")
+            except Exception as e:
+                logger.error(f"Failed to fetch job context: {e}")
 
     # 2. Check Keys & Configure Plugins
     # STT
@@ -182,14 +240,24 @@ async def entrypoint(ctx: JobContext):
         tts_provider = google.TTS()
 
     # LLM
-    if os.getenv("GOOGLE_API_KEY"):
+    interview_ai_url = os.getenv("INTERVIEW_AI_URL")
+    if interview_ai_url:
+        logger.info(f"Using Ollama (Gemma) for LLM at {interview_ai_url}")
+        # Ollama provides OpenAI compatible API at /v1
+        llm_provider = openai.LLM(
+            base_url=f"{interview_ai_url}/v1",
+            api_key="ollama", # Required but unused
+            model="gemma2:9b",
+            # temperature=0.7
+        )
+    elif os.getenv("GOOGLE_API_KEY"):
         logger.info("Using Google Gemini for LLM")
         llm_provider = google.LLM(model="gemini-2.0-flash-exp")
     elif os.getenv("OPENAI_API_KEY"):
         logger.info("Using OpenAI for LLM")
         llm_provider = openai.LLM(model="gpt-4o")
     else:
-        logger.error("CRITICAL: No LLM API Key found!")
+        logger.error("CRITICAL: No LLM API Key found and no INTERVIEW_AI_URL set!")
         return
 
     # 3. Initialize Session
@@ -286,8 +354,11 @@ async def entrypoint(ctx: JobContext):
             
             logger.info(f"Generated transcript length: {len(full_transcript)}")
 
-            if full_transcript and application_id:
-                 await save_interview_results(application_id, full_transcript)
+            if full_transcript:
+                if application_id:
+                    await save_interview_results(application_id, full_transcript)
+                elif session_id:
+                     await save_phone_screen_results(session_id, full_transcript)
             else:
                  logger.warning(f"Skipping save: ID={application_id}, TranscriptLen={len(full_transcript)}")
         except Exception as e:

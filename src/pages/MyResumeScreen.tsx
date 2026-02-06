@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UploadCloudIcon, CheckCircleIcon, FileTextIcon, UserIcon, BriefcaseIcon, GraduationCapIcon, CodeIcon, AwardIcon } from '../components/Icons';
 import { aiService } from '../services/aiService';
-import ResumeScreeningChatScreen from './ResumeScreeningChatScreen';
+import ResumeScreeningPhoneScreen from './ResumeScreeningPhoneScreen';
 import { z } from 'zod';
 
 // Generic Base64 converter (works for PDF, DOCX, DOC, Images)
@@ -622,7 +622,7 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
 
     if (showScreeningChat && parsedData) {
         return (
-            <ResumeScreeningChatScreen
+            <ResumeScreeningPhoneScreen
                 currentUser={currentUser}
                 resumeText={formatResumeAsText(parsedData)}
                 onComplete={() => {

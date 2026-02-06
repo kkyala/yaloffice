@@ -405,6 +405,23 @@ async function finalizeScreening(transcript: string, candidateName: string, user
     return requestBackend('screening/finalize', { transcript, candidateName, userId, jobTitle, jobId });
 }
 
+/**
+ * Start Phone Screening Call
+ */
+async function startPhoneScreening(phoneNumber: string, resumeText: string, jobTitle?: string): Promise<{ success: boolean; sessionId: string; status: string; token?: string; roomName?: string; wsUrl?: string }> {
+    return requestBackend('interview/start-phone-screen', { phoneNumber, resumeText, jobTitle });
+}
+
+/**
+ * Get Interview Status (Polling)
+ */
+async function getInterviewStatus(sessionId: string): Promise<any> {
+    const { data, error } = await api.get(`/interview/status/${sessionId}`);
+    if (error) throw error;
+    if (data && data.success && data.data) return data.data; // Handle unwrapping if needed
+    return data;
+}
+
 
 // ========================================================================================
 // FALLBACKS & UTILS
@@ -467,6 +484,8 @@ export const aiService = {
     startScreening,
     chatScreening,
     finalizeScreening,
+    startPhoneScreening,
+    getInterviewStatus,
 
     // Live Session & Media
     createLiveSession,
