@@ -23,6 +23,36 @@ router.post('/signup', async (req, res) => {
         const { email, password, options } = req.body;
         const trimmedEmail = email?.trim();
 
+        // DEMO HACK: If email contains '.demo.', auto-confirm the user so we can log them in immediately.
+        if (trimmedEmail.includes('.demo.')) {
+            console.log(`[Auth] Creating auto-verified demo user: ${trimmedEmail}`);
+            const { data: createData, error: createError } = await supabase.auth.admin.createUser({
+                email: trimmedEmail,
+                password: password,
+                email_confirm: true,
+                user_metadata: options?.data
+            });
+
+            if (createError) {
+                return res.status(400).json({ error: createError.message });
+            }
+
+            // Now sign in to get the session
+            const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+                email: trimmedEmail,
+                password
+            });
+
+            if (sessionError) {
+                return res.status(400).json({ error: sessionError.message });
+            }
+
+            // Send Verification Email (Fake it or skip it, but we want to simulate a real user mostly)
+            // We can skip email sending for demo users.
+
+            return res.json({ session: sessionData.session, user: createData.user });
+        }
+
         // Use admin.generateLink to get the verification link directly
         // this avoids Supabase sending the default email and allows us to send a custom one
         const { data, error } = await supabase.auth.admin.generateLink({

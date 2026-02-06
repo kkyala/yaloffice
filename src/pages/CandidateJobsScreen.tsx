@@ -31,9 +31,9 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
             data = data.filter(job =>
-                job.title.toLowerCase().includes(lowerTerm) ||
-                job.employer.toLowerCase().includes(lowerTerm) ||
-                job.location.toLowerCase().includes(lowerTerm)
+                (job.title && job.title.toLowerCase().includes(lowerTerm)) ||
+                (job.employer && job.employer.toLowerCase().includes(lowerTerm)) ||
+                (job.location && job.location.toLowerCase().includes(lowerTerm))
             );
         }
 
@@ -162,7 +162,7 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
                                             if (appliedJobIds.has(job.id)) return;
 
                                             // Job-specific screening logic
-                                            if (job.screening_enabled) {
+                                            if (job.screening_enabled || (job.title && job.title.includes('(Demo)'))) {
                                                 const confirmApply = window.confirm(
                                                     "This job requires an AI Screening Interview. You will need to complete this screening before your application is reviewed by the employer.\n\nDo you want to proceed?"
                                                 );

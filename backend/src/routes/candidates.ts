@@ -3,6 +3,9 @@ import { supabase } from '../services/supabaseService.js';
 import { pdfService } from '../services/pdfService.js';
 import { auditLogger } from '../services/auditLogger.js';
 import { emailService } from '../services/emailService.js';
+import { v4 as uuidv4 } from 'uuid';
+import { sipService } from '../services/sipService.js';
+import { interviewStore, InterviewSession } from '../services/interviewStore.js';
 
 const router = Router();
 
@@ -153,6 +156,69 @@ router.put('/:id', async (req, res) => {
         // Trigger async report generation
         processInterviewReportGenerationAsync(updatedCandidate)
             .catch(err => console.error('[Candidates] Report generation failed:', err));
+    }
+
+    // Check for resume update and phone number availability to trigger phone screen
+    const { resume_text, phone, name, jobTitle } = updatedCandidate;
+    const previousResume = existing ? (existing as any).resume_text : null;
+
+    // Check if resume_text has changed (or is new) AND phone exists AND not already screened
+    // Note: We check if resume_text is present in the current update or if it exists in the updated record
+    // But strictly, we only want to trigger if it was *just* updated.
+    const isResumeUpdated = req.body.resume_text && req.body.resume_text !== previousResume;
+
+    // Also ensure we have a phone number (either in update or existing)
+    const candidatePhone = req.body.phone || (existing as any)?.phone;
+
+    if (isResumeUpdated && candidatePhone) {
+        console.log(`[Candidates] Resume updated for ${updatedCandidate.name}, initiating phone screen...`);
+
+        try {
+            const sessionId = uuidv4();
+            const roomName = `phone-screen-${sessionId}`;
+
+            // Get Job Title (async)
+            let currentJobTitle = 'General Interview';
+            if (updatedCandidate.jobId) {
+                const { data: job } = await supabase.from('jobs').select('title').eq('id', updatedCandidate.jobId).single();
+                if (job) currentJobTitle = job.title;
+            }
+
+            // Create Interview Session
+            const session: InterviewSession = {
+                id: sessionId,
+                roomName: roomName,
+                jobTitle: currentJobTitle,
+                questionCount: 5,
+                difficulty: 'medium',
+                candidateId: 'phone-' + candidatePhone, // distinct from user_id to avoid confusion or match if possible
+                candidateName: updatedCandidate.name,
+                customQuestions: [],
+                resumeText: req.body.resume_text, // Use the new resume text
+                status: 'active',
+                startedAt: new Date().toISOString(),
+                transcript: [],
+                currentQuestionIndex: 0
+            };
+
+            await interviewStore.set(sessionId, session);
+
+            // Initiate SIP Call
+            await sipService.initiatePhoneScreen(candidatePhone, roomName, updatedCandidate.name);
+
+            // Audit
+            await auditLogger.log({
+                userId: updatedCandidate.user_id || 'system',
+                action: 'auto_phone_screen_initiated',
+                resourceType: 'interview',
+                resourceId: sessionId,
+                details: { phone: candidatePhone }
+            });
+
+        } catch (sipError) {
+            console.error('[Candidates] Failed to auto-initiate phone screen:', sipError);
+            // Don't fail the update request, just log error
+        }
     }
 
     res.json(updatedCandidate);

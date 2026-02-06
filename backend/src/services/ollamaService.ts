@@ -1,165 +1,358 @@
-import axios from 'axios';
+/**
+ * Ollama Service - Local LLM Integration
+ * 
+ * Provides integration with locally-hosted Ollama models:
+ * - DeepSeek-R1 Distill 7B: Resume parsing, screening, structured extraction
+ * - Gemma 2 9B Instruct: Interview conversations, evaluations, summaries
+ */
 
-// Configuration from environment variables
-const RESUME_AI_URL = process.env.RESUME_AI_URL || 'http://ollama-deepseek:11434';
-const INTERVIEW_AI_URL = process.env.INTERVIEW_AI_URL || 'http://ollama-gemma:11434';
+import axios, { AxiosInstance } from 'axios';
 
-// DeepSeek Model dedicated to Resume Parsing (Strict JSON)
-const RESUME_MODEL = 'deepseek-r1:7b';
+// ========================================================================================
+// TYPES
+// ========================================================================================
 
-// Gemma Model dedicated to Conversational Interviewing
-const INTERVIEW_MODEL = 'gemma2:9b';
+export interface OllamaMessage {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+}
 
-export const ollamaService = {
+export interface OllamaGenerateRequest {
+    model: string;
+    prompt: string;
+    stream?: boolean;
+    format?: 'json';
+    options?: {
+        temperature?: number;
+        top_p?: number;
+        num_predict?: number;
+    };
+}
 
-    /**
-     * Parse Resume and Score Candidate (Responsibility: DeepSeek)
-     * Strictly JSON output, no conversation.
-     */
-    async parseAndScoreResume(resumeText: string, jobDescription: string): Promise<any> {
-        try {
-            const prompt = `
-        You are a strict Resume Extraction AI. 
-        Analyze the following Resume against the Job Description.
-        
-        JOB DESCRIPTION:
-        ${jobDescription}
-        
-        RESUME:
-        ${resumeText}
-        
-        OUTPUT FORMAT:
-        Return ONLY a JSON object with this structure:
-        {
-          "candidateName": "string",
-          "email": "string",
-          "phone": "string",
-          "skills": ["string"],
-          "experience_summary": "string",
-          "match_score": number (0-100),
-          "gap_analysis": "string"
-        }
-        Do NOT output any markdown, explanations, or thinking. JUST THE JSON.
-      `;
+export interface OllamaChatRequest {
+    model: string;
+    messages: OllamaMessage[];
+    stream?: boolean;
+    format?: 'json';
+    options?: {
+        temperature?: number;
+        top_p?: number;
+    };
+}
 
-            const response = await axios.post(`${RESUME_AI_URL}/api/generate`, {
-                model: RESUME_MODEL,
-                prompt: prompt,
-                stream: false,
-                format: "json", // Enforce JSON mode
-                options: {
-                    temperature: 0.1, // Deterministic
-                    num_ctx: 4096
-                }
-            });
+export interface OllamaResponse {
+    model: string;
+    response: string;
+    done: boolean;
+}
 
-            // Parse output
-            const jsonStr = response.data.response;
-            return JSON.parse(jsonStr);
+export interface OllamaChatResponse {
+    model: string;
+    message: {
+        role: string;
+        content: string;
+    };
+    done: boolean;
+}
 
-        } catch (error) {
-            console.error('Ollama DeepSeek Error:', error);
-            throw new Error('Failed to parse resume with DeepSeek');
-        }
-    },
+// ========================================================================================
+// OLLAMA SERVICE CLASS
+// ========================================================================================
 
-    /**
-     * Generate Interview Questions or Follow-ups (Responsibility: Gemma)
-     * Conversational, reasoning allowed.
-     */
-    async generateInterviewResponse(
-        candidateInput: string,
-        history: { role: string; content: string }[],
-        jobContext: string
-    ): Promise<string> {
-        try {
-            // Format history for context
-            const contextStr = history.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n');
+class OllamaService {
+    private deepseekClient: AxiosInstance;
+    private gemmaClient: AxiosInstance;
 
-            const prompt = `
-        You are an expert Technical Interviewer AI.
-        Role Context: ${jobContext}
-        
-        Conversation History:
-        ${contextStr}
-        
-        Candidate just said: "${candidateInput}"
-        
-        Your Goal:
-        1. Evaluate the answer concisely.
-        2. Ask a relevant follow-up question OR move to the next topic.
-        3. Keep responses professional but conversational.
-        4. Do NOT verify the previous answer explicitly unless it was wrong.
-        
-        Respond as the Interviewer:
-      `;
+    // Model identifiers
+    private readonly DEEPSEEK_MODEL = 'deepseek-r1:7b';
+    private readonly GEMMA_MODEL = 'gemma2:9b-instruct-q8_0';
 
-            const response = await axios.post(`${INTERVIEW_AI_URL}/api/generate`, {
-                model: INTERVIEW_MODEL,
-                prompt: prompt,
-                stream: false,
-                options: {
-                    temperature: 0.7, // Creative/Conversational
-                    num_ctx: 4096
-                }
-            });
+    constructor() {
+        // Initialize clients for both Ollama instances
+        const deepseekUrl = process.env.RESUME_AI_URL || 'http://ollama-deepseek:11434';
+        const gemmaUrl = process.env.INTERVIEW_AI_URL || 'http://ollama-gemma:11434';
 
-            return response.data.response.trim();
+        this.deepseekClient = axios.create({
+            baseURL: deepseekUrl,
+            timeout: 120000, // 2 minutes for complex reasoning tasks
+            headers: { 'Content-Type': 'application/json' }
+        });
 
-        } catch (error) {
-            console.error('Ollama Gemma Error:', error);
-            // Fallback
-            return "That's interesting. Could you elaborate further on your experience with that technology?";
-        }
-    },
+        this.gemmaClient = axios.create({
+            baseURL: gemmaUrl,
+            timeout: 60000, // 1 minute for conversational tasks
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        console.log('[OllamaService] Initialized');
+        console.log(`[OllamaService] DeepSeek URL: ${deepseekUrl}`);
+        console.log(`[OllamaService] Gemma URL: ${gemmaUrl}`);
+    }
+
+    // ========================================================================================
+    // DEEPSEEK METHODS (Resume Parsing & Screening)
+    // ========================================================================================
 
     /**
-     * Analyze Completed Interview (Responsibility: DeepSeek)
-     * Detailed scoring and feedback JSON.
+     * Generate structured content using DeepSeek (for resume parsing, screening)
      */
-    async analyzeInterview(transcriptText: string, jobTitle: string, resumeText?: string): Promise<any> {
+    async generateWithDeepSeek(prompt: string, expectJson: boolean = true): Promise<string> {
         try {
-            const prompt = `
-        You are an Expert Interview Evaluator.
-        Analyze the following interview transcript for the role of "${jobTitle}".
-        ${resumeText ? `Candidate Resume Context: ${resumeText.substring(0, 1000)}...` : ''}
-
-        TRANSCRIPT:
-        ${transcriptText}
-
-        OUTPUT FORMAT:
-        Return ONLY a JSON object with this structure:
-        {
-          "score": number (0-100),
-          "summary": "string",
-          "strengths": ["string"],
-          "weaknesses": ["string"],
-          "suggestion": "string"
-        }
-        Do NOT output any markdown. JUST THE JSON.
-      `;
-
-            const response = await axios.post(`${RESUME_AI_URL}/api/generate`, {
-                model: RESUME_MODEL,
-                prompt: prompt,
+            const request: OllamaGenerateRequest = {
+                model: this.DEEPSEEK_MODEL,
+                prompt,
                 stream: false,
-                format: "json",
                 options: {
-                    temperature: 0.2, // Low temp for consistent scoring
-                    num_ctx: 4096
+                    temperature: 0.1, // Low temperature for deterministic outputs
+                    top_p: 0.9
                 }
-            });
-
-            return JSON.parse(response.data.response);
-        } catch (error) {
-            console.error('Ollama Analysis Error:', error);
-            // Fallback
-            return {
-                score: 0,
-                summary: "Analysis failed due to AI service error.",
-                strengths: [],
-                weaknesses: []
             };
+
+            if (expectJson) {
+                request.format = 'json';
+            }
+
+            const response = await this.deepseekClient.post<OllamaResponse>('/api/generate', request);
+
+            if (!response.data || !response.data.response) {
+                throw new Error('Empty response from DeepSeek');
+            }
+
+            return response.data.response;
+        } catch (error: any) {
+            console.error('[OllamaService] DeepSeek generation error:', error.message);
+            throw new Error(`DeepSeek generation failed: ${error.message}`);
         }
     }
-};
+
+    /**
+     * Chat-based generation with DeepSeek
+     */
+    async chatWithDeepSeek(messages: OllamaMessage[], expectJson: boolean = true): Promise<string> {
+        try {
+            const request: OllamaChatRequest = {
+                model: this.DEEPSEEK_MODEL,
+                messages,
+                stream: false,
+                options: {
+                    temperature: 0.1,
+                    top_p: 0.9
+                }
+            };
+
+            if (expectJson) {
+                request.format = 'json';
+            }
+
+            const response = await this.deepseekClient.post<OllamaChatResponse>('/api/chat', request);
+
+            if (!response.data || !response.data.message || !response.data.message.content) {
+                throw new Error('Empty response from DeepSeek chat');
+            }
+
+            return response.data.message.content;
+        } catch (error: any) {
+            console.error('[OllamaService] DeepSeek chat error:', error.message);
+            throw new Error(`DeepSeek chat failed: ${error.message}`);
+        }
+    }
+
+    // ========================================================================================
+    // GEMMA METHODS (Interview Conversations & Evaluations)
+    // ========================================================================================
+
+    /**
+     * Generate conversational content using Gemma (for interviews)
+     */
+    async generateWithGemma(prompt: string, expectJson: boolean = false): Promise<string> {
+        try {
+            const request: OllamaGenerateRequest = {
+                model: this.GEMMA_MODEL,
+                prompt,
+                stream: false,
+                options: {
+                    temperature: 0.7, // Higher temperature for more natural conversation
+                    top_p: 0.95
+                }
+            };
+
+            if (expectJson) {
+                request.format = 'json';
+            }
+
+            const response = await this.gemmaClient.post<OllamaResponse>('/api/generate', request);
+
+            if (!response.data || !response.data.response) {
+                throw new Error('Empty response from Gemma');
+            }
+
+            return response.data.response;
+        } catch (error: any) {
+            console.error('[OllamaService] Gemma generation error:', error.message);
+            throw new Error(`Gemma generation failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Chat-based generation with Gemma
+     */
+    async chatWithGemma(messages: OllamaMessage[], expectJson: boolean = false): Promise<string> {
+        try {
+            const request: OllamaChatRequest = {
+                model: this.GEMMA_MODEL,
+                messages,
+                stream: false,
+                options: {
+                    temperature: 0.7,
+                    top_p: 0.95
+                }
+            };
+
+            if (expectJson) {
+                request.format = 'json';
+            }
+
+            const response = await this.gemmaClient.post<OllamaChatResponse>('/api/chat', request);
+
+            if (!response.data || !response.data.message || !response.data.message.content) {
+                throw new Error('Empty response from Gemma chat');
+            }
+
+            return response.data.message.content;
+        } catch (error: any) {
+            console.error('[OllamaService] Gemma chat error:', error.message);
+            throw new Error(`Gemma chat failed: ${error.message}`);
+        }
+    }
+
+    // ========================================================================================
+    // UTILITY METHODS
+    // ========================================================================================
+
+    /**
+     * Parse JSON response from Ollama, handling markdown code blocks
+     */
+    parseJsonResponse(response: string): any {
+        let cleaned = response.trim();
+
+        // Remove markdown code blocks
+        if (cleaned.startsWith('```json')) {
+            cleaned = cleaned.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim();
+        } else if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+        }
+
+        try {
+            return JSON.parse(cleaned);
+        } catch (error) {
+            // Try to extract JSON object from text
+            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            }
+            throw new Error('Failed to parse JSON from Ollama response');
+        }
+    }
+
+    // ========================================================================================
+    // INTERVIEW-SPECIFIC METHODS (for interview.ts compatibility)
+    // ========================================================================================
+
+    /**
+     * Generate interview response (conversational)
+     * Uses: Gemma 2 9B Instruct
+     */
+    async generateInterviewResponse(
+        candidateResponse: string,
+        transcriptHistory: any[],
+        jobTitle: string
+    ): Promise<string> {
+        const messages: OllamaMessage[] = [
+            {
+                role: 'system',
+                content: `You are an expert interviewer for the position: ${jobTitle}. Conduct a professional interview by asking relevant questions based on the conversation history and the candidate's responses.`
+            }
+        ];
+
+        // Add history
+        for (const entry of transcriptHistory) {
+            messages.push({
+                role: entry.role === 'candidate' ? 'user' : 'assistant',
+                content: entry.content
+            });
+        }
+
+        // Add current response if not empty
+        if (candidateResponse && candidateResponse.trim()) {
+            messages.push({
+                role: 'user',
+                content: candidateResponse
+            });
+        }
+
+        return await this.chatWithGemma(messages, false);
+    }
+
+    /**
+     * Analyze complete interview transcript
+     * Uses: DeepSeek-R1 7B (for structured analysis)
+     */
+    async analyzeInterview(
+        transcriptText: string,
+        jobTitle: string,
+        resumeText?: string
+    ): Promise<{
+        summary: string;
+        score: number;
+        strengths: string[];
+        weaknesses: string[];
+        skills_analysis?: any[];
+    }> {
+        const prompt = `You are an expert HR analyst. Analyze this interview transcript for the position: ${jobTitle}.
+
+${resumeText ? `Candidate Resume:\n${resumeText}\n\n` : ''}Interview Transcript:
+${transcriptText}
+
+Provide a comprehensive analysis in JSON format:
+{
+  "summary": "<Executive summary of the interview and candidate performance>",
+  "score": <Overall score 0-100>,
+  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "weaknesses": ["<weakness 1>", "<weakness 2>"],
+  "skills_analysis": [
+    {"skill": "<skill name>", "score": <0-100>, "reason": "<brief reason>"},
+    {"skill": "<skill name>", "score": <0-100>, "reason": "<brief reason>"}
+  ]
+}
+
+Return ONLY the JSON object.`;
+
+        const response = await this.generateWithDeepSeek(prompt, true);
+        return this.parseJsonResponse(response);
+    }
+
+    /**
+     * Check if Ollama services are healthy
+     */
+    async healthCheck(): Promise<{ deepseek: boolean; gemma: boolean }> {
+        const results = { deepseek: false, gemma: false };
+
+        try {
+            await this.deepseekClient.get('/api/tags');
+            results.deepseek = true;
+        } catch (error) {
+            console.error('[OllamaService] DeepSeek health check failed');
+        }
+
+        try {
+            await this.gemmaClient.get('/api/tags');
+            results.gemma = true;
+        } catch (error) {
+            console.error('[OllamaService] Gemma health check failed');
+        }
+
+        return results;
+    }
+}
+
+export const ollamaService = new OllamaService();

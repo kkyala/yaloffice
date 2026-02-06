@@ -417,8 +417,10 @@ export default function ScreeningSessionScreen({ currentUser, onNavigate, interv
             });
 
             setToken(data.token);
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            setLiveKitUrl(`${protocol}//${window.location.host}/livekit`);
+            // Use 127.0.0.1 for LiveKit WebSocket
+            const livekitUrl = 'ws://127.0.0.1:7880';
+            console.log("Connecting to LiveKit URL:", livekitUrl);
+            setLiveKitUrl(livekitUrl);
 
         } catch (err: any) {
             console.error("Failed to start session:", err);

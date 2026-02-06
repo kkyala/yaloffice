@@ -33,7 +33,10 @@ class ApiService {
             headers['Authorization'] = `Bearer ${this.token}`;
         }
 
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        const fullUrl = `${API_BASE_URL}${endpoint}`;
+        console.log(`[API Request] ${options.method || 'GET'} ${fullUrl}`, { headers });
+
+        const response = await fetch(fullUrl, {
             ...options,
             headers,
         });

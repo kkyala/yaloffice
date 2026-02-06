@@ -1,279 +1,233 @@
-# Quick Start Guide - AI Interview with Avatar
+# YalOffice - Quick Start Guide (New AI Architecture)
 
-## ✅ All Issues Fixed
+## 🚀 Quick Setup (5 Steps)
 
-1. **AI now listens to candidate** - WebSocket connects to correct backend proxy
-2. **Wav2Lip avatar displays** - Lip-synced video shows when AI speaks
-3. **Continuous microphone** - No push-to-talk, natural conversation flow
-4. **Transcripts beneath participants** - Real-time text under each video
+### 1. Prerequisites
+- Docker Desktop installed and running
+- At least 20GB free disk space
+- GPU with 20GB+ VRAM (recommended) or CPU mode (slower)
+- Node.js 18+ and Python 3.10+
 
----
+### 2. Environment Configuration
 
-## Start the System
+Create/update `.env` files:
 
-### Option 1: Manual Start (Recommended for Testing)
-
-**Terminal 1 - LiveKit Server**
+**`backend/.env`:**
 ```bash
-cd livekit
-.\livekit-server.exe --config livekit-config.yaml
-```
-Wait for: `LiveKit server listening on :7880`
+# Ollama Services
+RESUME_AI_URL=http://ollama-deepseek:11434
+INTERVIEW_AI_URL=http://ollama-gemma:11434
 
-**Terminal 2 - Backend**
+# Deepgram STT
+DEEPGRAM_API_KEY=your_deepgram_api_key_here
+
+# LiveKit
+LIVEKIT_URL=ws://localhost:7880
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
+
+# Supabase
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+**`agent/.env`:**
 ```bash
-cd backend
-npm run dev
-```
-Wait for: `✅ Backend server running on port 8000`
+# Ollama
+INTERVIEW_AI_URL=http://ollama-gemma:11434
 
-**Terminal 3 - Frontend**
+# Deepgram
+DEEPGRAM_API_KEY=your_deepgram_api_key_here
+
+# LiveKit
+LIVEKIT_URL=ws://localhost:7880
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
+
+# Backend
+VITE_API_URL=http://backend:3000
+```
+
+### 3. Start Docker Services
+
 ```bash
-npm run dev
-```
-Wait for: `Local: http://localhost:3000`
+# Start Ollama containers first
+docker-compose up -d ollama-deepseek ollama-gemma
 
-### Option 2: One Command (PowerShell)
-```powershell
-# Start all services
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd livekit; .\livekit-server.exe --config livekit-config.yaml"
-Start-Sleep 3
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; npm run dev"
-Start-Sleep 5
-npm run dev
-```
+# Wait 10 seconds for containers to initialize
+# Then pull the AI models
 
----
+# Windows:
+powershell -ExecutionPolicy Bypass -File setup-ollama-models.ps1
 
-## Test the Interview
-
-1. **Open Browser**: http://localhost:3000
-2. **Navigate to Interview**: Click "Start Interview" or go to AI interview page
-3. **Allow Microphone**: Browser will ask for permission
-4. **Check Status**:
-   - ✅ Green "Audio Ready" indicator in header
-   - ✅ Green "LISTENING" badge on your video (when mic on)
-   - ✅ AI avatar displays (video or circle)
-
-5. **Speak Naturally**: Just talk - no button to hold!
-   - Your transcript appears under your video
-   - AI responds with voice
-   - AI transcript appears under AI video
-   - Avatar lip-syncs when Wav2Lip installed
-
----
-
-## What You Should See
-
-### Candidate Panel (Left)
-```
-┌─────────────────────────┐
-│   YOUR VIDEO FEED       │
-│   (from camera)         │
-│                         │
-│  🟢 LISTENING           │
-└─────────────────────────┘
-┌─────────────────────────┐
-│ 🟢 Your Transcript      │
-│ "I have 5 years..."     │
-└─────────────────────────┘
+# Linux/Mac:
+chmod +x setup-ollama-models.sh
+./setup-ollama-models.sh
 ```
 
-### AI Interviewer Panel (Right)
-```
-┌─────────────────────────┐
-│   AVATAR VIDEO          │
-│   (lip-synced or        │
-│    static AI circle)    │
-│  🟣 SPEAKING            │
-└─────────────────────────┘
-┌─────────────────────────┐
-│ 🟣 AI Transcript        │
-│ "Tell me about..."      │
-└─────────────────────────┘
-```
+### 4. Start All Services
 
-### Control Bar (Bottom)
-```
-[🎤 Microphone On] [📷] [🔇] [📞 End Interview]
-     (toggle)     LiveKit Controls
-```
-
----
-
-## Console Logs (What to Expect)
-
-### Backend Console
 ```bash
-✅ Backend server running on port 8000
-✅ WebSocket server ready at ws://localhost:8000/ws/gemini-proxy
-✅ Room Lifecycle Manager started
+# Start all remaining services
+docker-compose up -d
 
-[Proxy] Client connected for session abc123
-[Gemini] Connected for session abc123
-[Gemini] Setup complete for session abc123
-[Gemini] User transcript: "Hello, I'm ready for the interview"
-[Gemini] Text received: "Great! Let's begin..."
-[Proxy] Generating avatar video with 96000 bytes of audio
-[Proxy] Avatar video generated: /avatar_output/avatar_xyz.mp4
+# Or for local development:
+npm run dev         # Frontend (port 3001)
+cd backend && npm run dev  # Backend (port 8000)
+# Agent runs via Docker automatically
 ```
 
-### Frontend Console
-```javascript
-[ConversationRoom] Connected to Gemini proxy
-[ConversationRoom] AudioWorklet loaded
-[ConversationRoom] Continuous audio capture ready
-[ConversationRoom] Audio frames: 500
-[ConversationRoom] Audio frames: 1000
-[ConversationRoom] Received audio chunk
-[ConversationRoom] Received avatar video: /avatar_output/avatar_xyz.mp4
-```
+### 5. Verify Everything Works
 
----
-
-## Troubleshooting
-
-### Issue: "AI doesn't respond to my speech"
-**Fix**: Check WebSocket connection
 ```bash
-# Backend console should show:
-[Proxy] Client connected for session...
-[Gemini] User transcript: "..."
+# Check Ollama models
+curl http://localhost:11435/api/tags  # Should list deepseek-r1:7b
+curl http://localhost:11436/api/tags  # Should list gemma2:9b-instruct-q8_0
 
-# If not, check:
-- Backend running on port 8000? ✓
-- Frontend .env.local has VITE_WS_URL=ws://localhost:8000? ✓
-- Browser console shows "Connected to Gemini proxy"? ✓
+# Check backend
+curl http://localhost:8000/health
+
+# Check LiveKit
+curl http://localhost:7880
 ```
 
-### Issue: "Microphone not working"
-**Fix**: Check browser permissions
-1. Click lock icon in browser address bar
-2. Ensure "Microphone" is set to "Allow"
-3. Refresh page
-4. Check browser console for: `Audio frames: X`
+---
 
-### Issue: "Avatar not displaying"
-**Fix**: Avatar is optional - works without Wav2Lip
+## 🧪 Test the System
+
+### Test 1: Resume Parsing
 ```bash
-# Static fallback shows purple circle with "AI"
-# To enable Wav2Lip avatar:
-1. Install Python 3.8+
-2. Install Wav2Lip dependencies
-3. Download model checkpoint
-4. Set paths in backend/.env
-
-# Check backend console for:
-[AvatarService] Avatar rendering is available ✓
-# or
-[AvatarService] Python not available - avatar rendering disabled ⚠️
+# Upload a Word resume through the frontend
+# Or call API directly:
+curl -X POST http://localhost:8000/api/ai/resume/parse \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileBase64": "<base64-word-doc>",
+    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  }'
 ```
 
-### Issue: "No transcript appearing"
-**Fix**: Check Gemini API key
+### Test 2: Resume Screening
 ```bash
-# In backend/.env:
-GEMINI_API_KEY=your_actual_key_here
-
-# Backend console should show:
-[Gemini] User transcript: "your speech"
-[Gemini] Text received: "AI response"
+curl -X POST http://localhost:8000/api/ai/resume/screen \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resumeText": "Software Engineer with 5 years of React experience...",
+    "jobDescription": "Looking for a Senior React Developer..."
+  }'
 ```
 
-### Issue: "WebSocket connection failed"
-**Fix**: Check ports and URLs
+### Test 3: Live Voice Interview
+1. Open YalOffice frontend
+2. Navigate to"Interview" section
+3. Click "Start AI Interview"
+4. Speak in English - Deepgram will transcribe
+5. Gemma 2 will respond via Cartesia TTS
+
+---
+
+## 📊 Model Usage
+
+| When You... | Which Model | Why |
+|------------|-------------|-----|
+| Upload a resume | DeepSeek-R1 7B | Extracts info accurately |
+| Screen candidates | DeepSeek-R1 7B | Consistent scoring |
+| Start text interview | Gemma 2 9B | Fast, natural conversation |
+| Start voice interview | Gemma 2 9B + Deepgram + Cartesia | Real-time audio pipeline |
+| Generate report | Gemma 2 9B | Natural language summary |
+
+---
+
+## 🔧 Troubleshooting
+
+### "Ollama model not found"
 ```bash
-# Backend should be on 8000:
-✅ Backend server running on port 8000
+# Pull models manually
+docker exec ollama-deepseek ollama pull deepseek-r1:7b
+docker exec ollama-gemma ollama pull gemma2:9b-instruct-q8_0
+```
 
-# Frontend .env.local:
-VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
+### "Deepgram authentication failed"
+- Check your `DEEPGRAM_API_KEY` in `.env`
+- Verify quota at https://deepgram.com/
 
-# NOT ws://localhost:7880 (that's LiveKit)
+### "Out of GPU memory"
+```bash
+# Use CPU mode (slower)
+# Edit docker-compose.yml and remove GPU reservations
+# Or use smaller quantized models
+```
+
+### "Agent not responding in voice interview"
+```bash
+# Check agent logs
+docker logs agent
+
+# Verify LiveKit connection
+curl ws://localhost:7880
 ```
 
 ---
 
-## Architecture Summary
+## 📈 Performance Tips
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   BROWSER (Frontend)                │
-│  ┌─────────────┐              ┌─────────────┐      │
-│  │  Candidate  │              │ AI Avatar   │      │
-│  │   Video     │              │  (Wav2Lip)  │      │
-│  │  + Mic      │              │ + Transcript│      │
-│  └──────┬──────┘              └──────▲──────┘      │
-│         │                            │             │
-│         │ Audio (PCM16)              │ Video URL   │
-│         │                            │             │
-└─────────┼────────────────────────────┼─────────────┘
-          │                            │
-          │ WebSocket                  │ HTTP
-          │ ws://localhost:8000/ws/... │
-          │                            │
-┌─────────▼────────────────────────────┴─────────────┐
-│              BACKEND (Node.js)                     │
-│  ┌─────────────────────┐  ┌──────────────────┐    │
-│  │  Gemini Proxy       │  │  Avatar Service  │    │
-│  │  - Audio streaming  │  │  - Wav2Lip       │    │
-│  │  - Transcription    │  │  - Video gen     │    │
-│  └──────────┬──────────┘  └────────▲─────────┘    │
-│             │                       │              │
-│             │ Gemini Live API       │ Audio chunks │
-│             └───────────────────────┘              │
-└────────────────────────────────────────────────────┘
-                      │
-                      │ WebSocket
-                      │ wss://generativelanguage.googleapis.com
-                      │
-┌─────────────────────▼──────────────────────────────┐
-│            Google Gemini Live API                  │
-│  - Speech-to-text (your speech)                    │
-│  - AI conversation (responds)                      │
-│  - Text-to-speech (AI voice)                       │
-└────────────────────────────────────────────────────┘
-```
+1. **GPU Allocation:**
+   - DeepSeek: Allocate 8GB VRAM
+   - Gemma: Allocate 12GB VRAM
+   - Leave 4GB for system
+
+2. **Model Quantization:**
+   - Using `gemma2:9b-instruct-q8_0` (8-bit quantization)
+   - For lower memory: Try `gemma2:9b-instruct-q4_0`
+
+3. **Concurrent Requests:**
+   - Set `OLLAMA_MAX_LOADED_MODELS=1` to prevent memory overflow
+   - Use `OLLAMA_KEEP_ALIVE=24h` to avoid reload delays
 
 ---
 
-## Key Changes Made
+## 🎯 What's Different from Before?
 
-### 1. WebSocket URL Fixed
-- **Before**: `ws://localhost:7880` (wrong - LiveKit server)
-- **After**: `ws://localhost:8000` (correct - backend proxy)
-- **File**: `src/services/interviewService.ts:9`
-
-### 2. Avatar Integration
-- Backend collects audio → generates video → sends URL
-- Frontend displays video when available
-- **Files**: `backend/src/services/geminiProxy.ts`, `src/pages/LiveKitInterviewScreen.tsx`
-
-### 3. Continuous Microphone
-- **Before**: Hold button to speak (push-to-talk)
-- **After**: Toggle on/off, always listening when on
-- **File**: `src/pages/LiveKitInterviewScreen.tsx:444`
+| Aspect | Before (Gemini) | Now (Ollama) |
+|--------|----------------|--------------|
+| **AI Provider** | Google Gemini API | Local Ollama |
+| **Cost** | Pay per request | $0 (after setup) |
+| **Latency** | ~500ms-2s | ~1-5s (depends on GPU) |
+| **Language** | Thai | English |
+| **STT** | Google STT (Thai) | Deepgram (English) |
+| **TTS** | Google TTS (Thai) | Cartesia (English) |
+| **Privacy** | Cloud | Local LLMs |
+| **Internet** | Required | Optional (except STT/TTS) |
 
 ---
 
-## Next Steps
+## 🎓 Key Points to Remember
 
-1. **Test Full Flow**: Start interview, speak, verify AI responds
-2. **Check Logs**: Ensure transcripts show in both backend and frontend console
-3. **Optional**: Install Wav2Lip for animated avatar (works without it)
-4. **Production**: Configure proper Gemini API quotas and rate limiting
+✅ **DeepSeek** = Resume parsing & screening (structured tasks)  
+✅ **Gemma** = Interviews & conversations (natural language)  
+✅ **Deepgram** = Speech-to-text (low latency)  
+✅ **Cartesia** = Text-to-speech (natural voice)  
+✅ **Backend** = Routes requests to the right AI
 
 ---
 
-## Support
+## 📚 Documentation
 
-- **Documentation**: See `FIXES_APPLIED.md` for detailed technical info
-- **Backend Logs**: Check Terminal 2 for WebSocket and Gemini messages
-- **Frontend Logs**: Open browser DevTools → Console
-- **Issues**: Verify all three services (LiveKit, Backend, Frontend) are running
+- **Full Architecture:** `AI_ARCHITECTURE.md`
+- **Migration Details:** `MIGRATION_SUMMARY.md`
+- **API Routes:** `backend/src/routes/ai.ts` and `backend/src/routes/interview.ts`
 
-**Status Indicators**:
-- ✅ Green dot = Good
-- ⚠️ Yellow = Warning (optional feature)
-- ❌ Red = Error (check logs)
+---
+
+## 🆘 Need Help?
+
+1. Check Docker logs: `docker-compose logs -f`
+2. Check Ollama status: `curl localhost:11435/api/tags`
+3. Verify `.env` configuration
+4. Review `MIGRATION_SUMMARY.md` for breaking changes
+
+---
+
+**Ready to go!** 🎉
+
+Start recruiting with AI-powered interviews in English using your local models!

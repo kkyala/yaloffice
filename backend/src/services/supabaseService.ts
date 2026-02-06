@@ -11,7 +11,8 @@ const __dirname = path.dirname(__filename);
 const paths = [
     path.resolve(process.cwd(), '.env'),
     path.resolve(__dirname, '../../.env'), // From dist/services/ to root
-    path.resolve(__dirname, '../.env')     // From src/services/ to src/ (dev)
+    path.resolve(__dirname, '../.env'),    // From src/services/ to src/ (dev)
+    path.resolve(__dirname, '../../../.env') // From src/services/ to project root (yaloffice/.env)
 ];
 
 let loaded = false;

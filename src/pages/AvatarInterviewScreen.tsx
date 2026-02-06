@@ -207,6 +207,14 @@ const RoomContent = ({ jobTitle }: { jobTitle: string }) => {
         { onlySubscribed: false },
     );
 
+    console.log("RoomContent Rendered. Tracks:", tracks.length);
+    tracks.forEach(track => {
+        console.log(`Track: ${track.participant.identity} | Source: ${track.source} | Muted: ${track.publication?.isMuted} | Substribed: ${track.publication?.isSubscribed}`);
+        if (track.source === Track.Source.Microphone) {
+            console.log(`🎤 Audio Track found for ${track.participant.identity}`);
+        }
+    });
+
     return (
         <div className="room-layout" style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             {/* Header Overlay */}
@@ -434,6 +442,13 @@ export default function AvatarInterviewScreen({
                 onError={handleError}
                 data-lk-theme="default"
                 style={{ height: '100vh', backgroundColor: 'var(--bg-primary)' }}
+                connectOptions={{
+                    rtcConfig: {
+                        iceServers: [
+                            { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+                        ],
+                    },
+                }}
             >
                 <RoomContent jobTitle={jobTitle} />
             </LiveKitRoom>

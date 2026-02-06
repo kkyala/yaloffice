@@ -67,7 +67,7 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
 
         const result = await onApplyForJob(job, profileData);
         if (result && result.success) {
-            if (job.screening_enabled) {
+            if (job.screening_enabled || job.title.includes('(Demo)')) {
                 // Redirect to screening if required
                 // Assuming result.applicationId or result.data.id is available
                 const applicationId = result.applicationId || result.data?.id;

@@ -24,13 +24,9 @@ export interface LiveKitToken {
 }
 
 class LiveKitService {
-    private apiKey: string;
-    private apiSecret: string;
     private url: string;
 
     constructor() {
-        this.apiKey = config.livekit.apiKey || '';
-        this.apiSecret = config.livekit.apiSecret || '';
         this.url = config.livekit.url || '';
     }
 
@@ -38,7 +34,7 @@ class LiveKitService {
      * Check if LiveKit is configured
      */
     isConfigured(): boolean {
-        return !!(this.apiKey && this.apiSecret && this.url);
+        return !!this.url;
     }
 
     /**
@@ -59,7 +55,9 @@ class LiveKitService {
      * Request an access token from the backend
      */
     async getAccessToken(roomConfig: LiveKitRoomConfig): Promise<LiveKitToken> {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        // Use relative URL on production (goes through tunnel), absolute on localhost
+        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        const apiUrl = isProduction ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:8000');
         const endpoint = '/api/livekit/token';
         const url = apiUrl.endsWith('/api') ? `${apiUrl}${endpoint.replace(/^\/api/, '')}` : `${apiUrl}${endpoint}`;
 
@@ -82,21 +80,13 @@ class LiveKitService {
 
         const data = await response.json();
 
-        // Dynamic URL handling for Ngrok/Remote access
-        let livekitUrl = this.url || data.url;
+        // Construct absolute WebSocket URL from relative path
+        let livekitUrl = this.url || '/livekit';
 
-        // If we are on a remote host (like ngrok), force the client to use the current host's proxy
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (!isLocalhost && livekitUrl.includes('localhost')) {
+        // If URL is relative (starts with /), construct full WebSocket URL
+        if (livekitUrl.startsWith('/')) {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            livekitUrl = `${protocol}//${window.location.host}/livekit`;
-        }
-
-        // Convert relative URL to absolute WebSocket URL (fallback)
-        if (livekitUrl && livekitUrl.startsWith('/')) {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.host;
-            livekitUrl = `${protocol}//${host}${livekitUrl}`;
+            livekitUrl = `${protocol}//${window.location.host}${livekitUrl}`;
         }
 
         console.log("Connecting to LiveKit URL:", livekitUrl);

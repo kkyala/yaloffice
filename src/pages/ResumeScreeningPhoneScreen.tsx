@@ -52,17 +52,15 @@ const ResumeScreeningPhoneScreen: React.FC<ResumeScreeningPhoneScreenProps> = ({
             // Initiate Session & Get Token
             const response = await aiService.startPhoneScreening(phoneNumber || 'voip-user', resumeText, jobTitle);
 
-            if (response.success && response.token) {
-                setToken(response.token);
+            if (response.success) {
                 setSessionId(response.sessionId);
-                setLiveKitUrl(response.wsUrl || import.meta.env.VITE_LIVEKIT_URL || "wss://yal-office-bi7w482a.livekit.cloud");
                 setStatus('on-call');
-                setLogs(prev => [...prev, "Connected via VoIP.", "Waiting for Agent..."]);
+                setLogs(prev => [...prev, "Call initiated to " + phoneNumber]);
 
-                // We don't need to poll for completion if we trust the "End Call" button or Room Disconnect
-                // But the Agent might end it.
+                // Start polling for analysis/completion immediately since we aren't connected to the room to know when it ends
+                monitorCallStatus(response.sessionId);
             } else {
-                setError("Failed to initiate call. Status: " + response.status);
+                setError("Failed to initiate call. Error: " + (response.message || response.error || "Unknown"));
                 setStatus('idle');
             }
         } catch (err: any) {
@@ -79,23 +77,25 @@ const ResumeScreeningPhoneScreen: React.FC<ResumeScreeningPhoneScreenProps> = ({
         };
     }, [analysisPoll]);
 
-    const waitForAnalysis = (sid: string) => {
-        setStatus('analyzing');
-        setLogs(prev => [...prev, "Call ended. Waiting for AI analysis..."]);
+    const monitorCallStatus = (sid: string) => {
+        // Don't set status to 'analyzing' immediately. We are 'on-call' until backend says otherwise.
+        // setStatus('analyzing'); 
 
         const poll = setInterval(async () => {
             try {
                 const res = await aiService.getInterviewStatus(sid);
-                if (res.status === 'completed' || res.status === 'finished') {
+
+                // If the call is effectively done but we are still in 'on-call' state in UI
+                if ((res.status === 'completed' || res.status === 'finished') && status !== 'completed') {
                     if (poll) clearInterval(poll);
                     setStatus('completed');
-                    setLogs(prev => [...prev, "Analysis Complete!"]);
-                    setTimeout(onComplete, 2000);
+                    setLogs(prev => [...prev, "Interview Finished!", "Redirecting..."]);
+                    setTimeout(onComplete, 3000);
                 }
             } catch (e) {
                 console.error("Polling error", e);
             }
-        }, 2000);
+        }, 3000);
         setAnalysisPoll(poll);
     };
 
@@ -103,7 +103,7 @@ const ResumeScreeningPhoneScreen: React.FC<ResumeScreeningPhoneScreenProps> = ({
         // Only trigger if we were actually in a call
         if (status === 'on-call' || status === 'calling') {
             if (sessionId) {
-                waitForAnalysis(sessionId);
+                monitorCallStatus(sessionId);
             } else {
                 // Fallback if session ID missing (shouldn't happen if token received)
                 onComplete();
@@ -156,12 +156,24 @@ const ResumeScreeningPhoneScreen: React.FC<ResumeScreeningPhoneScreenProps> = ({
                 {status === 'idle' && (
                     <div className="phone-input-section">
                         <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Ready to Start?</h2>
-                        <p>We will use your device microphone.</p>
+                        <p>Enter your phone number to receive the call.</p>
+
+                        <div style={{ margin: '1rem auto', maxWidth: '300px' }}>
+                            <input
+                                type="tel"
+                                className="form-control"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                placeholder="+1 555 123 4567"
+                                style={{ textAlign: 'center', fontSize: '1.2rem', padding: '0.8rem' }}
+                            />
+                        </div>
 
                         <button
                             className="btn btn-primary btn-lg"
                             onClick={handleCall}
-                            style={{ marginTop: '2rem', padding: '1rem 3rem', borderRadius: '50px', fontSize: '1.2rem' }}
+                            disabled={!phoneNumber || phoneNumber === 'VoIP-User'}
+                            style={{ marginTop: '1rem', padding: '1rem 3rem', borderRadius: '50px', fontSize: '1.2rem' }}
                         >
                             Start Call
                         </button>
@@ -170,32 +182,41 @@ const ResumeScreeningPhoneScreen: React.FC<ResumeScreeningPhoneScreenProps> = ({
 
                 {status === 'calling' && (
                     <div>
-                        <h2>Connecting...</h2>
+                        <h2>Initiating Call...</h2>
+                        <p>Calling {phoneNumber}...</p>
                     </div>
                 )}
 
-                {status === 'on-call' && token && (
-                    <LiveKitRoom
-                        video={false}
-                        audio={true}
-                        token={token}
-                        serverUrl={liveKitUrl}
-                        connect={true}
-                        onDisconnected={handleDisconnected}
-                        data-lk-theme="default"
-                    >
-                        <h2>Interview in Progress</h2>
-                        <p style={{ color: '#22c55e', fontWeight: 'bold' }}>• Live Connection</p>
-                        <RoomAudioRenderer />
-                        <AudioControls onEndCall={() => setStatus('completed') /* Will trigger disconnect effect via LiveKitRoom unmount or logic */} />
-                    </LiveKitRoom>
+                {status === 'on-call' && (
+                    <div className="active-call-state">
+                        <h2>Call in Progress</h2>
+                        <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
+                            We are calling your phone. Please pick up to start the interview.
+                        </p>
+                        <hr style={{ margin: '2rem 0', opacity: 0.1 }} />
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                            Speak clearly. The AI will ask you questions based on your resume.
+                        </p>
+                        <button className="btn btn-outline-danger" onClick={onComplete} style={{ marginTop: '2rem' }}>
+                            End Session
+                        </button>
+                    </div>
                 )}
 
-                {status === 'analyzing' || status === 'completed' && (
+                {(status === 'analyzing' || status === 'completed') && (
                     <div>
                         <h2>Processing Results</h2>
                         <div className="loading-spinner" style={{ margin: '2rem auto' }}></div>
                         <p>The AI is analyzing your responses...</p>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="alert alert-danger" style={{ marginTop: '1rem' }}>
+                        {error}
+                        <div style={{ marginTop: '1rem' }}>
+                            <button className="btn btn-sm btn-outline-secondary" onClick={() => setStatus('idle')}>Try Again</button>
+                        </div>
                     </div>
                 )}
 

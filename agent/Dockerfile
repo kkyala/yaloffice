@@ -12,5 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+
 # Run in dev mode
 CMD ["python", "main.py", "dev"]

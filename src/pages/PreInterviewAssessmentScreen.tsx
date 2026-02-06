@@ -71,7 +71,7 @@ export default function PreInterviewAssessmentScreen({
         if (result.success) {
             // Check if job requires AI screening
             // Note: job object is available in scope
-            if (job.screening_enabled) {
+            if (job.screening_enabled || job.title.includes('(Demo)')) {
                 // Redirect to AI Screening Session
                 onNavigate('screening-session', 'dashboard');
             } else {
@@ -171,7 +171,7 @@ export default function PreInterviewAssessmentScreen({
                                             checked={canRelocate === option}
                                             onChange={(e) => setCanRelocate(e.target.value)}
                                             required
-                                            style={{ display: 'none' }}
+                                            style={{ position: 'absolute', opacity: 0, height: 0, width: 0 }}
                                         />
                                         {option}
                                     </label>

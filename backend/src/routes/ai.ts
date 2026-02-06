@@ -9,9 +9,11 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { aiService } from '../services/aiService.js';
 import { auditLogger } from '../services/auditLogger.js';
 import { supabase } from '../services/supabaseService.js';
+import { sipService } from '../services/sipService.js';
 
 const router = Router();
 // ... (existing code)
@@ -544,6 +546,71 @@ router.post('/resume/process-screening', async (req: Request, res: Response) => 
       error: 'Failed to process resume screening',
       message: error.message
     });
+  }
+});
+
+/**
+ * POST /api/ai/interview/start-phone-screen
+ * (Compatibility Route) Initiates an outbound SIP call to the candidate's phone number.
+ * This duplicates logic from /api/interview to support older frontend clients.
+ */
+router.post('/interview/start-phone-screen', async (req: Request, res: Response) => {
+  try {
+    const { phoneNumber, resumeText, jobTitle, candidateName } = req.body;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    const sessionId = uuidv4();
+    const roomName = `phone-screen-${sessionId}`;
+
+    console.log(`[AI Routes] Initiating SIP call to ${phoneNumber} for room ${roomName}`);
+
+    // Create session first so context is available when agent joins
+    // Dynamic import to match existing pattern or avoid circular deps logic if any
+    const { interviewStore } = await import('../services/interviewStore.js');
+
+    const session = {
+      id: sessionId,
+      roomName: roomName,
+      jobTitle: jobTitle || 'Phone Screening',
+      questionCount: 5,
+      difficulty: 'medium',
+      candidateId: 'phone-' + phoneNumber,
+      candidateName: candidateName || 'Phone Candidate',
+      customQuestions: [],
+      resumeText: resumeText,
+      status: 'active',
+      startedAt: new Date().toISOString(),
+      transcript: [],
+      currentQuestionIndex: 0
+    } as any; // Cast to avoid full type matching if Interface is strict
+
+    await interviewStore.set(sessionId, session);
+
+    // Initiate SIP Call
+    await sipService.initiatePhoneScreen(phoneNumber, roomName, candidateName);
+
+    // Audit Log
+    await auditLogger.log({
+      userId: 'anonymous',
+      action: 'phone_screen_started',
+      resourceType: 'interview',
+      resourceId: sessionId,
+      details: { jobTitle, roomName, phoneNumber }
+    });
+
+    res.json({
+      success: true,
+      sessionId,
+      roomName,
+      message: "Call initiated"
+    });
+
+  } catch (error: any) {
+    console.error('[AI Routes] Error starting phone screen:', error);
+    res.status(500).json({ error: 'Failed to initiate phone screening session: ' + error.message });
   }
 });
 

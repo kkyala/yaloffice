@@ -1,23 +1,41 @@
 import logging
 import os
-import json
 import asyncio
 import aiohttp
-import datetime 
+import datetime
 from dotenv import load_dotenv
+
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
 from livekit.agents.voice import Agent, AgentSession
-from livekit.plugins import deepgram, openai, google, silero
+from livekit.plugins import deepgram, silero
+from livekit.agents import llm as agents_llm
+from livekit.agents.llm import ChatContext, ChatRole, ChatChunk, ChoiceDelta
+
+# Compatibility shim for LiveKit Agents 1.3.x where Choice might not be exported directly
+try:
+    from livekit.agents.llm import Choice
+except ImportError:
+    try:
+        from livekit.agents.llm.llm import Choice
+    except ImportError:
+        # Last resort fallback if completely hidden but supports duck typing or updated API 
+        class Choice:
+            def __init__(self, delta, index=0):
+                self.delta = delta
+                self.index = index
 
 load_dotenv()
-logger = logging.getLogger("gemini-interviewer")
+logger = logging.getLogger("yaloffice-interviewer")
+logging.basicConfig(level=logging.INFO)
 
+
+# =========================
+# Interviewer Agent
+# =========================
 class Interviewer(Agent):
     def __init__(self, system_instruction: str):
-        super().__init__(
-            instructions=system_instruction
-        )
-        # Mock Job Database
+        super().__init__(instructions=system_instruction)
+
         self.jobs = [
             {"id": "j1", "title": "Senior Software Engineer", "location": "Remote", "skills": ["React", "Node.js", "TypeScript"]},
             {"id": "j2", "title": "Product Manager", "location": "New York", "skills": ["Agile", "Roadmapping", "Communication"]},
@@ -26,343 +44,354 @@ class Interviewer(Agent):
 
     @llm.function_tool
     async def search_jobs(self, query: str):
-        """Search for available job positions based on skills or title.
-        
-        Args:
-            query: The job title or skill to search for.
-        """
-        logger.info(f"Searching jobs for: {query}")
         query = query.lower()
-        matches = []
-        for job in self.jobs:
-            if query in job['title'].lower() or any(query in s.lower() for s in job['skills']):
-                matches.append(job)
-        
+        matches = [
+            j for j in self.jobs
+            if query in j["title"].lower()
+            or any(query in s.lower() for s in j["skills"])
+        ]
+
         if not matches:
-            return "I couldn't find any specific jobs matching that description, but we are always looking for talented individuals."
-        
-        return f"I found {len(matches)} relevant positions: " + ", ".join([f"{j['title']} ({j['location']})" for j in matches])
+            return "No matching jobs found at the moment."
 
+        return "Relevant roles: " + ", ".join(
+            f"{j['title']} ({j['location']})" for j in matches
+        )
+
+
+# =========================
+# Backend helpers
+# =========================
 async def save_interview_results(application_id: str, transcript: str):
-    """Saves the interview transcript and status to the backend."""
-    if not application_id:
-        logger.warning("No application ID found, cannot save results.")
-        return
-
-    api_url = os.getenv("VITE_API_URL", "http://localhost:8000") # Backend URL
+    api_url = os.getenv("VITE_API_URL", "http://localhost:8000")
     candidate_url = f"{api_url}/api/candidates/{application_id}"
-    
-    logger.info(f"Saving interview results for {application_id} to {candidate_url}")
 
     async with aiohttp.ClientSession() as session:
         try:
-            # 1. Fetch existing candidate to preserve config
             async with session.get(candidate_url) as resp:
                 if resp.status != 200:
-                    logger.error(f"Failed to fetch candidate: {resp.status} {await resp.text()}")
+                    logger.error(f"Failed to fetch candidate: {resp.status}")
                     return
                 candidate = await resp.json()
 
-            current_config = candidate.get("interview_config", {})
-            
-            # Simple word count based score or random for demo if analysis fails provided
-            # ideally we would ask the LLM for this, but for stability we ensure at least a save happens.
-            transcript_len = len(transcript)
-            mock_score = min(10, max(5, transcript_len / 100)) # Simple heuristic for now
-            
-            # 2. Prepare Update
             updated_config = {
-                **current_config,
+                **candidate.get("interview_config", {}),
                 "transcript": transcript,
-                "completedAt": datetime.datetime.utcnow().isoformat(), 
+                "completedAt": datetime.datetime.utcnow().isoformat(),
                 "interviewStatus": "finished",
-                # "aiScore": float(f"{mock_score:.1f}"), # Let frontend AI calculate this
-                # Remove mock analysis so frontend triggers real AI analysis
             }
 
-            # 3. Send Update
-            async with session.put(candidate_url, json={"interview_config": updated_config}) as resp:
+            async with session.put(
+                candidate_url, json={"interview_config": updated_config}
+            ) as resp:
                 if resp.status == 200:
-                    logger.info("Successfully saved interview results.")
-                else:
-                    logger.error(f"Failed to save results: {resp.status} {await resp.text()}")
-
+                    logger.info("Interview results saved")
         except Exception as e:
-            logger.error(f"Error saving interview results: {e}")
+            logger.error(f"Error saving results: {e}")
+
 
 async def save_phone_screen_results(session_id: str, transcript: str):
-    """Saves the phone screening transcript to the backend via /stop endpoint."""
-    if not session_id:
-        return
-
     api_url = os.getenv("VITE_API_URL", "http://localhost:8000")
     stop_url = f"{api_url}/api/interview/stop"
-    
-    logger.info(f"Finalizing Phone Screening Session: {session_id}")
 
     async with aiohttp.ClientSession() as session:
         try:
-            # Call Stop endpoint with transcript
-            payload = {
+            await session.post(stop_url, json={
                 "sessionId": session_id,
                 "transcript": transcript
-            }
-            async with session.post(stop_url, json=payload) as resp:
-                if resp.status == 200:
-                    logger.info("Successfully saved phone screening results.")
-                else:
-                    logger.error(f"Failed to save phone screening: {resp.status} {await resp.text()}")
+            })
         except Exception as e:
-            logger.error(f"Error saving phone screening results: {e}")
+            logger.error(f"Error saving phone screen results: {e}")
 
+
+async def fetch_interview_context(application_id=None, session_id=None):
+    api_url = os.getenv("VITE_API_URL", "http://localhost:8000")
+    context = {
+        "candidate_name": "Candidate",
+        "job_title": "General Position",
+        "job_description": "General interview",
+        "type": "Technical Interview" if application_id else "Phone Screening"
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            if application_id:
+                async with session.get(f"{api_url}/api/candidates/{application_id}") as resp:
+                    if resp.status == 200:
+                        cand = await resp.json()
+                        context["candidate_name"] = cand.get("name", "Candidate")
+                        # Resume extraction if available in candidate object
+                        context["resume_text"] = cand.get("interview_config", {}).get("resume_text", "")
+                        job_id = cand.get("jobId")
+
+                        if job_id:
+                            async with session.get(f"{api_url}/api/jobs/{job_id}") as jresp:
+                                if jresp.status == 200:
+                                    job = await jresp.json()
+                                    context["job_title"] = job.get("title", context["job_title"])
+                                    context["job_description"] = job.get("description", context["job_description"])
+            elif session_id:
+                async with session.get(f"{api_url}/api/interview/context/{session_id}") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        context["candidate_name"] = data.get("candidateName", "Candidate")
+                        context["job_title"] = data.get("jobTitle", "Phone Screening")
+                        context["resume_text"] = data.get("resumeText", "")
+                        # fetch job desc if needed, assuming generic for now or passed in context
+            
+    except Exception as e:
+        logger.error(f"Error fetching context: {e}")
+
+    return context
+
+
+# =========================
+# Ollama LLM Adapter (FIXED for LiveKit 1.3+)
+# =========================
+class OllamaStream:
+    def __init__(self, llm, chat_ctx: ChatContext):
+        self.llm = llm
+        self.chat_ctx = chat_ctx
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        pass
+
+    async def __aiter__(self):
+        try:
+
+
+            messages = []
+
+            # ChatContext is iterable (list of messages)
+            for msg in self.chat_ctx:
+                if msg.role == ChatRole.SYSTEM:
+                    continue
+
+                role = "assistant" if msg.role == ChatRole.ASSISTANT else "user"
+                # Handle both string content and list content (newer API)
+                content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                messages.append({"role": role, "content": content})
+
+            payload = {
+                "model": self.llm.model, # Use property
+                "messages": messages,
+                "stream": False,
+                "options": {"temperature": 0.7}
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.llm.base_url}/api/chat", json=payload
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(f"Ollama API Error: {resp.status}")
+                        return
+
+                    data = await resp.json()
+                    text = data.get("message", {}).get("content", "")
+
+                    if text:
+                        yield ChatChunk(
+                            choices=[Choice(
+                                index=0,
+                                delta=ChoiceDelta(
+                                    role=ChatRole.ASSISTANT,
+                                    content=text
+                                )
+                            )]
+                        )
+        except Exception as e:
+            logger.exception("LLM inference failed")
+            return
+
+
+# FIX 1: Correct OllamaLLM implementation
+class OllamaLLM(agents_llm.LLM):
+    def __init__(self, base_url: str, model_name: str):
+        super().__init__()
+        self.base_url = base_url
+        self._model_name = model_name  # ✅ private variable
+
+    @property
+    def model(self):
+        return self._model_name
+
+    def chat(self, chat_ctx: ChatContext, fnc_ctx=None, *args, **kwargs):
+        return OllamaStream(self, chat_ctx)
+
+
+# =========================
+# Entry Point
+# =========================
 async def entrypoint(ctx: JobContext):
-    
-    logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-    # Set Agent Name
-    try:
-        if ctx.room and ctx.room.local_participant:
-             await ctx.room.local_participant.set_name("AI Avatar")
-    except Exception as e:
-        logger.warning(f"Failed to set agent name: {e}")
-
-    # Parse Application ID or Session ID from Room Name
+    # Robust Room ID Parsing
+    room = ctx.room.name
     application_id = None
     session_id = None
-    
-    try:
-        room_name = ctx.room.name
-        if "interview-" in room_name:
-            # Format: interview-{application_id}
-            parts = room_name.split("-")
-            for part in parts:
-                if part.isdigit():
-                    application_id = part
-                    break
-        elif "phone-screen-" in room_name:
-            # Format: phone-screen-{uuid}
-            session_id = room_name.replace("phone-screen-", "")
-    except Exception as e:
-        logger.warning(f"Failed to parse ID from room name: {e}")
+
+    if "interview-" in room:
+        parts = room.split("-")
+        for part in parts:
+            if part.isdigit():
+                application_id = part
+                break
+    elif "phone-screen-" in room:
+        session_id = room.replace("phone-screen-", "")
+
+    context = await fetch_interview_context(application_id, session_id)
 
     participant = await ctx.wait_for_participant()
-    logger.info(f"starting voice assistant for participant {participant.identity}")
+    logger.info(f"Participant joined: {participant.identity}")
 
-    # 1. Fetch Job Context for System Instruction
-    system_instruction = "You are a helpful AI interviewer. Conduct a professional technical interview. Start by introducing yourself."
+    # Generate Technical Questions based on context and resume
+    tech_questions = []
     
-    api_url = os.getenv("VITE_API_URL", "http://localhost:8000")
-    job_details = None
+    resume_excerpt = context.get("resume_text", "")[:2000] # Limit context size
     
-    async with aiohttp.ClientSession() as fetch_session:
-        # Case A: Phone Screening (Session ID)
-        if session_id:
-             try:
-                async with fetch_session.get(f"{api_url}/api/interview/context/{session_id}") as resp:
-                    if resp.status == 200:
-                        ctx_data = await resp.json()
-                        job_title = ctx_data.get('jobTitle', 'Role')
-                        candidate_name = ctx_data.get('candidateName', 'Candidate')
-                        resume_text = ctx_data.get('resumeText', '')
-                        
-                        system_instruction = (
-                            f"You are an expert AI Recruiter conducting a Phone Screening for the role of '{job_title}'.\n"
-                            f"Candidate Name: {candidate_name}\n"
-                            f"Resume Context (Do not read aloud, use for questions):\n{resume_text[:2000]}...\n\n"
-                            "SCREENING STRUCTURE (5-10 mins):\n"
-                            "1. GREETING: Introduce yourself as the AI Recruiter from Yal Office. Verify you are speaking to {candidate_name}.\n"
-                            "2. EXPERIENCE CHECK: Ask about their most recent role or a specific project from their resume.\n"
-                            "3. LOGISTICS: Ask about their notice period and salary expectations.\n"
-                            "4. WRAP UP: Thank them and explain the next steps (hiring manager review).\n\n"
-                            "Keep your tone professional, efficient, but friendly. Listen more than you talk."
-                        )
-                        logger.info(f"Loaded Phone Screening context for {job_title}")
-             except Exception as e:
-                logger.error(f"Failed to fetch phone context: {e}")
+    if resume_excerpt:
+        logger.info("Generating questions based on resume...")
+        # Simple generation prompt could use the LLM helper if available, or just hardcode for brevity + dynamic injection
+        # check if we can generate dynamically here? 
+        # For simplicity, we'll append a resume-specific question to standard ones
+        try:
+             # We can't easily call LLM here without initializing it, so we'll init earlier or just use a placeholder mechanism
+             # But the user wants "screening based on the resume".
+             # It's better to let the System Prompt handle it by feeding the resume.
+             pass
+        except:
+             pass
+    
+    tech_questions = [
+        f"Can you explain your experience with {context['job_title']} roles?",
+        "What has been your most challenging technical project?",
+        "How do you handle debugging complex systems?",
+    ]
+    
+    # If resume is present, the System Prompt will be updated to instruct the AI to ask questions based on it.
+    
+    questions_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(tech_questions)])
 
-        # Case B: Technical Interview (Application ID)
-        elif application_id:
-            try:
-                # Get Candidate to find Job ID
-                async with fetch_session.get(f"{api_url}/api/candidates/{application_id}") as resp:
-                    if resp.status == 200:
-                        candidate = await resp.json()
-                        job_id = candidate.get("jobId")
-                        candidate_name = candidate.get("name", "Candidate")
-                        
-                        # Get Job Details
-                        if job_id:
-                            async with fetch_session.get(f"{api_url}/api/jobs/{job_id}") as job_resp:
-                                if job_resp.status == 200:
-                                    job_details = await job_resp.json()
-                                    
-                                    # --- PROMPT ENGINEERING ---
-                                    job_title = job_details.get('title', 'Ref')
-                                    job_desc = job_details.get('description', '')
-                                    job_skills = ", ".join(job_details.get('skills', []))
-                                    
-                                    system_instruction = (
-                                        f"You are an expert AI Interviewer for the role of '{job_title}' at Yal Office.\n"
-                                        f"Candidate Name: {candidate_name}\n"
-                                        f"Job Context:\n"
-                                        f"- Description: {job_desc}\n"
-                                        f"- Required Skills: {job_skills}\n\n"
-                                        "INTERVIEW STRUCTURE (Manage time carefully):\n"
-                                        "1. GREETING: Warmly welcome the candidate, introduce yourself as the AI interviewer, and briefly mention the role context.\n"
-                                        "2. INTRODUCTION (Light): Ask 1-2 questions about their background/introduction or cultural fit. Keep it light.\n"
-                                        "3. CORE SKILLS (Strong): Ask 3-4 deep, technical, or situational questions specifically based on the Job Description and Skills above. Challenge them politely.\n"
-                                        "4. WRAP UP: When you feel you have enough info or if 15 minutes have passed, thank them and end the interview professionally.\n\n"
-                                        "Maintain a professional but encouraging tone. Do not provide answers, but ask follow-up questions if their answers are vague."
-                                    )
-                                    logger.info(f"Loaded job context for {job_title}")
-            except Exception as e:
-                logger.error(f"Failed to fetch job context: {e}")
+    resume_context_str = ""
+    if resume_excerpt:
+        resume_context_str = f"\nCANDIDATE RESUME:\n{resume_excerpt}\n\nINSTRUCTION: Ask questions relevant to the projects and skills mentioned in the resume ABOVE, in addition to standard technical questions."
 
-    # 2. Check Keys & Configure Plugins
-    # STT
-    if os.getenv("DEEPGRAM_API_KEY"):
-        logger.info("Using Deepgram for STT")
-        stt_provider = deepgram.STT()
-    else:
-        logger.warning("DEEPGRAM_API_KEY not found, falling back to Google STT")
-        stt_provider = google.STT()
+    system_instruction = f"""
+You are a professional AI interviewer at YalOffice.
+You are interviewing {context['candidate_name']} for the position of {context['job_title']}.
+Job Description Summary: {context['job_description']}
+{resume_context_str}
 
-    # TTS
-    if os.getenv("DEEPGRAM_API_KEY"):
-        logger.info("Using Deepgram for TTS")
-        tts_provider = deepgram.TTS()
-    elif os.getenv("OPENAI_API_KEY"):
-        logger.info("Using OpenAI for TTS")
-        tts_provider = openai.TTS()
-    else:
-        logger.warning("No TTS key found, falling back to Google TTS")
-        tts_provider = google.TTS()
+INTERVIEW PROTOCOL:
+You must ask questions one by one. Do not ask multiple questions at once.
+Wait for the candidate to answer before moving to the next question.
 
-    # LLM
-    interview_ai_url = os.getenv("INTERVIEW_AI_URL")
-    if interview_ai_url:
-        logger.info(f"Using Ollama (Gemma) for LLM at {interview_ai_url}")
-        # Ollama provides OpenAI compatible API at /v1
-        llm_provider = openai.LLM(
-            base_url=f"{interview_ai_url}/v1",
-            api_key="ollama", # Required but unused
-            model="gemma2:9b",
-            # temperature=0.7
-        )
-    elif os.getenv("GOOGLE_API_KEY"):
-        logger.info("Using Google Gemini for LLM")
-        llm_provider = google.LLM(model="gemini-2.0-flash-exp")
-    elif os.getenv("OPENAI_API_KEY"):
-        logger.info("Using OpenAI for LLM")
-        llm_provider = openai.LLM(model="gpt-4o")
-    else:
-        logger.error("CRITICAL: No LLM API Key found and no INTERVIEW_AI_URL set!")
+If a resume is provided, prioritize asking about specific projects, skills, or experiences listed in the resume.
+Otherwise, use the following standard questions as a guide:
+{questions_text}
+
+Rules:
+- Greet the candidate professionally first.
+- Ask the first question.
+- Listen to the answer, acknowledge it briefly (e.g., "I see", "That's interesting"), then ask the next question.
+- Dig deeper if the answer is vague.
+- After 5-7 minutes or 5 questions, finalize the interview.
+- Thank the candidate and say goodbye.
+- Be polite and concise.
+"""
+
+    # Use environment variable for Ollama URL, default to docker internal name
+    ollama_url = os.getenv("INTERVIEW_AI_URL", "http://ollama-gemma:11434")
+    
+    # Update usage: use model_name
+    llm_provider = OllamaLLM(
+        base_url=ollama_url,
+        model_name="gemma2:9b-instruct-q8_0" 
+    )
+
+    if not os.getenv("DEEPGRAM_API_KEY"):
+        logger.error("DEEPGRAM_API_KEY not found. Agent will fail.")
         return
 
-    # 3. Initialize Session
+    stt = deepgram.STT(language="en-US")
+    tts = deepgram.TTS()
+    vad = silero.VAD.load()
+
     session = AgentSession(
-        vad=silero.VAD.load(),
-        stt=stt_provider,
+        vad=vad,
+        stt=stt,
         llm=llm_provider,
-        tts=tts_provider,
+        tts=tts,
     )
-    # Prevent panic on disconnect by disabling auto-close
-    if hasattr(session, 'close_on_disconnect'):
-         session.close_on_disconnect = False
-    elif hasattr(session, 'room_input'):
-         # In some versions it might be nested
-         pass
 
-    # Fallback/Newer API might use properties. 
-    # The log message explicitly said "disable via RoomInputOptions.close_on_disconnect=False"
-    # This implies RoomInputOptions object.
-    # But passing it failed. 
-    
     agent = Interviewer(system_instruction)
+
+    # FIX 2: Explicitly send opening audio
+    await session.start(agent=agent, room=ctx.room)
     
-    # 4. Run Session
+    # Give LiveKit + TTS time to fully attach
+    await asyncio.sleep(2.0)
+
+    # FORCE audio output - greeting
     try:
-        logger.info("Starting Agent Session...")
-        await session.start(agent=agent, room=ctx.room)
+        logger.info("FORCING GREETING AUDIO")
+        greeting_text = f"Hello {context['candidate_name']}, I am Yal, your AI interviewer. Shall we begin?"
         
-        # Explicitly publish data to confirm presence/logs
-        # await ctx.room.local_participant.publish_data("Agent Connected")
+        if hasattr(session, 'say'):
+            await session.say(greeting_text)
+        else:
+            logger.warning("session.say() method not found. Attempting fallback.")
+            await session.generate_reply(instructions=f"Say exactly: {greeting_text}")
 
-        logger.info("Agent Session Started. Generating greeting...")
-        await session.generate_reply(instructions="Greet the candidate by name and start the interview.")
+        # 🔥 ASK FIRST QUESTION IMMEDIATELY
+        await asyncio.sleep(0.5)  # Brief pause for natural pacing
         
-        @session.on("agent_speech_committed")
-        def on_agent_speech_committed(msg):
-            logger.info(f"Agent starting to speak: {msg.content}")
+        first_question = tech_questions[0]
+        logger.info(f"Asking first question: {first_question}")
+        
+        if hasattr(session, 'say'):
+            await session.say(first_question)
+        else:
+            await session.generate_reply(instructions=f"Say exactly: {first_question}")
 
-        @session.on("agent_speech_stopped")
-        def on_agent_speech_stopped(msg):
-             logger.info("Agent stopped speaking.")
-        
-        # --- TIME LIMIT ENFORCEMENT ---
-        # 15 Minute hard limit for the session task
-        INTERVIEW_DURATION_SECONDS = 15 * 60 
-        
-        # Keep the task alive until the room is disconnected
-        logger.info("Waiting for participant disconnect...")
-        
-        try:
-             # Wait for disconnect OR timeout
-             await asyncio.wait_for(asyncio.Event().wait(), timeout=INTERVIEW_DURATION_SECONDS)
-        except asyncio.TimeoutError:
-             logger.info("Interview time limit reached. Ending session.")
-             await session.generate_reply(instructions="The scheduled time for this interview is over. Thank the candidate for their time and say goodbye.")
-             # Give it a moment to speak
-             await asyncio.sleep(5) 
-             await ctx.disconnect()
-        except asyncio.CancelledError:
-             logger.info("Task cancelled - Participant likely disconnected.") 
-        
-        logger.info("Participant disconnected.")
-        
     except Exception as e:
-        logger.error(f"CRITICAL ERROR in Agent Session: {e}", exc_info=True)
-        # Don't re-raise immediately so we can save partial results if needed, 
-        # but for now let's just log it.
-        
-    finally:
-        # 5. Save Transcript on Exit
-        logger.info("Session ended, saving transcript...")
-        try:
-            full_transcript = ""
-            if hasattr(session, 'chat_ctx') and session.chat_ctx:
-                 logger.info(f"Found chat_ctx with {len(session.chat_ctx.messages)} messages.")
-                 for msg in session.chat_ctx.messages:
-                     role = getattr(msg, 'role', None) or 'unknown'
-                     content = getattr(msg, 'content', "")
-                     
-                     if role in ["user", "assistant", "system"]:
-                         role_label = "Interviewer" if role == "assistant" else "Candidate"
-                         if role == "system": role_label = "System"
-                         
-                         # Content can be a list of ContentItems or string
-                         text_content = ""
-                         if isinstance(content, list):
-                             text_content = " ".join([str(c) for c in content])
-                         else:
-                             text_content = str(content)
-                             
-                         full_transcript += f"{role_label}: {text_content}\n"
-            else:
-                 logger.warning("session.chat_ctx is missing or empty.")
-            
-            logger.info(f"Generated transcript length: {len(full_transcript)}")
+        logger.error(f"Error during greeting/first question: {e}")
 
-            if full_transcript:
-                if application_id:
-                    await save_interview_results(application_id, full_transcript)
-                elif session_id:
-                     await save_phone_screen_results(session_id, full_transcript)
-            else:
-                 logger.warning(f"Skipping save: ID={application_id}, TranscriptLen={len(full_transcript)}")
+    try:
+        await asyncio.sleep(20 * 60) 
+    except asyncio.CancelledError:
+        logger.info("Session cancelled")
+    finally:
+        logger.info("Closing session...")
+        
+        # PERSIST TRANSCRIPT
+        try:
+            # Extract transcript from chat context
+            transcript_entries = []
+            if agent.chat_ctx:
+                for msg in agent.chat_ctx:
+                    role_str = "AI" if msg.role == ChatRole.ASSISTANT else "Candidate"
+                    if msg.role == ChatRole.SYSTEM: continue
+                    content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                    transcript_entries.append(f"{role_str}: {content}")
+            
+            full_transcript = "\n".join(transcript_entries)
+            logger.info(f"Saving transcript ({len(full_transcript)} chars)...")
+            
+            if application_id:
+                await save_interview_results(application_id, full_transcript)
+            elif session_id:
+                await save_phone_screen_results(session_id, full_transcript)
+                
         except Exception as e:
-             logger.error(f"Error saving transcript: {e}", exc_info=True) 
+            logger.error(f"Failed to save transcript: {e}")
+
+        await ctx.disconnect()
+
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

@@ -7,7 +7,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:3000"
+      - "8005:3000"
     environment:
       - PORT=3000
       - FRONTEND_URL=http://localhost:3001
@@ -36,7 +36,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "3001:3001"
+      - "3006:3001"
     environment:
       - VITE_API_URL=http://backend:3000
       - VITE_WS_URL=ws://backend:3000
@@ -54,9 +54,9 @@ services:
       args:
         VITE_API_URL: /api
         VITE_WS_URL: /ws
-        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL}
+        VITE_LIVEKIT_URL: /livekit
     ports:
-      - "3001:3001"
+      - "3005:3001"
     restart: unless-stopped
 
   # AI Agent (Python)
@@ -71,6 +71,7 @@ services:
       - RESUME_AI_URL=http://ollama-deepseek:11434
       - INTERVIEW_AI_URL=http://ollama-gemma:11434
       - STT_URL=http://whisper:9000
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
     depends_on:
       - livekit
       - backend

@@ -18,19 +18,34 @@ import candidatesRouter from './routes/candidates.js';
 import placementsRouter from './routes/placements.js';
 import resumesRouter from './routes/resumes.js';
 import auditLogsRouter from './routes/auditLogs.js';
-import { setupGeminiProxyWS } from './services/geminiProxy.js';
+// import { setupGeminiProxyWS } from './services/geminiProxy.js'; // REMOVED: Using Ollama/LiveKit Agent now
 import { roomLifecycleManager } from './services/roomLifecycleManager.js';
 
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws/gemini-proxy' });
+// const wss = new WebSocketServer({ server, path: '/ws/gemini-proxy' }); // REMOVED: Using Ollama/LiveKit Agent now
+
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 // Middleware
 app.use(cors({
-  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001', 'https://stasia-mediastinal-fathomlessly.ngrok-free.dev'],
+  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001', 'https://stasia-mediastinal-fathomlessly.ngrok-free.dev', 'https://demo.yalhire.ai'],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' })); // Increased for audio/video data
+
+// Proxy /livekit requests to the local LiveKit server (port 7880)
+// This strips the '/livekit' prefix so LiveKit server receives the correct path
+const livekitProxy = createProxyMiddleware({
+  target: 'http://127.0.0.1:7880',
+  changeOrigin: true,
+  ws: true, // Enable WebSocket proxying
+  pathRewrite: {
+    '^/livekit': '', // Remove base path
+  }
+});
+
+app.use('/livekit', livekitProxy);
 
 // Logging Middleware
 app.use((req, res, next) => {
@@ -75,8 +90,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// WebSocket for Gemini Live proxy
-setupGeminiProxyWS(wss);
+// WebSocket for Gemini Live proxy - REMOVED: Using Ollama/LiveKit Agent now
+// setupGeminiProxyWS(wss);
 
 const PORT = process.env.PORT || 8000;
 

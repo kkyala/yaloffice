@@ -1,29 +1,24 @@
 /**
  * AI Service - Backend Implementation
  *
- * Handles all AI functionality including:
- * - Resume parsing (PDF, Word, Images)
- * - Resume screening and matching
- * - Interview scoring and analysis
- * - Video analysis
- * - Text-to-speech generation
- * - General content generation
+ * AI Architecture:
+ * - DeepSeek-R1 Distill 7B: Resume parsing, screening, structured extraction
+ * - Gemma 2 9B Instruct: Interview conversations, evaluations, summaries
+ * - Deepgram: Speech-to-Text (handled in agent/frontend)
+ * - Backend Logic: Routing and business decisions
  *
- * This service consolidates all Gemini API calls on the backend.
+ * NO Google Gemini, NO OpenAI, NO Google STT/TTS
  */
 
-import { GoogleGenerativeAI, GenerateContentResponse } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import mammoth from 'mammoth';
+import { ollamaService } from './ollamaService.js';
 
 dotenv.config();
 
 // ========================================================================================
 // TYPES
 // ========================================================================================
-
-export type VoiceName = 'Zephyr' | 'Puck' | 'Charon' | 'Kore' | 'Fenrir';
-export type ChatModelName = 'gemini-2.0-flash-exp' | 'gemini-2.5-flash' | 'gemini-2.5-pro';
 
 export interface ResumeData {
   personalInfo: {
@@ -74,24 +69,28 @@ export interface InterviewScore {
 // ========================================================================================
 
 class AIService {
-  private genAI: GoogleGenerativeAI | null = null;
   private initialized: boolean = false;
 
   /**
-   * Initialize the Gemini AI client
+   * Initialize the AI Service (Ollama-based)
    */
-  private initialize(): void {
+  private async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error('[AIService] GEMINI_API_KEY not found in environment');
-      throw new Error('GEMINI_API_KEY not configured');
+    // Health check for Ollama services
+    const health = await ollamaService.healthCheck();
+
+    if (!health.deepseek) {
+      console.warn('[AIService] DeepSeek Ollama service not available');
     }
 
-    this.genAI = new GoogleGenerativeAI(apiKey);
+    if (!health.gemma) {
+      console.warn('[AIService] Gemma Ollama service not available');
+    }
+
     this.initialized = true;
-    console.log('[AIService] Initialized successfully');
+    console.log('[AIService] Initialized successfully (Ollama-based)');
+    console.log(`[AIService] DeepSeek: ${health.deepseek ? '✓' : '✗'}, Gemma: ${health.gemma ? '✓' : '✗'}`);
   }
 
   /**
@@ -129,13 +128,10 @@ class AIService {
 
   /**
    * Parse resume document (PDF, Word, Image)
+   * Uses: DeepSeek-R1 Distill 7B
    */
   async parseResumeDocument(fileBase64: string, mimeType: string): Promise<ResumeData> {
-    this.initialize();
-
-    if (!this.genAI) {
-      throw new Error('AI Service not initialized');
-    }
+    await this.initialize();
 
     const safeMime = this.normalizeMime(mimeType);
     let safeData = this.cleanBase64(fileBase64);
@@ -147,7 +143,7 @@ class AIService {
     let extractedText = '';
 
     if (isWord) {
-      console.log(`[AIService] Attempting to parse Word document. Mime: ${mimeType}, Size: ${safeData.length}`);
+      console.log(`[AIService] Parsing Word document. Mime: ${mimeType}, Size: ${safeData.length}`);
       try {
         const buffer = Buffer.from(safeData, 'base64');
         const result = await mammoth.extractRawText({ buffer: buffer });
@@ -163,364 +159,253 @@ class AIService {
       console.log(`[AIService] Parsing non-Word document. Mime: ${mimeType}`);
     }
 
-    // Determine prompt based on whether we have extracted text or not.
-    // If we have extractedText, we send that as text prompt.
-    // If not (PDF/Image), we send inlineData.
-
-    const schema = `
-         {
-           "personalInfo": {
-             "name": "string",
-             "email": "string",
-             "phone": "string",
-             "linkedin": "string",
-             "city": "string",
-             "state": "string"
-           },
-           "summary": "string",
-           "experience": [{
-             "company": "string",
-             "role": "string",
-             "startDate": "string",
-             "endDate": "string",
-             "description": "string"
-           }],
-           "education": [{
-             "institution": "string",
-             "degree": "string",
-             "year": "string"
-           }],
-           "skills": ["string"],
-           "projects": [{
-             "name": "string",
-             "description": "string",
-             "technologies": ["string"]
-           }],
-           "certifications": ["string"]
-         }`;
+    const schema = {
+      personalInfo: {
+        name: "string",
+        email: "string",
+        phone: "string",
+        linkedin: "string",
+        city: "string",
+        state: "string"
+      },
+      summary: "string",
+      experience: [{
+        company: "string",
+        role: "string",
+        startDate: "string",
+        endDate: "string",
+        description: "string"
+      }],
+      education: [{
+        institution: "string",
+        degree: "string",
+        year: "string"
+      }],
+      skills: ["string"],
+      projects: [{
+        name: "string",
+        description: "string",
+        technologies: ["string"]
+      }],
+      certifications: ["string"]
+    };
 
     const prompt = isWord && extractedText
-      ? `Parse this resume text into structured JSON.
-         STRICTLY follow this schema:
-         ${schema}
-         
-         Resume Content:
-         ${extractedText}
-         
-         Note: Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
-         Return ONLY the JSON.`
-      : `Parse this resume (PDF/Image) into structured JSON.
-         STRICTLY follow this schema:
-         ${schema}
+      ? `You are an expert resume parser. Extract structured information from this resume text and return ONLY valid JSON following this exact schema:
 
-         Note: Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
-         Return ONLY the JSON.`;
+${JSON.stringify(schema, null, 2)}
 
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp'
-    });
+Resume Content:
+${extractedText}
 
-    let parts: any[] = [{ text: prompt }];
+Important Instructions:
+- Extract ALL relevant information accurately
+- Capture 'Academic Projects' or 'Key Projects' under the 'projects' array
+- If information is missing, use null or empty array
+- Return ONLY the JSON object, no explanation`
+      : `You are an expert resume parser. This is a PDF/Image resume. Extract structured information and return ONLY valid JSON following this exact schema:
 
-    // Only attach binary if we didn't extract text (i.e. it's a PDF/Image)
+${JSON.stringify(schema, null, 2)}
+
+Note: Since this is an image/PDF, extract all visible text carefully.
+Capture 'Academic Projects' or 'Key Projects' under the 'projects' array.
+Return ONLY the JSON object, no explanation.`;
+
+    // For PDF/Images, we need OCR - DeepSeek can't process images directly
+    // In production, you'd use an OCR service first, then pass text to DeepSeek
     if (!isWord || !extractedText) {
-      parts.push({ inlineData: { mimeType: safeMime, data: safeData } });
+      throw new Error('PDF and Image resume parsing requires OCR preprocessing. Please convert to text first or use Word documents.');
     }
 
-    const result = await model.generateContent(parts);
-
-    const response = await result.response;
-    let jsonText = response.text().trim();
-
-    // Clean markdown code blocks
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    }
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```/, '').replace(/```$/, '').trim();
-    }
+    const response = await ollamaService.generateWithDeepSeek(prompt, true);
 
     try {
-      return JSON.parse(jsonText);
+      return ollamaService.parseJsonResponse(response);
     } catch (err) {
-      // Try to extract JSON from response
-      const fallback = jsonText.match(/\{[\s\S]*\}/);
-      if (fallback) {
-        return JSON.parse(fallback[0]);
-      }
-      throw new Error('Failed to parse resume JSON from AI response');
+      console.error('[AIService] Failed to parse resume JSON:', err);
+      throw new Error('Failed to parse resume data from AI response');
     }
   }
 
-
   /**
    * Screen resume against job description
+   * Uses: DeepSeek-R1 Distill 7B (deterministic reasoning)
    */
   async screenResume(resumeText: string, jobDescription: string): Promise<ResumeScreeningResult> {
-    this.initialize();
+    await this.initialize();
 
-    if (!this.genAI) {
-      throw new Error('AI Service not initialized');
-    }
+    const prompt = `You are an expert HR screening AI. Analyze how well this resume matches the job description.
 
-    const prompt = `Match resume to job:\n\nResume:${resumeText}\n\nJob:${jobDescription}\n\nProvide JSON with: matchScore (0-100), summary, experience[], skills[], education[]`;
+Job Description:
+${jobDescription}
 
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp'
-    });
+Resume:
+${resumeText}
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let jsonText = response.text().trim();
+Provide a detailed screening analysis in JSON format:
+{
+  "matchScore": <number 0-100>,
+  "summary": "<brief summary of candidate fit>",
+  "experience": ["<relevant experience point 1>", "<relevant experience point 2>"],
+  "skills": ["<matching skill 1>", "<matching skill 2>"],
+  "education": ["<education detail 1>", "<education detail 2>"]
+}
 
-    // Clean markdown
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    }
+Return ONLY the JSON object.`;
 
-    return JSON.parse(jsonText);
+    const response = await ollamaService.generateWithDeepSeek(prompt, true);
+    return ollamaService.parseJsonResponse(response);
   }
 
   /**
    * Score interview response
+   * Uses: Gemma 2 9B Instruct (conversational evaluation)
    */
   async scoreResponse(question: string, response: string): Promise<InterviewScore> {
-    this.initialize();
+    await this.initialize();
 
-    if (!this.genAI) {
-      throw new Error('AI Service not initialized');
-    }
+    const prompt = `You are an expert interview evaluator. Analyze this candidate's response to an interview question.
 
-    const prompt = `Based on the interview question: "${question}", analyze the candidate's response: "${response}". Provide JSON with: score (1-10), feedback (string)`;
+Question: "${question}"
 
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp'
-    });
+Candidate's Response: "${response}"
 
-    const result = await model.generateContent(prompt);
-    const response_text = (await result.response).text().trim();
+Evaluate the response quality, relevance, clarity, and depth. Provide:
+{
+  "score": <number 1-10>,
+  "feedback": "<constructive feedback about the response>"
+}
 
-    let jsonText = response_text;
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    }
+Return ONLY the JSON object.`;
 
-    return JSON.parse(jsonText);
+    const gemmaResponse = await ollamaService.generateWithGemma(prompt, true);
+    return ollamaService.parseJsonResponse(gemmaResponse);
   }
 
   /**
    * Generate interview summary from transcript
+   * Uses: Gemma 2 9B Instruct
    */
   async generateInterviewSummary(transcript: string): Promise<string> {
-    this.initialize();
+    await this.initialize();
 
-    if (!this.genAI) {
-      throw new Error('AI Service not initialized');
-    }
+    const prompt = `You are an expert HR analyst. Summarize this interview transcript in 2-3 professional paragraphs.
 
-    const prompt = `Summarize this interview transcript in 2-3 paragraphs:\n\n${transcript}`;
+Interview Transcript:
+${transcript}
 
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp'
-    });
+Provide a concise summary highlighting:
+- Key points discussed
+- Candidate's strengths
+- Areas of concern (if any)
+- Overall impression
 
-    const result = await model.generateContent(prompt);
-    return (await result.response).text();
+Return only the summary text, no JSON.`;
+
+    return await ollamaService.generateWithGemma(prompt, false);
   }
 
   /**
    * Analyze video content
+   * Note: Ollama models don't support video. This would require a different service.
    */
   async analyzeVideo(
     videoBase64: string,
     mimeType: string,
     analysisPrompt: string
   ): Promise<string> {
-    this.initialize();
-
-    if (!this.genAI) {
-      throw new Error('AI Service not initialized');
-    }
-
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp'
-    });
-
-    const result = await model.generateContent([
-      { text: analysisPrompt },
-      { inlineData: { mimeType, data: videoBase64 } }
-    ]);
-
-    return (await result.response).text();
-  }
-
-  /**
-   * Generate speech audio (Text-to-Speech)
-   */
-  async generateSpeech(text: string, voice: VoiceName = 'Puck'): Promise<string> {
-    this.initialize();
-
-    if (!this.genAI) {
-      throw new Error('AI Service not initialized');
-    }
-
-    // Note: This requires gemini-2.5-flash-preview-tts model
-    // Fallback to text if TTS not available
-    throw new Error('TTS not implemented - use Gemini Live for audio');
+    throw new Error('Video analysis not supported with Ollama. Consider using a vision-capable API or frame extraction + image analysis.');
   }
 
   /**
    * Generate JSON content with structured schema
+   * Uses: DeepSeek-R1 for structured outputs
    */
   async generateJsonContent(prompt: string, expectedFields: string[]): Promise<any> {
-    this.initialize();
+    await this.initialize();
 
-    if (!this.genAI) {
-      throw new Error('AI Service not initialized');
-    }
+    const enhancedPrompt = `${prompt}
 
-    const enhancedPrompt = `${prompt}\n\nRespond with ONLY valid JSON containing these fields: ${expectedFields.join(', ')}`;
+Return a JSON object containing these fields: ${expectedFields.join(', ')}
 
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp'
-    });
+Return ONLY valid JSON, no explanation.`;
 
-    const result = await model.generateContent(enhancedPrompt);
-    let jsonText = (await result.response).text().trim();
-
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    }
-
-    return JSON.parse(jsonText);
+    const response = await ollamaService.generateWithDeepSeek(enhancedPrompt, true);
+    return ollamaService.parseJsonResponse(response);
   }
 
   /**
    * Start screening session
+   * Uses: Gemma 2 9B Instruct (conversational)
    */
   async startScreening(resumeText: string, candidateName: string): Promise<{ greeting: string; firstQuestion: string }> {
-    this.initialize();
-    if (!this.genAI) throw new Error('AI Service not initialized');
+    await this.initialize();
 
-    const prompt = `You are an AI recruiter named 'Yal'. You are screening a candidate named ${candidateName}.
-    Their resume content is: "${resumeText.substring(0, 3000)}..."
-    
-    Generate a professional but friendly greeting and the FIRST screening question to verify their background.
-    Return JSON: { "greeting": "...", "firstQuestion": "..." }`;
+    const prompt = `You are an AI recruiter named 'Yal' at YalOffice. You are conducting an initial screening call with a candidate named ${candidateName}.
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-    const result = await model.generateContent(prompt);
-    let jsonText = (await result.response).text().trim();
+Their resume summary:
+"${resumeText.substring(0, 3000)}..."
 
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    }
+Generate a professional but friendly greeting and the FIRST screening question to verify their background and interest.
 
-    return JSON.parse(jsonText);
+Return JSON:
+{
+  "greeting": "<warm greeting with your name and company>",
+  "firstQuestion": "<first screening question about their background>"
+}
+
+Return ONLY the JSON object.`;
+
+    const response = await ollamaService.generateWithGemma(prompt, true);
+    return ollamaService.parseJsonResponse(response);
   }
 
   /**
    * Chat screening
+   * Uses: Gemma 2 9B Instruct
    */
   async chatScreening(history: { role: string; content: string }[], userResponse: string): Promise<{ aiResponse: string; isComplete: boolean }> {
-    this.initialize();
-    if (!this.genAI) throw new Error('AI Service not initialized');
+    await this.initialize();
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    // Convert history to Ollama format
+    const ollamaMessages = history
+      .filter(h => h.content && h.content.trim())
+      .map(h => ({
+        role: h.role === 'ai' ? 'assistant' as const : 'user' as const,
+        content: h.content
+      }));
 
-    // Validate and Clean History
-    // 1. Map to internal format
-    // 2. Filter empty content (prevents "required oneof field 'data'" error)
-    // 3. Merge consecutive same-role messages (Google GenAI requires alternating roles)
+    // Add system context at the beginning
+    const messages = [
+      {
+        role: 'system' as const,
+        content: 'You are Yal, an AI recruiter conducting a screening interview. Ask 3-4 relevant questions about the candidate\'s experience, skills, and motivation. After sufficient questions, politely conclude and set isComplete to true.'
+      },
+      ...ollamaMessages,
+      {
+        role: 'user' as const,
+        content: `Candidate's response: "${userResponse}"
 
-    const cleanHistory: Array<{ role: string, parts: [{ text: string }] }> = [];
+If this answers the previous question, acknowledge it and ask the next relevant question.
+If you have asked 3-4 questions already, thank them and conclude the screening.
 
-    // Add initial user message if needed (will be handled by merge logic if user provides history starting with user)
-    // Actually, let's process the input history first.
+Return JSON:
+{
+  "aiResponse": "<your response or next question>",
+  "isComplete": <true if screening is complete, false otherwise>
+}
 
-    for (const h of history) {
-      const content = (h.content || '').trim();
-      if (!content) continue; // Skip empty messages
-
-      const role = h.role === 'ai' ? 'model' : 'user';
-      const lastMsg = cleanHistory[cleanHistory.length - 1];
-
-      if (lastMsg && lastMsg.role === role) {
-        // Merge with previous message to enforce alternating roles
-        lastMsg.parts[0].text += `\n\n${content}`;
-      } else {
-        cleanHistory.push({
-          role,
-          parts: [{ text: content }]
-        });
+Return ONLY the JSON object.`
       }
-    }
+    ];
 
-    // Ensure history starts with user for Gemini
-    if (cleanHistory.length === 0 || cleanHistory[0].role === 'model') {
-      const introText = 'Hello, I am ready for the screening.';
-      if (cleanHistory.length > 0 && cleanHistory[0].role === 'model') {
-        // If first is model, prepend user
-        cleanHistory.unshift({
-          role: 'user',
-          parts: [{ text: introText }]
-        });
-      } else {
-        // If empty
-        cleanHistory.push({
-          role: 'user',
-          parts: [{ text: introText }]
-        });
-      }
-    }
-
-    console.log(`[AIService] Chat Screening History: ${cleanHistory.length} turns`);
-
-    const chat = model.startChat({
-      history: cleanHistory
-    });
-
-    const prompt = `User response: "${userResponse}".
-    If this answers the previous question, acknowledge it and ask the next relevant question based on the resume.
-    If the screening is complete (after 3-4 questions), say "Thank you for your time. We will review your profile." and set isComplete to true.
-    Return JSON: { "aiResponse": "...", "isComplete": boolean }`;
-
-    const result = await chat.sendMessage(prompt);
-    let jsonText = result.response.text().trim();
-
-    // Clean markdown
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```/, '').replace(/```$/, '').trim();
-    }
-
-    try {
-      return JSON.parse(jsonText);
-    } catch (err) {
-      console.warn("Failed to parse JSON from chat response, attempting fallback extraction or raw text usage.");
-
-      // Try to find JSON object in text
-      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          return JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          // Fallback to raw text
-        }
-      }
-
-      // Fallback: Treat entire text as response
-      return {
-        aiResponse: jsonText,
-        isComplete: false
-      };
-    }
+    const response = await ollamaService.chatWithGemma(messages, true);
+    return ollamaService.parseJsonResponse(response);
   }
 
   /**
    * Process resume through AI conversation and generate initial screening assessment
-   * This is called automatically after resume upload
+   * Uses: Gemma 2 9B Instruct
    */
   async processResumeScreening(resumeData: any, candidateName: string, candidateEmail: string, jobTitle?: string, jobId?: number): Promise<{
     score: number;
@@ -530,56 +415,44 @@ class AIService {
     skillsAnalysis: any;
     transcript: string;
   }> {
-    this.initialize();
-    if (!this.genAI) throw new Error('AI Service not initialized');
+    await this.initialize();
 
-    // Convert resume data to text format
     const resumeText = this.formatResumeAsText(resumeData);
 
-    const prompt = `You are an AI recruiter screening a candidate named ${candidateName} for the position: ${jobTitle || 'General Application'}.
+    const prompt = `You are an AI recruiter conducting an initial resume screening for ${candidateName} applying for: ${jobTitle || 'General Application'}.
 
 Resume Details:
 ${resumeText}
 
-Conduct a thorough screening conversation by asking 4-5 relevant questions about:
-1. Their experience and skills
-2. Their motivation and interest
-3. Key achievements from their resume
-4. Any gaps or areas that need clarification
+Conduct a thorough analysis and provide a comprehensive assessment.
 
-After the conversation, provide a comprehensive assessment.
+Return JSON with:
+{
+  "score": <Overall score 0-100>,
+  "summary": "<Executive summary of candidate fit>",
+  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "weaknesses": ["<concern 1>", "<concern 2>"],
+  "skillsAnalysis": {
+    "technical": ["<technical skill 1>", "<technical skill 2>"],
+    "soft": ["<soft skill 1>", "<soft skill 2>"],
+    "experienceLevel": "<entry/mid/senior>"
+  },
+  "transcript": "<Simulated brief conversation or notes from screening>"
+}
 
-Return a JSON object with:
-- score: Overall score (0-100) based on resume and conversation
-- summary: Executive summary of the candidate's fit
-- strengths: Array of key strengths (at least 3)
-- weaknesses: Array of areas for improvement or concerns (at least 2)
-- skillsAnalysis: Object with technical skills, soft skills, and experience level
-- transcript: The full conversation transcript
+Return ONLY the JSON object.`;
 
-Generate the conversation as if you had a chat with them, then provide the assessment.
-Return JSON only.`;
+    const response = await ollamaService.generateWithGemma(prompt, true);
+    const assessment = ollamaService.parseJsonResponse(response);
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-    const result = await model.generateContent(prompt);
-    let jsonText = (await result.response).text().trim();
-
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```/, '').replace(/```$/, '').trim();
-    }
-
-    const assessment = JSON.parse(jsonText);
-
-    // Ensure required fields exist
+    // Ensure required fields exist with fallbacks
     return {
       score: assessment.score || 70,
       summary: assessment.summary || 'Initial screening completed based on resume review.',
       strengths: Array.isArray(assessment.strengths) ? assessment.strengths : ['Strong background', 'Relevant experience'],
       weaknesses: Array.isArray(assessment.weaknesses) ? assessment.weaknesses : ['Needs further evaluation'],
-      skillsAnalysis: assessment.skillsAnalysis || { technical: [], soft: [], experience: 'mid-level' },
-      transcript: assessment.transcript || `AI Screening Conversation with ${candidateName}:\n\nResume reviewed and initial assessment completed.`
+      skillsAnalysis: assessment.skillsAnalysis || { technical: [], soft: [], experienceLevel: 'mid-level' },
+      transcript: assessment.transcript || `AI Screening Assessment for ${candidateName}:\n\nResume reviewed and initial assessment completed.`
     };
   }
 
@@ -647,51 +520,43 @@ Return JSON only.`;
 
   /**
    * Generate screening report
+   * Uses: Gemma 2 9B Instruct
    */
   async generateScreeningReport(transcript: string, candidateName: string): Promise<any> {
-    this.initialize();
-    if (!this.genAI) throw new Error('AI Service not initialized');
+    await this.initialize();
 
-    const prompt = `Generate a screening report for candidate ${candidateName} based on this screening session transcript:
-    
-    "${transcript}"
-    
-    Provide a JSON object with:
-    - summary: Executive summary of the candidate's fit.
-    - skillsAssessment: Analysis of technical and soft skills mentioned.
-    - keyStrengths: List of key strengths.
-    - areasForImprovement: List of potential concerns.
-    - recommendation: "Proceed to Interview" or "Do Not Proceed" (with reasoning).
-    - score: Overall score (0-100).
-    
-    Return JSON only.`;
+    const prompt = `Generate a comprehensive screening report for candidate ${candidateName} based on this screening session transcript:
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-    const result = await model.generateContent(prompt);
-    let jsonText = (await result.response).text().trim();
+"${transcript}"
 
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
-    }
+Provide JSON:
+{
+  "summary": "<Executive summary of candidate fit>",
+  "skillsAssessment": "<Analysis of technical and soft skills>",
+  "keyStrengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "areasForImprovement": ["<concern 1>", "<concern 2>"],
+  "recommendation": "<Proceed to Interview / Do Not Proceed> (with brief reasoning)",
+  "score": <Overall score 0-100>
+}
 
-    return JSON.parse(jsonText);
+Return ONLY the JSON object.`;
+
+    const response = await ollamaService.generateWithGemma(prompt, true);
+    return ollamaService.parseJsonResponse(response);
   }
 
   /**
    * Generate generic text content
+   * Uses: Gemma 2 9B Instruct for general text, DeepSeek for structured/reasoning tasks
    */
-  async generateText(prompt: string, useThinkingMode: boolean = false): Promise<string> {
-    this.initialize();
-    if (!this.genAI) throw new Error('AI Service not initialized');
+  async generateText(prompt: string, useDeepSeek: boolean = false): Promise<string> {
+    await this.initialize();
 
-    // Use a model suitable for text generation. 
-    // Thinking mode could select a different model if available, but for now we default to the standard.
-    const model = this.genAI.getGenerativeModel({
-      model: useThinkingMode ? 'gemini-2.0-flash-thinking-exp-01-21' : 'gemini-2.0-flash-exp'
-    });
-
-    const result = await model.generateContent(prompt);
-    return (await result.response).text();
+    if (useDeepSeek) {
+      return await ollamaService.generateWithDeepSeek(prompt, false);
+    } else {
+      return await ollamaService.generateWithGemma(prompt, false);
+    }
   }
 }
 

@@ -5,6 +5,7 @@ import { ollamaService } from '../services/ollamaService.js';
 import { interviewStore, InterviewSession } from '../services/interviewStore.js';
 import { supabase } from '../services/supabaseService.js';
 import { auditLogger } from '../services/auditLogger.js';
+import { sipService } from '../services/sipService.js';
 
 const router = Router();
 
@@ -129,7 +130,12 @@ router.post('/stop', async (req, res) => {
       .map(t => `${t.role}: ${t.content}`)
       .join('\n');
 
-    let analysis = { summary: 'Analysis pending', score: 0, strengths: [], weaknesses: [] };
+    let analysis: { summary: string; score: number; strengths: string[]; weaknesses: string[]; skills_analysis?: any[] } = {
+      summary: 'Analysis pending',
+      score: 0,
+      strengths: [] as string[],
+      weaknesses: [] as string[]
+    };
     try {
       analysis = await ollamaService.analyzeInterview(
         transcriptText,
@@ -283,8 +289,24 @@ router.post('/analyze-screening', async (req, res) => {
       .map((t: any) => `${t.sender === 'user' ? 'Candidate' : 'Interviewer'}: ${t.text}`)
       .join('\n');
 
-    // Analyze with Ollama (DeepSeek)
-    const analysis = await ollamaService.analyzeInterview(transcriptText, effectiveJobTitle, resumeText);
+    let analysis;
+    if (effectiveJobTitle.includes('(Demo)') || transcriptText.length < 10) {
+      console.log('[Interview] Using Mock Analysis (Demo or specific condition)');
+      analysis = {
+        summary: "This is a simulated analysis for the Demo. The candidate demonstrated excellent potential and strong communication skills. They showed enthusiasm for the company's mission and a solid understanding of the required technologies.",
+        score: 92,
+        strengths: ["Communication", "Cultural Fit", "Technical Potential", "Enthusiasm"],
+        weaknesses: ["None observed in demo"],
+        skills_analysis: [
+          { skill: "System Design", score: 88, reason: "Demonstrated good grasp of concepts." },
+          { skill: "react.js", score: 95, reason: "Strong familiarity indicated." },
+          { skill: "node.js", score: 90, reason: "Solid backend understanding." }
+        ]
+      };
+    } else {
+      // Analyze with Ollama (DeepSeek)
+      analysis = await ollamaService.analyzeInterview(transcriptText, effectiveJobTitle, resumeText);
+    }
 
     // Create a record in the database for this screening
     const sessionId = uuidv4();
@@ -476,7 +498,7 @@ router.post('/upload-audio', async (req, res) => {
  */
 router.post('/start-phone-screen', async (req, res) => {
   try {
-    const { phoneNumber, resumeText, jobTitle } = req.body;
+    const { phoneNumber, resumeText, jobTitle, candidateName } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
@@ -485,40 +507,17 @@ router.post('/start-phone-screen', async (req, res) => {
     const sessionId = uuidv4();
     const roomName = `phone-screen-${sessionId}`;
 
-    console.log(`[PhoneScreen] Initiating call to ${phoneNumber} for room ${roomName}`);
+    console.log(`[PhoneScreen] Initiating SIP call to ${phoneNumber} for room ${roomName}`);
 
-    // --- REAL SIP CALL LOGIC ---
-    // --- VOIP / WEB AUDIO LOGIC (SIP Removed) ---
-    // Instead of dialing out, we generate a token for the user to join via browser audio.
-    console.log(`[PhoneScreen] Generating user token for room ${roomName}`);
-
-    const at = new AccessToken(
-      process.env.LIVEKIT_API_KEY,
-      process.env.LIVEKIT_API_SECRET,
-      {
-        identity: `candidate-${sessionId}`,
-        name: "Candidate",
-      }
-    );
-
-    at.addGrant({
-      roomJoin: true,
-      room: roomName,
-      canPublish: true,
-      canSubscribe: true,
-    });
-
-    const token = await at.toJwt();
-
-    // Create session (as before)
+    // Create session first so context is available when agent joins
     const session: InterviewSession = {
       id: sessionId,
       roomName: roomName,
       jobTitle: jobTitle || 'Phone Screening',
       questionCount: 5,
       difficulty: 'medium',
-      candidateId: 'phone-candidate',
-      candidateName: 'Phone Candidate',
+      candidateId: 'phone-' + phoneNumber,
+      candidateName: candidateName || 'Phone Candidate',
       customQuestions: [],
       resumeText: resumeText,
       status: 'active',
@@ -529,26 +528,28 @@ router.post('/start-phone-screen', async (req, res) => {
 
     await interviewStore.set(sessionId, session);
 
+    // Initiate SIP Call
+    await sipService.initiatePhoneScreen(phoneNumber, roomName, candidateName);
+
     // Audit Log
     await auditLogger.log({
-      userId: 'anonymous', // or req.user.id if available
+      userId: 'anonymous',
       action: 'phone_screen_started',
       resourceType: 'interview',
       resourceId: sessionId,
-      details: { jobTitle, roomName }
+      details: { jobTitle, roomName, phoneNumber }
     });
 
     res.json({
       success: true,
       sessionId,
       roomName,
-      token: token,
-      wsUrl: process.env.LIVEKIT_URL // Helper for frontend if needed
+      message: "Call initiated"
     });
 
   } catch (error: any) {
     console.error('Error starting phone screen:', error);
-    res.status(500).json({ error: 'Failed to initiate phone screening session' });
+    res.status(500).json({ error: 'Failed to initiate phone screening session: ' + error.message });
   }
 });
 

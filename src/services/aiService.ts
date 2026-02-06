@@ -408,8 +408,11 @@ async function finalizeScreening(transcript: string, candidateName: string, user
 /**
  * Start Phone Screening Call
  */
-async function startPhoneScreening(phoneNumber: string, resumeText: string, jobTitle?: string): Promise<{ success: boolean; sessionId: string; status: string; token?: string; roomName?: string; wsUrl?: string }> {
-    return requestBackend('interview/start-phone-screen', { phoneNumber, resumeText, jobTitle });
+async function startPhoneScreening(phoneNumber: string, resumeText: string, jobTitle?: string): Promise<{ success: boolean; sessionId: string; status: string; token?: string; roomName?: string; wsUrl?: string; message?: string; error?: string }> {
+    const { data: response, error } = await api.post('/interview/start-phone-screen', { phoneNumber, resumeText, jobTitle });
+
+    if (error) throw error;
+    return response;
 }
 
 /**
