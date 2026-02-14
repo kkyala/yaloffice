@@ -11,15 +11,19 @@ interface EmailAttachment {
 class EmailService {
     private transporter: nodemailer.Transporter;
     private fromEmail: string;
+    private emailEnabled: boolean;
 
     constructor() {
+        // Check if email functionality is enabled
+        this.emailEnabled = process.env.EMAIL_ENABLED === 'true';
+
         // If SMTP settings are provided, use them. Otherwise, log to console (dev mode).
         const smtpHost = process.env.SMTP_HOST;
         const smtpUser = process.env.SMTP_USER;
 
-        console.log(`[EmailService] Initializing. SMTP_HOST present: ${!!smtpHost}, SMTP_USER present: ${!!smtpUser}`);
+        console.log(`[EmailService] Initializing. EMAIL_ENABLED: ${this.emailEnabled}, SMTP_HOST present: ${!!smtpHost}, SMTP_USER present: ${!!smtpUser}`);
 
-        if (smtpHost && smtpUser && process.env.SMTP_PASS) {
+        if (this.emailEnabled && smtpHost && smtpUser && process.env.SMTP_PASS) {
             this.transporter = nodemailer.createTransport({
                 host: smtpHost,
                 port: Number(process.env.SMTP_PORT) || 587,
@@ -47,13 +51,34 @@ class EmailService {
                 }
             } as any;
             this.fromEmail = '"Yāl Office (Dev)" <noreply@yaloffice.test>';
-            console.warn('[EmailService] SMTP credentials not found (HOST/USER/PASS). Using Mock Transporter.');
+            if (!this.emailEnabled) {
+                console.warn('[EmailService] EMAIL_ENABLED is false. All emails will be logged to console only.');
+            } else {
+                console.warn('[EmailService] SMTP credentials not found (HOST/USER/PASS). Using Mock Transporter.');
+            }
         }
     }
 
     private async sendEmail(to: string, subject: string, html: string, attachments: EmailAttachment[] = []): Promise<boolean> {
         try {
             if (!to) return false;
+
+            // If email is disabled, log to console and return success
+            if (!this.emailEnabled) {
+                console.log('═══════════════════════════════════════════════════════');
+                console.log('[EmailService] EMAIL DISABLED - Would have sent email:');
+                console.log(`  To: ${to}`);
+                console.log(`  Subject: ${subject}`);
+                console.log(`  From: ${this.fromEmail}`);
+                console.log(`  Body (preview): ${html.substring(0, 150)}...`);
+                if (attachments && attachments.length > 0) {
+                    console.log(`  Attachments: ${attachments.length}`);
+                    attachments.forEach(att => console.log(`    - ${att.filename}`));
+                }
+                console.log('═══════════════════════════════════════════════════════');
+                return true; // Return true to indicate "successful" no-op
+            }
+
             const info = await this.transporter.sendMail({
                 from: this.fromEmail,
                 to,

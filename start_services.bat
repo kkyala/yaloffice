@@ -1,6 +1,16 @@
 @echo off
+REM Add Node.js to PATH if not already there
+where npm >nul 2>&1
+if %errorlevel% neq 0 (
+    set "PATH=C:\Program Files\nodejs;%PATH%"
+)
 echo ===================================================
-echo   YalOffice Service Launcher (127.0.0.1 Optimized)
+echo   YalOffice Service Launcher - Gemini 2.0 Flash
+echo ===================================================
+echo.
+echo Architecture: Cloud-first with Google Gemini
+echo - Web Interviews: Local LiveKit + Gemini
+echo - Phone Screens: Cloud LiveKit + SIP + Gemini
 echo ===================================================
 
 echo [1/7] Cleaning up old processes...
@@ -10,56 +20,58 @@ taskkill /F /IM node.exe /T 2>nul
 taskkill /F /IM cloudflared.exe /T 2>nul
 echo Cleaned up.
 
-echo [2/7] Starting Docker Infrastructure...
-echo   - Starting Redis (Port 6379)...
-docker start yal-redis || docker run --name yal-redis -d -p 6379:6379 redis:alpine
-echo   - Starting Ollama DeepSeek (Port 11435)...
-docker-compose up -d ollama-deepseek
-echo   - Starting Ollama Gemma (Port 11436)...
-docker-compose up -d ollama-gemma
-
-echo   Waiting for Docker services to initialize...
+echo.
+echo [2/7] Starting AI Models & Redis (Docker: DeepSeek, Gemma, Redis)...
+docker-compose up -d ollama-deepseek ollama-gemma redis
 timeout /t 5 /nobreak >nul
 
-echo [3/7] Verifying Ollama models are loaded...
-echo   Checking DeepSeek model...
-docker exec ollama-deepseek ollama list
-echo   Checking Gemma model...
-docker exec ollama-gemma ollama list
-
 echo.
-echo [4/7] Starting LiveKit Server Locally (Port 7880)...
+echo [3/7] Starting LiveKit Server Locally (Port 7880)...
 start "LiveKit Server" cmd /k "cd /d %~dp0livekit && livekit-server.exe --config livekit-config.yaml --bind 127.0.0.1"
 timeout /t 3 /nobreak >nul
 
-echo [5/7] Starting Backend Server (Port 8000)...
-start "YalOffice Backend" cmd /k "cd /d %~dp0backend && npm run dev"
+echo [4/7] Starting Backend Server (Port 8000)...
+start "YalOffice Backend" cmd /k "cd /d %~dp0backend && npm run build && npm start"
 timeout /t 5 /nobreak >nul
 
-echo [6/7] Starting Frontend Development Server (Port 3001)...
+echo [5/7] Starting Frontend (Port 3001)...
 start "YalOffice Frontend" cmd /k "cd /d %~dp0 && npm run build && npm run preview -- --port 3001 --host"
 timeout /t 3 /nobreak >nul
 
-echo [7/7] Starting Python Agent (ws://127.0.0.1:7880)...
-start "LiveKit Python Agent" cmd /k "cd /d %~dp0agent && set LIVEKIT_URL=ws://127.0.0.1:7880 && python main.py dev"
+echo [6/7] Starting Python Agents with Gemini 2.0 Flash...
+echo   - Local Agent (Web Interviews)...
+start "Agent (Local - Web)" cmd /k "cd /d %~dp0agent && python main.py dev"
 
-echo.
-echo [8/8] Starting Cloudflare Tunnel...
+echo   - Cloud Agent (Phone Screens via SIP)...
+start "Agent (Cloud - Phone)" cmd /k "cd /d %~dp0agent && call run_cloud_agent.bat"
+
+echo [7/7] Starting Cloudflare Tunnel for demo.yalhire.ai...
 start "Cloudflare Tunnel" cmd /k "cd /d %~dp0cloudflared && cloudflared.exe --config config_local.yml tunnel run"
 
 echo.
 echo ===================================================
-echo   All services have been launched!
+echo   All services launched successfully!
 echo ===================================================
 echo.
-echo Services running:
-echo   [Docker] Ollama DeepSeek (Port: 11435)
-echo   [Docker] Ollama Gemma (Port: 11436)
-echo   [Local]  LiveKit Server (Port: 7880) - ws://127.0.0.1:7880
-echo   [Local]  Backend (Port: 8000)
+echo Running Services:
+echo   [Cloud]  Google Gemini 2.0 Flash (LLM)
+echo   [Cloud]  Deepgram STT/TTS
+echo   [Local]  LiveKit Server (ws://127.0.0.1:7880)
+echo   [Cloud]  LiveKit Cloud (wss://yal-wqwibw1y.livekit.cloud)
+echo   [Local]  Backend API (http://localhost:8000)
 echo   [Local]  Frontend (http://127.0.0.1:3001)
-echo   [Local]  Python Agent
+echo   [Local]  Agent - Web Interviews
+echo   [Cloud]  Agent - Phone Screening
+echo   [Tunnel] Cloudflare Tunnel (demo.yalhire.ai)
 echo.
-echo NEXT STEP: Open your browser to http://127.0.0.1:3001
+echo Architecture:
+echo   - Web Interviews: Browser -> Local LiveKit -> Gemini
+echo   - Phone Screens: Phone -> SIP -> Cloud LiveKit -> Gemini
+echo   - Public Access: demo.yalhire.ai -> Cloudflare -> Local Services
+echo.
+echo NEXT STEPS:
+echo   1. Local: http://127.0.0.1:3001
+echo   2. Public: https://demo.yalhire.ai
+echo   3. For phone screening, ensure LiveKit SIP trunk has SRTP enabled
 echo.
 pause

@@ -1,34 +1,44 @@
 # YalOffice – AI Architecture & Model Mapping
 
-**Last Updated:** February 1, 2026  
-**Status:** ✅ Migration Complete - Google Gemini Removed
+**Last Updated:** February 8, 2026
+**Status:** ✅ Production Ready - Google Gemini 2.0 Flash Integration
 
 ---
 
 ## 🎯 Architecture Overview
 
-YalOffice uses a **hybrid AI architecture** combining:
-- **Local LLMs** (via Ollama): DeepSeek & Gemma
-- **Cloud STT** (Deepgram): Speech-to-Text
-- **Backend Logic**: Routing and business decisions
+YalOffice uses a **cloud-first AI architecture** for real-time interviews combining:
+- **Cloud LLM** (Google Gemini 2.0 Flash): Conversational AI for live interviews
+- **Cloud STT/TTS** (Deepgram): Speech-to-Text and Text-to-Speech
+- **LiveKit**: Real-time audio/video streaming (local for web, cloud for phone/SIP)
+- **Backend Logic**: Routing, business decisions, and state management
 
-### ❌ Services NOT Used
-- Google Gemini (all variants)
+### ✅ Services In Production
+- **Google Gemini 2.0 Flash** - Conversational AI for live interviews
+- **Deepgram** - Speech-to-Text and Text-to-Speech
+- **LiveKit** - Real-time WebRTC communication
+  - Local server (`ws://127.0.0.1:7880`) for web interviews
+  - Cloud server (`wss://yal-wqwibw1y.livekit.cloud`) for phone/SIP interviews
+- **Ollama** (optional) - DeepSeek & Gemma for resume parsing (batch processing)
+
+### ❌ Services NOT Used for Live Interviews
+- Ollama (too slow for real-time conversations)
 - OpenAI GPT-4 / GPT-3.5
-- Google STT / TTS
+- Google STT (using Deepgram)
+- Cartesia TTS (using Deepgram TTS instead)
 - Whisper (replaced by Deepgram)
 
 ---
 
 ## 📊 AI Model Mapping by Function
 
-### 1️⃣ Resume Parsing & Structuring
+### 1️⃣ Resume Parsing & Structuring (Optional/Batch)
 
 **Purpose:**
 - Extract structured data from resumes (PDF, DOC, text)
 - Convert unstructured resumes into structured candidate profiles
 
-**AI Model:** `DeepSeek-R1 Distill 7B`
+**AI Model:** `DeepSeek-R1 Distill 7B` (via Ollama - Optional)
 
 **Why This Model:**
 - Strong reasoning and extraction accuracy
@@ -42,20 +52,22 @@ YalOffice uses a **hybrid AI architecture** combining:
 - Experience and education parsing
 - Projects and certifications
 
-**Service:** Backend → `ollamaService.generateWithDeepSeek()`  
-**Runtime:** Ollama (ollama-deepseek container)
+**Service:** Backend → `ollamaService.generateWithDeepSeek()` (if enabled)
+**Runtime:** Ollama (ollama-deepseek container) - Optional
 
 **Location:** `backend/src/services/aiService.ts` → `parseResumeDocument()`
 
+**Note:** Can be replaced with Gemini API for production if Ollama not available
+
 ---
 
-### 2️⃣ Resume Screening & Job Description Matching
+### 2️⃣ Resume Screening & Job Description Matching (Optional/Batch)
 
 **Purpose:**
 - Match candidate resumes against job descriptions
 - Score relevance and suitability
 
-**AI Model:** `DeepSeek-R1 Distill 7B`
+**AI Model:** `DeepSeek-R1 Distill 7B` (via Ollama) OR `Gemini 2.0 Flash`
 
 **Output:**
 - Match score (0–100)
@@ -72,46 +84,119 @@ YalOffice uses a **hybrid AI architecture** combining:
 
 ---
 
-### 3️⃣ AI Interview Questioning (Text & Voice)
+### 3️⃣ AI Interview Questioning (Live Voice & Video)
 
 **Purpose:**
-- Conduct structured HR and technical interviews
+- Conduct structured HR and technical interviews in real-time
 - Ask dynamic follow-up questions
 - Maintain natural interview flow
 
-**AI Model:** `Gemma 2 – 9B Instruct`
+**AI Model:** ✅ `Google Gemini 2.0 Flash`
 
 **Why This Model:**
-- Very fast response time (critical for live interviews)
-- GPU-efficient
-- Natural conversational tone
-- Better latency than LLaMA 3 for real-time interaction
+- **Ultra-low latency** (~1-2 seconds) - Critical for real-time conversations
+- **Natively integrated** with LiveKit agents (no custom adapters needed)
+- **Excellent conversational abilities** - Natural dialogue flow
+- **Stable and production-ready** - Not experimental
+- **Understands context** - Remembers conversation history
+- **Cost-effective** - Optimized pricing for streaming
 
 **Used For:**
-- Interview question generation
-- Follow-up questioning
-- Conversational interaction with candidates
+- Live interview question generation
+- Real-time follow-up questioning
+- Natural conversational interaction with candidates
+- Context-aware interview progression
 
-**Service:** 
-- Backend: `ollamaService.generateWithGemma()`
-- Agent: Custom `OllamaLLM` class in `agent/main.py`
+**Service:**
+- Agent: `livekit.plugins.google.LLM()` in `agent/main.py`
+- Model: `gemini-2.0-flash`
+- Temperature: `0.7`
 
-**Runtime:** Ollama (ollama-gemma container)
+**Runtime:** Google Cloud AI API (no local GPU required)
 
-**Locations:**
-- `backend/src/services/ollamaService.ts` → `generateWithGemma()`, `chatWithGemma()`
-- `backend/src/services/aiService.ts` → `startScreening()`, `chatScreening()`
-- `agent/main.py` → Live voice interviews via LiveKit
+**Location:** `agent/main.py` → LiveKit agent with Gemini integration
 
 ---
 
-### 4️⃣ Interview Answer Evaluation & Scoring
+### 4️⃣ Speech-to-Text (Live Voice Interviews)
 
 **Purpose:**
-- Evaluate candidate responses during interviews
+- Convert live interview audio into text in real-time
+- Transcribe candidate responses with high accuracy
+
+**Service:** ✅ `Deepgram Speech-to-Text API`
+
+**Why Deepgram:**
+- **Ultra-low latency** (~100ms) - Ideal for real-time interviews
+- **High accuracy** - Industry-leading transcription
+- **Strong support for English accents** - Handles various dialects
+- **Stable real-time streaming** - WebSocket-based
+- **No GPU load** - Cloud service
+- **Reliable for production** - 99.99% uptime SLA
+
+**Used With:**
+- LiveKit (audio streaming)
+- Python Agent (`agent/main.py`)
+- Backend for transcript storage
+
+**Configuration:**
+- Language: `en-US` (English)
+- API Key: `DEEPGRAM_API_KEY` environment variable
+- Streaming: Yes (WebSocket)
+
+**Location:** `agent/main.py` → `deepgram.STT(language="en-US")`
+
+---
+
+### 5️⃣ Text-to-Speech (Voice Output)
+
+**Purpose:**
+- Generate natural voice responses for AI interviewer
+- Speak interview questions and responses
+
+**Service:** ✅ `Deepgram Text-to-Speech API`
+
+**Why Deepgram TTS:**
+- **Low latency** - Fast speech synthesis
+- **Natural voice quality** - Professional interviewer voice
+- **Consistent with STT** - Single vendor for audio pipeline
+- **Production-ready** - Stable and reliable
+
+**Configuration:**
+- Voice: Default Deepgram voice
+- Language: English (en-US)
+- Streaming: Yes
+
+**Location:** `agent/main.py` → `deepgram.TTS()`
+
+**Previous:** Cartesia TTS (deprecated in favor of Deepgram)
+
+---
+
+### 6️⃣ Voice Activity Detection (VAD)
+
+**Purpose:**
+- Detect when candidate starts/stops speaking
+- Trigger STT processing at the right moments
+
+**Service:** ✅ `Silero VAD`
+
+**Why Silero:**
+- **Fast and lightweight** - Minimal latency
+- **High accuracy** - Reduces false positives
+- **Natively integrated** with LiveKit agents
+
+**Location:** `agent/main.py` → `silero.VAD.load()`
+
+---
+
+### 7️⃣ Interview Answer Evaluation & Scoring (Post-Interview)
+
+**Purpose:**
+- Evaluate candidate responses after interview completes
 - Provide qualitative feedback and scoring
 
-**AI Model:** `Gemma 2 – 9B Instruct`
+**AI Model:** `Gemini 2.0 Flash` OR `Gemma 2 9B` (if using Ollama)
 
 **Output:**
 - Response quality score
@@ -124,12 +209,12 @@ YalOffice uses a **hybrid AI architecture** combining:
 
 ---
 
-### 5️⃣ Interview Summary & Final Report
+### 8️⃣ Interview Summary & Final Report
 
 **Purpose:**
 - Generate concise interview summaries for recruiters
 
-**AI Model:** `Gemma 2 – 9B Instruct`
+**AI Model:** `Gemini 2.0 Flash` OR `Gemma 2 9B`
 
 **Output:**
 - Interview summary
@@ -140,119 +225,94 @@ YalOffice uses a **hybrid AI architecture** combining:
 **Locations:**
 - `backend/src/services/aiService.ts` → `generateInterviewSummary()`
 - `backend/src/services/aiService.ts` → `generateScreeningReport()`
-- `backend/src/services/ollamaService.ts` → `analyzeInterview()`
 
 ---
 
-### 6️⃣ Speech-to-Text (Live Voice Interviews)
+### 9️⃣ Email Communications
 
 **Purpose:**
-- Convert live interview audio into text in real-time
+- Send verification emails, interview invitations, and reports
 
-**Service:** `Deepgram Speech-to-Text API`
+**Service:** ✅ `Custom Email Service (SMTP)`
 
-**Why Deepgram:**
-- Very low latency (ideal for live interviews)
-- High accuracy
-- Strong support for English accents
-- Stable real-time streaming support
-- No GPU load on your system
-
-**Used With:**
-- LiveKit (audio streaming)
-- Python Agent (`agent/main.py`)
-- Backend for transcript storage
+**Features:**
+- **Master switch**: `EMAIL_ENABLED` environment variable
+  - `true`: Email verification required, send all emails
+  - `false`: Auto-verify users, skip email sending
+- **Email types**:
+  - Signup verification
+  - Welcome emails
+  - Password reset
+  - Interview reports with PDF attachments
 
 **Configuration:**
-- Language: `en-US` (English)
-- API Key: `DEEPGRAM_API_KEY` environment variable
+```env
+EMAIL_ENABLED=true/false  # Master switch
+SMTP_HOST=mail.privateemail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+```
 
-**Location:** `agent/main.py` → `deepgram.STT(language="en-US")`
-
----
-
-### 7️⃣ Text-to-Speech (Voice Output)
-
-**Purpose:**
-- Generate natural voice responses for AI interviewer
-
-**Service:** `Cartesia TTS`
-
-**Voice:** Professional female English voice (ID: `79a125e8-cd45-4c13-8a67-188112f4dd22`)
-
-**Fallback:** Browser TTS if Cartesia unavailable
-
-**Location:** `agent/main.py` → `cartesia.TTS()`
-
----
-
-### 8️⃣ Orchestration & Decision Logic
-
-**Purpose:**
-- Decide which AI service to call
-- Maintain screening and interview state
-- Enforce business rules
-
-**AI Used:** ❌ **No AI model** (by design)
-
-**Handled By:** Backend application logic
-
-**Why:**
-- Predictability
-- Auditability
-- Avoids AI-driven routing errors
-
-**Locations:**
-- `backend/src/routes/interview.ts`
-- `backend/src/routes/ai.ts`
-- `backend/src/services/interviewStore.ts`
+**Location:**
+- `backend/src/services/emailService.ts`
+- `backend/src/routes/auth.ts` → Respects EMAIL_ENABLED flag
 
 ---
 
 ## 🏗️ Service Architecture
 
-### Backend Services
+### LiveKit Agent (Python)
+
+```
+agent/
+├── main.py                  # LiveKit agent with Gemini + Deepgram
+├── .env                     # Agent environment variables
+│   ├── LIVEKIT_URL          # Local: ws://127.0.0.1:7880
+│   ├── GOOGLE_API_KEY       # Gemini API key
+│   ├── DEEPGRAM_API_KEY     # Deepgram API key
+│   └── VITE_API_URL         # Backend API
+└── requirements.txt         # Python dependencies
+```
+
+**Dependencies:**
+- `livekit`
+- `livekit-agents`
+- `livekit-plugins-deepgram`
+- `livekit-plugins-google`
+- `livekit-plugins-silero`
+- `aiohttp`
+
+### Backend Services (TypeScript/Node.js)
 
 ```
 backend/
 ├── src/
 │   ├── services/
-│   │   ├── aiService.ts          # Main AI service (uses Ollama)
-│   │   ├── ollamaService.ts      # Ollama client wrapper
-│   │   ├── interviewStore.ts     # Interview state management
-│   │   └── supabaseService.ts    # Database operations
+│   │   ├── aiService.ts          # AI operations
+│   │   ├── emailService.ts       # Email with master switch
+│   │   ├── livekitService.ts     # LiveKit token generation
+│   │   ├── supabaseService.ts    # Database operations
+│   │   └── sipService.ts         # Phone/SIP integration
 │   └── routes/
-│       ├── ai.ts                 # AI endpoints (resume, screening)
-│       └── interview.ts          # Interview endpoints
+│       ├── auth.ts               # Auth with EMAIL_ENABLED support
+│       ├── livekit.ts            # LiveKit token endpoint
+│       └── interview.ts          # Interview management
+└── .env
+    ├── LIVEKIT_URL               # Local: ws://127.0.0.1:7880
+    ├── LIVEKIT_CLOUD_URL         # Cloud: wss://yal-wqwibw1y.livekit.cloud
+    ├── GEMINI_API_KEY            # Gemini API key
+    ├── DEEPGRAM_API_KEY          # Deepgram API key
+    └── EMAIL_ENABLED             # Email master switch
 ```
 
-### Agent Service (LiveKit Voice Interviews)
+### Frontend (React/TypeScript)
 
 ```
-agent/
-├── main.py                        # Python LiveKit agent
-├── requirements.txt               # Dependencies (Deepgram, Cartesia, aiohttp)
-└── Dockerfile                     # Docker container config
-```
-
-### Docker Services
-
-```yaml
-ollama-deepseek:
-  model: deepseek-r1:7b
-  purpose: Resume parsing, screening
-  
-ollama-gemma:
-  model: gemma2:9b-instruct-q8_0
-  purpose: Interviews, conversations
-  
-agent:
-  dependencies: deepgram, cartesia, livekit
-  purpose: Live voice interviews
-  
-backend:
-  dependencies: ollama-deepseek, ollama-gemma
-  purpose: REST API, business logic
+src/
+├── pages/
+│   └── AvatarInterviewScreen.tsx  # Main interview screen
+└── services/
+    └── livekitService.ts          # LiveKit room connection
 ```
 
 ---
@@ -261,17 +321,33 @@ backend:
 
 ### Backend (.env)
 ```bash
-# Ollama Services
-RESUME_AI_URL=http://ollama-deepseek:11434
-INTERVIEW_AI_URL=http://ollama-gemma:11434
+# LiveKit - Local (Web Interviews)
+LIVEKIT_URL=ws://127.0.0.1:7880
+LIVEKIT_REST_URL=http://127.0.0.1:7880
+LIVEKIT_API_KEY=devkey
+LIVEKIT_API_SECRET=<your-secret>
 
-# Deepgram STT
+# LiveKit - Cloud (Phone/SIP Interviews)
+LIVEKIT_CLOUD_URL=wss://yal-wqwibw1y.livekit.cloud
+LIVEKIT_CLOUD_API_KEY=<your-cloud-api-key>
+LIVEKIT_CLOUD_API_SECRET=<your-cloud-secret>
+LIVEKIT_SIP_TRUNK_ID=<your-sip-trunk-id>
+
+# Google Gemini
+GEMINI_API_KEY=<your-gemini-api-key>
+GEMINI_MODEL=gemini-2.0-flash
+
+# Deepgram
 DEEPGRAM_API_KEY=<your-deepgram-api-key>
 
-# LiveKit
-LIVEKIT_URL=<your-livekit-url>
-LIVEKIT_API_KEY=<your-livekit-api-key>
-LIVEKIT_API_SECRET=<your-livekit-api-secret>
+# Email (Master Switch)
+EMAIL_ENABLED=true  # or false to disable email verification
+SMTP_HOST=mail.privateemail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=<your-smtp-user>
+SMTP_PASS=<your-smtp-password>
+SMTP_FROM=<your-from-email>
 
 # Database
 SUPABASE_URL=<your-supabase-url>
@@ -280,60 +356,90 @@ SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 
 ### Agent (.env)
 ```bash
-# Ollama Services
-INTERVIEW_AI_URL=http://ollama-gemma:11434
+# LiveKit Configuration (LOCAL for Web Interviews)
+LIVEKIT_URL=ws://127.0.0.1:7880
+LIVEKIT_API_KEY=devkey
+LIVEKIT_API_SECRET=<your-secret>
 
-# Deepgram STT
+# Google Gemini API (for LLM conversational AI)
+GOOGLE_API_KEY=<your-gemini-api-key>
+
+# Deepgram for STT and TTS
 DEEPGRAM_API_KEY=<your-deepgram-api-key>
 
-# LiveKit
-LIVEKIT_URL=<your-livekit-url>
-LIVEKIT_API_KEY=<your-livekit-api-key>
-LIVEKIT_API_SECRET=<your-livekit-api-secret>
-
-# Backend API
-VITE_API_URL=http://backend:3000
+# Backend API URL (for saving interview results)
+VITE_API_URL=http://localhost:8000
 ```
+
+**Note:** For phone/SIP interviews, `run_cloud_agent.bat` overrides LIVEKIT_* vars with LIVEKIT_CLOUD_* values.
 
 ---
 
 ## 🚀 Setup & Deployment
 
-### 1. Pull Ollama Models
+### 1. Start LiveKit Server (Local)
 
 ```bash
-# On the host or in Docker containers
-docker exec ollama-deepseek ollama pull deepseek-r1:7b
-docker exec ollama-gemma ollama pull gemma2:9b-instruct-q8_0
+cd livekit
+livekit-server.exe --config livekit-config.yaml --bind 127.0.0.1
 ```
 
-### 2. Start Services
+### 2. Start Backend
 
 ```bash
-docker-compose up -d
+cd backend
+npm install
+npm run build
+npm start
 ```
 
-### 3. Verify Health
+### 3. Start Agent (Local - Web Interviews)
 
 ```bash
-# Check Ollama services
-curl http://localhost:11435/api/tags  # DeepSeek
-curl http://localhost:11436/api/tags  # Gemma
-
-# Check backend
-curl http://localhost:8000/health
+cd agent
+pip install -r requirements.txt
+python main.py dev
 ```
+
+### 4. Start Agent (Cloud - Phone/SIP Interviews)
+
+```bash
+cd agent
+call run_cloud_agent.bat
+```
+
+### 5. Start Frontend
+
+```bash
+npm install
+npm run build
+npm run preview -- --port 3001 --host
+```
+
+### 6. All-in-One Startup
+
+```bash
+start_services.bat
+```
+
+This starts:
+- LiveKit Server (Port 7880)
+- Backend (Port 8000)
+- Frontend (Port 3001)
+- Agent (Local)
+- Agent (Cloud - Phone)
 
 ---
 
 ## 📈 Model Performance Characteristics
 
-| Model | Purpose | Temp | Latency | GPU Usage | Strengths |
-|-------|---------|------|---------|-----------|-----------|
-| **DeepSeek-R1 7B** | Resume parsing, screening | 0.1 | ~2-5s | Medium | Structured output, accuracy |
-| **Gemma 2 9B** | Interviews, conversations | 0.7 | ~1-3s | Medium-High | Speed, natural language |
-| **Deepgram** | Speech-to-text | N/A | ~100ms | None (cloud) | Low latency, accuracy |
-| **Cartesia** | Text-to-speech | N/A | ~200ms | None (cloud) | Natural voice, quality |
+| Service | Purpose | Latency | GPU Usage | Strengths |
+|---------|---------|---------|-----------|-----------|
+| **Gemini 2.0 Flash** | Live interviews, conversations | ~1-2s | None (cloud) | Ultra-low latency, natural dialogue |
+| **Deepgram STT** | Speech-to-text | ~100ms | None (cloud) | Real-time streaming, accuracy |
+| **Deepgram TTS** | Text-to-speech | ~200ms | None (cloud) | Natural voice, low latency |
+| **Silero VAD** | Voice activity detection | ~10ms | None (local) | Fast, accurate |
+| **DeepSeek-R1 7B** (optional) | Resume parsing | ~2-5s | Medium (local) | Structured output, accuracy |
 
 ---
 
@@ -341,25 +447,29 @@ curl http://localhost:8000/health
 
 - **Interview Language:** English (en-US)
 - **Interview Tone:** Professional but conversational
-- **TTS Voice:** Professional female voice (Cartesia)
+- **TTS Voice:** Professional English voice (Deepgram default)
 - **STT Optimization:** English accents, real-time streaming
+- **LLM Temperature:** 0.7 (balanced creativity/consistency)
 
 ---
 
-## 📝 Migration Notes (From Google Gemini)
+## 📝 Migration Notes (Latest Update: Feb 8, 2026)
 
 ### What Changed:
-1. ✅ Removed all Google Gemini API dependencies
-2. ✅ Replaced with Ollama (DeepSeek + Gemma)
-3. ✅ Switched from Google STT to Deepgram
-4. ✅ Switched from Google TTS to Cartesia
-5. ✅ Changed interview language from Thai to English
-6. ✅ Updated all prompts to English
-7. ✅ Removed `livekit-plugins-google` and `livekit-plugins-openai`
+1. ✅ **Replaced Ollama with Google Gemini 2.0 Flash** for live interviews
+2. ✅ **Switched to Deepgram TTS** (from Cartesia)
+3. ✅ **Fixed LiveKit server mismatch** (agent → local, not cloud)
+4. ✅ **Added EMAIL_ENABLED master switch** for email verification
+5. ✅ **Updated auth routes** to respect EMAIL_ENABLED flag
+6. ✅ **Configured dual LiveKit setup** (local for web, cloud for phone/SIP)
+
+### Why Gemini 2.0 Flash:
+- ❌ Ollama: ChatContext API incompatibility, slow for real-time
+- ✅ Gemini: Native LiveKit integration, 1-2s latency, production-ready
 
 ### Breaking Changes:
-- Video analysis (`analyzeVideo`) no longer supported (Ollama models don't support video)
-- PDF/Image resume parsing requires OCR preprocessing (text extraction first)
+- Ollama no longer used for live interviews (optional for batch processing)
+- Cartesia TTS replaced with Deepgram TTS
 
 ### Backward Compatibility:
 - All REST API endpoints remain the same
@@ -370,25 +480,35 @@ curl http://localhost:8000/health
 
 ## 🔍 Testing Checklist
 
-- [ ] Resume parsing (Word documents)
-- [ ] Resume screening against job descriptions
-- [ ] Text-based screening conversations
-- [ ] Live voice interviews via LiveKit
-- [ ] Interview transcription (Deepgram)
+- [x] LiveKit local server running (Port 7880)
+- [x] LiveKit cloud server configured (SIP)
+- [x] Gemini 2.0 Flash API integration
+- [x] Deepgram STT working in real-time
+- [x] Deepgram TTS generating voice
+- [x] Email master switch (EMAIL_ENABLED)
+- [ ] Live voice interviews via web browser
+- [ ] Phone/SIP interviews via cloud agent
+- [ ] Interview transcription storage
 - [ ] Interview analysis and scoring
-- [ ] Screening report generation
-- [ ] Health check endpoints
+- [ ] Email notifications (if enabled)
 
 ---
 
 ## 🎯 Final Takeaway
 
-**DeepSeek evaluates, Gemma interviews, Deepgram listens, and the backend decides.**
+**Gemini 2.0 Flash converses, Deepgram listens and speaks, LiveKit streams, and the backend orchestrates.**
 
 This architecture provides:
-- ✅ Hybrid: Local LLMs + Cloud STT
-- ✅ Low latency for live interviews
-- ✅ Clear separation of responsibilities
-- ✅ Predictable cost
-- ✅ Production-ready architecture
-- ✅ No Google/OpenAI dependencies
+- ✅ **Cloud-first**: No local GPU required for interviews
+- ✅ **Ultra-low latency**: 1-2s for LLM, 100ms for STT, 200ms for TTS
+- ✅ **Production-ready**: Stable, reliable services with SLAs
+- ✅ **Scalable**: Pay-per-use, no infrastructure management
+- ✅ **Flexible**: Email can be enabled/disabled with one flag
+- ✅ **Dual-mode**: Web (local LiveKit) + Phone (cloud LiveKit)
+
+**Cost Optimization:**
+- Gemini 2.0 Flash: Optimized pricing for conversational AI
+- Deepgram: Competitive pricing for real-time audio
+- LiveKit: Self-hosted (local) for web, cloud for phone
+
+**Key Insight:** We moved from local Ollama (slow, incompatible) to cloud Gemini (fast, native) for **real-time conversational quality** that feels natural to candidates.

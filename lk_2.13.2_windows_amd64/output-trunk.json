@@ -1,0 +1,11 @@
+{
+    "trunk": {
+        "name": "yalhire-outbound",
+        "address": "yalhire.pstn.twilio.com",
+        "numbers": [
+            "+14124447787"
+        ],
+        "authUsername": "yalhire",
+        "authPassword": "Yal@2026#12345"
+    }
+}

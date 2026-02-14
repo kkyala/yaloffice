@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { aiService } from '../services/aiService.js';
 import { auditLogger } from '../services/auditLogger.js';
 import { supabase } from '../services/supabaseService.js';
-import { sipService } from '../services/sipService.js';
+import { LiveKitManager } from '../services/livekit.js';
 
 const router = Router();
 // ... (existing code)
@@ -589,8 +589,9 @@ router.post('/interview/start-phone-screen', async (req: Request, res: Response)
 
     await interviewStore.set(sessionId, session);
 
-    // Initiate SIP Call
-    await sipService.initiatePhoneScreen(phoneNumber, roomName, candidateName);
+    // Initiate SIP Call via LiveKit Dispatch Rule (No Twilio needed!)
+    // Dispatch rule SDR_jPnaj3zBZbwP will automatically route to agent 'phone_yal_agent'
+    await LiveKitManager.createSIPParticipant(phoneNumber, roomName, candidateName);
 
     // Audit Log
     await auditLogger.log({
@@ -601,11 +602,26 @@ router.post('/interview/start-phone-screen', async (req: Request, res: Response)
       details: { jobTitle, roomName, phoneNumber }
     });
 
+    // START CHANGE: Generate Token for CLOUD environment (for frontend to listen)
+    // We create a token for a specialized "monitoring" identity or similar, 
+    // though the frontend mainly needs the URL and Room Name.
+    // Actually, usually frontend connects as a user. Let's create a viewer token.
+    const viewerIdentity = `viewer-${sessionId.substring(0, 8)}`;
+    const { token: viewerToken, url: viewerWsUrl } = await LiveKitManager.generateToken(
+      viewerIdentity,
+      roomName,
+      'cloud'
+    );
+    // END CHANGE
+
     res.json({
       success: true,
       sessionId,
       roomName,
-      message: "Call initiated"
+      message: "Call initiated",
+      // Include Cloud connection details for Frontend
+      token: viewerToken,
+      wsUrl: viewerWsUrl
     });
 
   } catch (error: any) {

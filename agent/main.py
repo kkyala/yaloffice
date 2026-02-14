@@ -6,27 +6,36 @@ import datetime
 from dotenv import load_dotenv
 
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
+from livekit import rtc
 from livekit.agents.voice import Agent, AgentSession
-from livekit.plugins import deepgram, silero
-from livekit.agents import llm as agents_llm
-from livekit.agents.llm import ChatContext, ChatRole, ChatChunk, ChoiceDelta
+from livekit.plugins import deepgram, silero, google
+from livekit.agents.llm import ChatRole
 
-# Compatibility shim for LiveKit Agents 1.3.x where Choice might not be exported directly
-try:
-    from livekit.agents.llm import Choice
-except ImportError:
-    try:
-        from livekit.agents.llm.llm import Choice
-    except ImportError:
-        # Last resort fallback if completely hidden but supports duck typing or updated API 
-        class Choice:
-            def __init__(self, delta, index=0):
-                self.delta = delta
-                self.index = index
+# Load environment variables (try local .env, then backend .env)
+import pathlib
+current_dir = pathlib.Path(__file__).parent.absolute()
+backend_env = current_dir.parent / "backend" / ".env"
 
-load_dotenv()
+if os.path.exists(".env"):
+    load_dotenv(".env")
+    print(f"Loaded .env from {current_dir}")
+elif os.path.exists(backend_env):
+    load_dotenv(backend_env)
+    print(f"Loaded .env from {backend_env}")
+else:
+    print("Warning: No .env file found!")
+
 logger = logging.getLogger("yaloffice-interviewer")
 logging.basicConfig(level=logging.INFO)
+
+# Debug: Show connection info
+lk_url = os.getenv("LIVEKIT_URL")
+lk_cloud = os.getenv("LIVEKIT_CLOUD_URL")
+print(f"--------------------------------------------------")
+print(f"LIVEKIT_URL (Local): {lk_url}")
+print(f"LIVEKIT_CLOUD_URL:   {lk_cloud}")
+print(f"--------------------------------------------------")
+
 
 
 # =========================
@@ -145,89 +154,15 @@ async def fetch_interview_context(application_id=None, session_id=None):
     return context
 
 
-# =========================
-# Ollama LLM Adapter (FIXED for LiveKit 1.3+)
-# =========================
-class OllamaStream:
-    def __init__(self, llm, chat_ctx: ChatContext):
-        self.llm = llm
-        self.chat_ctx = chat_ctx
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        pass
-
-    async def __aiter__(self):
-        try:
-
-
-            messages = []
-
-            # ChatContext is iterable (list of messages)
-            for msg in self.chat_ctx:
-                if msg.role == ChatRole.SYSTEM:
-                    continue
-
-                role = "assistant" if msg.role == ChatRole.ASSISTANT else "user"
-                # Handle both string content and list content (newer API)
-                content = msg.content if isinstance(msg.content, str) else str(msg.content)
-                messages.append({"role": role, "content": content})
-
-            payload = {
-                "model": self.llm.model, # Use property
-                "messages": messages,
-                "stream": False,
-                "options": {"temperature": 0.7}
-            }
-
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.llm.base_url}/api/chat", json=payload
-                ) as resp:
-                    if resp.status != 200:
-                        logger.error(f"Ollama API Error: {resp.status}")
-                        return
-
-                    data = await resp.json()
-                    text = data.get("message", {}).get("content", "")
-
-                    if text:
-                        yield ChatChunk(
-                            choices=[Choice(
-                                index=0,
-                                delta=ChoiceDelta(
-                                    role=ChatRole.ASSISTANT,
-                                    content=text
-                                )
-                            )]
-                        )
-        except Exception as e:
-            logger.exception("LLM inference failed")
-            return
-
-
-# FIX 1: Correct OllamaLLM implementation
-class OllamaLLM(agents_llm.LLM):
-    def __init__(self, base_url: str, model_name: str):
-        super().__init__()
-        self.base_url = base_url
-        self._model_name = model_name  # ✅ private variable
-
-    @property
-    def model(self):
-        return self._model_name
-
-    def chat(self, chat_ctx: ChatContext, fnc_ctx=None, *args, **kwargs):
-        return OllamaStream(self, chat_ctx)
-
 
 # =========================
 # Entry Point
 # =========================
 async def entrypoint(ctx: JobContext):
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    # Connect with auto-subscribe to audio only - LiveKit handles codec negotiation automatically
+    await ctx.connect(
+        auto_subscribe=AutoSubscribe.AUDIO_ONLY
+    )
 
     # Robust Room ID Parsing
     room = ctx.room.name
@@ -245,8 +180,19 @@ async def entrypoint(ctx: JobContext):
 
     context = await fetch_interview_context(application_id, session_id)
 
-    participant = await ctx.wait_for_participant()
-    logger.info(f"Participant joined: {participant.identity}")
+    # Check for existing participants or wait briefly (SIP participant might already be connected)
+    try:
+        # Give it 5 seconds to wait for participant if room is empty
+        participant = await asyncio.wait_for(ctx.wait_for_participant(), timeout=5.0)
+        logger.info(f"Participant joined: {participant.identity}")
+    except asyncio.TimeoutError:
+        # Check if there are already participants in the room (common for phone screening)
+        if len(ctx.room.remote_participants) > 0:
+            participant = list(ctx.room.remote_participants.values())[0]
+            logger.info(f"Found existing participant: {participant.identity}")
+        else:
+            logger.warning("No participant found after 5 seconds, continuing anyway...")
+            participant = None  # Continue without participant - they might join later
 
     # Generate Technical Questions based on context and resume
     tech_questions = []
@@ -281,46 +227,66 @@ async def entrypoint(ctx: JobContext):
         resume_context_str = f"\nCANDIDATE RESUME:\n{resume_excerpt}\n\nINSTRUCTION: Ask questions relevant to the projects and skills mentioned in the resume ABOVE, in addition to standard technical questions."
 
     system_instruction = f"""
-You are a professional AI interviewer at YalOffice.
+You are a professional AI interviewer at YalOffice named Yal.
 You are interviewing {context['candidate_name']} for the position of {context['job_title']}.
 Job Description Summary: {context['job_description']}
 {resume_context_str}
 
-INTERVIEW PROTOCOL:
-You must ask questions one by one. Do not ask multiple questions at once.
-Wait for the candidate to answer before moving to the next question.
+CRITICAL - YOU MUST SPEAK FIRST:
+This is an OUTBOUND PHONE CALL. YOU called the candidate.
+DO NOT wait for them to say hello. As your VERY FIRST action, immediately greet:
+"Hello {context['candidate_name']}, I am Yal, AI recruiter from YalOffice. Thank you for taking this call. Are you ready to begin?"
 
-If a resume is provided, prioritize asking about specific projects, skills, or experiences listed in the resume.
-Otherwise, use the following standard questions as a guide:
+Then ask the first question right away.
+
+INTERVIEW PROTOCOL:
+- Ask questions ONE at a time
+- Wait for the candidate to answer before moving to next question
+- Keep responses brief and professional
+- Acknowledge answers briefly: "I see", "Good", "Interesting"
+- Do NOT repeat or summarize - move to next question immediately
+
+QUESTIONS TO ASK:
+If a resume is provided, ask about specific projects, skills, or experiences from the resume.
+Otherwise, use these standard questions:
 {questions_text}
 
-Rules:
-- Greet the candidate professionally first.
-- Ask the first question.
-- Listen to the answer, acknowledge it briefly (e.g., "I see", "That's interesting"), then ask the next question.
-- Dig deeper if the answer is vague.
-- After 5-7 minutes or 5 questions, finalize the interview.
-- Thank the candidate and say goodbye.
-- Be polite and concise.
+TIMING:
+- After 5 questions or 7 minutes, wrap up
+- Say: "Thank you for your time. We'll be in touch soon. Goodbye."
+- Keep the entire interview under 10 minutes
+
+Be professional, concise, and natural.
 """
 
-    # Use environment variable for Ollama URL, default to docker internal name
-    ollama_url = os.getenv("INTERVIEW_AI_URL", "http://ollama-gemma:11434")
-    
-    # Update usage: use model_name
-    llm_provider = OllamaLLM(
-        base_url=ollama_url,
-        model_name="gemma2:9b-instruct-q8_0" 
-    )
+    # Use Google Gemini (natively supported by LiveKit)
+    if not os.getenv("GOOGLE_API_KEY"):
+        logger.error("GOOGLE_API_KEY not found. Agent will fail.")
+        return
 
     if not os.getenv("DEEPGRAM_API_KEY"):
         logger.error("DEEPGRAM_API_KEY not found. Agent will fail.")
         return
 
+    # Initialize Google Gemini LLM with STRICT settings for voice streaming
+    # This prevents hidden concurrency throttling and retry storms
+    llm_provider = google.LLM(
+        model="gemini-2.0-flash",
+        temperature=0.7,
+    )
+
     stt = deepgram.STT(language="en-US")
     tts = deepgram.TTS()
-    vad = silero.VAD.load()
+    
+    # Use VAD with settings optimized for phone calls
+    # Lower thresholds make the agent more responsive  
+    vad = silero.VAD.load(
+        min_silence_duration=0.5,  # Reduced from 0.8 - faster turn detection
+        activation_threshold=0.3,  # Lower threshold - more sensitive to speech
+        min_speech_duration=0.2,   # Minimum speech length to process
+    )
 
+    # Standard AgentSession - retry logic is handled by LiveKit internally
     session = AgentSession(
         vad=vad,
         stt=stt,
@@ -330,38 +296,38 @@ Rules:
 
     agent = Interviewer(system_instruction)
 
-    # FIX 2: Explicitly send opening audio
-    await session.start(agent=agent, room=ctx.room)
+    # Start the session
+    logger.info("Starting agent session...")
+    session_task = asyncio.create_task(session.start(agent=agent, room=ctx.room))
     
-    # Give LiveKit + TTS time to fully attach
-    await asyncio.sleep(2.0)
-
-    # FORCE audio output - greeting
+    # Wait briefly for audio channels to initialize
+    await asyncio.sleep(1.5)
+    
+    logger.info("Playing immediate greeting before LLM session...")
+    
+    # FORCE IMMEDIATE GREETING using TTS directly (bypasses LLM wait-for-user pattern)
     try:
-        logger.info("FORCING GREETING AUDIO")
-        greeting_text = f"Hello {context['candidate_name']}, I am Yal, your AI interviewer. Shall we begin?"
+        greeting_text = f"Hello {context['candidate_name']}, I am Yal, your AI recruiter from YalOffice. Thank you for taking this call. Are you ready to begin the interview?"
         
-        if hasattr(session, 'say'):
-            await session.say(greeting_text)
-        else:
-            logger.warning("session.say() method not found. Attempting fallback.")
-            await session.generate_reply(instructions=f"Say exactly: {greeting_text}")
-
-        # 🔥 ASK FIRST QUESTION IMMEDIATELY
-        await asyncio.sleep(0.5)  # Brief pause for natural pacing
+        # Synthesize and play greeting immediately
+        greeting_stream = tts.synthesize(greeting_text)
+        async for audio_chunk in greeting_stream:
+            # Publish audio directly to room
+            await ctx.room.local_participant.publish_data(
+                audio_chunk.frame.data,
+                kind="audio",
+            )
         
-        first_question = tech_questions[0]
-        logger.info(f"Asking first question: {first_question}")
-        
-        if hasattr(session, 'say'):
-            await session.say(first_question)
-        else:
-            await session.generate_reply(instructions=f"Say exactly: {first_question}")
-
+        logger.info("Immediate greeting played successfully")
     except Exception as e:
-        logger.error(f"Error during greeting/first question: {e}")
+        logger.warning(f"Could not play immediate greeting: {e}")
+    
+    # Now wait for the reactive session to continue
+    logger.info("Agent session started successfully.")
+    await session_task
 
     try:
+        # Keep session alive for up to 20 minutes
         await asyncio.sleep(20 * 60) 
     except asyncio.CancelledError:
         logger.info("Session cancelled")
@@ -372,8 +338,8 @@ Rules:
         try:
             # Extract transcript from chat context
             transcript_entries = []
-            if agent.chat_ctx:
-                for msg in agent.chat_ctx:
+            if hasattr(agent.chat_ctx, 'messages'):
+                for msg in agent.chat_ctx.messages:
                     role_str = "AI" if msg.role == ChatRole.ASSISTANT else "Candidate"
                     if msg.role == ChatRole.SYSTEM: continue
                     content = msg.content if isinstance(msg.content, str) else str(msg.content)
@@ -390,8 +356,26 @@ Rules:
         except Exception as e:
             logger.error(f"Failed to save transcript: {e}")
 
-        await ctx.disconnect()
+        # Session cleanup is handled automatically by LiveKit
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    # Check if running in cloud mode (identified by LiveKit Cloud URL)
+    # The run_cloud_agent.bat sets LIVEKIT_URL to the cloud endpoint.
+    import os
+    
+    lk_url = os.getenv("LIVEKIT_URL", "").lower()
+    is_cloud = "livekit.cloud" in lk_url
+    
+    worker_options_kwargs = {}
+    
+    if is_cloud:
+        worker_options_kwargs["agent_name"] = "phone_yal_agent"
+        print(f"☁️  Running in CLOUD mode (Agent Name: phone_yal_agent)")
+    else:
+        print(f"💻 Running in LOCAL mode (Default Agent Name)")
+
+    cli.run_app(WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        **worker_options_kwargs
+    ))

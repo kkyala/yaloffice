@@ -528,8 +528,10 @@ router.post('/start-phone-screen', async (req, res) => {
 
     await interviewStore.set(sessionId, session);
 
-    // Initiate SIP Call
-    await sipService.initiatePhoneScreen(phoneNumber, roomName, candidateName);
+    // Initiate SIP Call via LiveKit Dispatch Rule (No Twilio needed!)
+    // Dispatch rule SDR_jPnaj3zBZbwP will automatically route to agent 'phone_yal_agent'
+    const { LiveKitManager } = await import('../services/livekit.js');
+    await LiveKitManager.createSIPParticipant(phoneNumber, roomName, candidateName);
 
     // Audit Log
     await auditLogger.log({

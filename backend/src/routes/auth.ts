@@ -23,13 +23,17 @@ router.post('/signup', async (req, res) => {
         const { email, password, options } = req.body;
         const trimmedEmail = email?.trim();
 
+        // Check if email verification is disabled
+        const emailEnabled = process.env.EMAIL_ENABLED === 'true';
+
         // DEMO HACK: If email contains '.demo.', auto-confirm the user so we can log them in immediately.
-        if (trimmedEmail.includes('.demo.')) {
-            console.log(`[Auth] Creating auto-verified demo user: ${trimmedEmail}`);
+        // OR if EMAIL_ENABLED=false, skip email verification for all users
+        if (trimmedEmail.includes('.demo.') || !emailEnabled) {
+            console.log(`[Auth] Creating auto-verified user: ${trimmedEmail} (EMAIL_ENABLED: ${emailEnabled})`);
             const { data: createData, error: createError } = await supabase.auth.admin.createUser({
                 email: trimmedEmail,
                 password: password,
-                email_confirm: true,
+                email_confirm: true, // Auto-confirm email
                 user_metadata: options?.data
             });
 
@@ -47,8 +51,10 @@ router.post('/signup', async (req, res) => {
                 return res.status(400).json({ error: sessionError.message });
             }
 
-            // Send Verification Email (Fake it or skip it, but we want to simulate a real user mostly)
-            // We can skip email sending for demo users.
+            // Skip email sending when EMAIL_ENABLED=false
+            if (!emailEnabled) {
+                console.log(`[Auth] Skipping verification email (EMAIL_ENABLED=false)`);
+            }
 
             return res.json({ session: sessionData.session, user: createData.user });
         }
@@ -104,6 +110,16 @@ router.post('/reset-password', async (req, res) => {
 
     if (!trimmedEmail) {
         return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const emailEnabled = process.env.EMAIL_ENABLED === 'true';
+
+    // If email is disabled, reject password reset requests
+    if (!emailEnabled) {
+        console.log(`[Auth] Password reset disabled (EMAIL_ENABLED=false)`);
+        return res.status(503).json({
+            error: 'Password reset is currently unavailable. Please contact support.'
+        });
     }
 
     try {

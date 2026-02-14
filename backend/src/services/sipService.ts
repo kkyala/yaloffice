@@ -1,16 +1,19 @@
-
 import { SipClient } from 'livekit-server-sdk';
+import { LiveKitManager } from './livekit.js';
+
+// Get Cloud Config for SIP/Telephony
+const cloudConfig = LiveKitManager.getConfig('cloud');
 
 // Twirp requires HTTP, not WS. Ensure we use the correct protocol.
-const RAW_URL = process.env.LIVEKIT_URL || 'http://127.0.0.1:7880';
+const RAW_URL = cloudConfig.url || 'http://127.0.0.1:7880';
 const LIVEKIT_HTTP_URL = RAW_URL.replace('ws://', 'http://').replace('wss://', 'https://');
 
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
-const LIVEKIT_SIP_TRUNK_ID = process.env.LIVEKIT_SIP_TRUNK_ID || 'ST_TBPgiLlt4CXP8';
+const LIVEKIT_API_KEY = cloudConfig.apiKey;
+const LIVEKIT_API_SECRET = cloudConfig.apiSecret;
+const LIVEKIT_SIP_TRUNK_ID = process.env.LIVEKIT_SIP_TRUNK_ID || 'ST_QzjtLtrc35PP';
 
 if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-    console.warn("[SIP] LiveKit credentials missing, SIP Service will not function.");
+    console.warn(`[SIP] LiveKit credentials missing for Cloud environment (using URL: ${LIVEKIT_HTTP_URL}), SIP Service will not function.`);
 }
 
 // Initialize SipClient only if credentials exist to avoid crashes
@@ -28,12 +31,23 @@ export const sipService = {
             throw new Error("SIP Client not initialized (missing credentials)");
         }
 
-        console.log(`[SIP] Initiating call to ${phoneNumber} in room ${roomName} via trunk ${LIVEKIT_SIP_TRUNK_ID}`);
+        // basic E.164 formatting
+        let formattedPhone = phoneNumber.trim();
+        if (!formattedPhone.startsWith('+')) {
+            // Assume US if 10 digits, otherwise just prepend +
+            if (formattedPhone.length === 10) {
+                formattedPhone = '+1' + formattedPhone;
+            } else {
+                formattedPhone = '+' + formattedPhone;
+            }
+        }
+
+        console.log(`[SIP] Initiating call to ${formattedPhone} (original: ${phoneNumber}) in room ${roomName} via trunk ${LIVEKIT_SIP_TRUNK_ID}`);
 
         try {
             const participant = await sipClient.createSipParticipant(
                 LIVEKIT_SIP_TRUNK_ID,
-                phoneNumber,
+                formattedPhone,
                 roomName,
                 {
                     participantIdentity: `phone-${phoneNumber.replace(/\+/g, '')}`,
