@@ -150,7 +150,7 @@ export default function TopHeader({ user, onLogout, onProfileClick, currentPage,
     const isCalendarActive = currentPage === 'calendar';
 
     return (
-        <header className="top-header" style={{ height: '70px', padding: '0 2rem', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', zIndex: 50 }}>
+        <header className="top-header" style={{ height: '56px', padding: '0 3.5rem', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', zIndex: 50 }}>
             <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 {isMobile && (
                     <button className="mobile-menu-btn" onClick={onMenuClick} aria-label="Open menu" style={{ padding: '0.5rem', background: 'transparent', border: 'none', cursor: 'pointer' }}>

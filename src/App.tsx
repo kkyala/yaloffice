@@ -175,6 +175,17 @@ export default function App() {
         let isMounted = true;
 
         const loadInitialData = async () => {
+            if (!session?.user?.id) {
+                console.warn('Session user ID is missing. Cannot load profile.', {
+                    sessionExists: !!session,
+                    userExists: !!session?.user,
+                    userKeys: session?.user ? Object.keys(session.user) : [],
+                    fullUser: JSON.stringify(session?.user || {})
+                });
+                setIsLoading(false);
+                return;
+            }
+
             console.log('Loading initial data for user:', session.user.id);
             setIsLoading(true);
             const { data: userProfile, error: profileError } = await api.get(`/users/${session.user.id}`);
@@ -233,36 +244,56 @@ export default function App() {
 
     const handleLogin = async ({ email, password }: { email: string; password: string; }) => {
         const { data, error } = await api.login({ email, password });
+        console.log('[App] Login response data:', JSON.stringify(data, null, 2));
+
         if (!error && data?.session) {
-            setSession(data.session);
+            // Ensure session object has user data (handle backend inconsistencies)
+            const sessionWithUser = {
+                ...data.session,
+                user: data.session.user || data.user
+            };
+            console.log('[App] constructed sessionWithUser:', JSON.stringify(sessionWithUser, null, 2));
+            setSession(sessionWithUser);
         }
         return { success: !error, error: error ? getErrorMessage(error) : null };
     };
+
     const handleSignup = async ({ email, password, fullName, role, mobileNumber }: { email: string; password: string; fullName: string; role: string; mobileNumber: string; }) => {
         const { data: authData, error: signUpError } = await api.signup({ email, password, options: { data: { name: fullName, role: role, mobile: mobileNumber, status: 'Active' } } });
+
         if (signUpError) {
-            if ((signUpError as any).message && (signUpError as any).message.includes('unique constraint')) return { success: false, error: 'A user with this email already exists.' };
+            const errorMsg = (signUpError as any).message || '';
+            if (errorMsg.includes('unique constraint') || errorMsg.includes('already registered')) {
+                return { success: false, error: 'A user with this email already exists.' };
+            }
             handleError(signUpError, 'signing up user');
             return { success: false, error: getErrorMessage(signUpError) };
         }
+
         if (!authData.user) return { success: false, error: 'Sign up succeeded but no user data was returned. Please try logging in.' };
 
-        // Create profile
+        // Create profile (idempotent check is handled by backend usually, but we try anyway)
         const { error: profileError } = await api.post('/users', { id: authData.user.id, email: authData.user.email, name: fullName, role: role, mobile: mobileNumber, status: 'Active' });
+
         if (profileError) {
-            handleError(profileError, 'creating user profile after signup');
-            console.warn(`User ${authData.user.id} signed up but profile creation failed. It will be retried on next login.`);
+            // Log warning but proceed if it's just a duplicate key error (profile already exists)
+            console.warn(`Profile creation note: ${getErrorMessage(profileError)}`);
         }
 
-        // Auto-login if session is returned (Email confirmation disabled)
+        // Auto-login if session is returned
         if (authData.session) {
-            setSession(authData.session);
-            // Fetch profile again to be sure or construct it
+            const sessionWithUser = {
+                ...authData.session,
+                user: authData.session.user || authData.user
+            };
+            setSession(sessionWithUser);
+
+            // Set currentUser immediately to avoid race conditions with useEffect
             const { data: userProfile } = await api.get(`/users/${authData.user.id}`);
             setCurrentUser(userProfile || { id: authData.user.id, email: authData.user.email, name: fullName, role: role, mobile: mobileNumber, status: 'Active' });
 
-            // Set initial page
-            const initialPage = roleConfig[role]?.defaultPage || 'dashboard';
+            // Set initial page based on role
+            const initialPage = roleConfig[role as keyof typeof roleConfig]?.defaultPage || 'dashboard';
             setCurrentPage(initialPage);
             setActiveParent(initialPage);
 
@@ -634,7 +665,12 @@ export default function App() {
         return { success: false, error: 'Verification succeeded but no session returned.' };
     };
 
-    if (isLoading) return <div className="loading-overlay"><h2>Loading Yāl Office...</h2></div>;
+    if (isLoading) return (
+        <div className="loading-overlay">
+            <div className="loading-spinner"></div>
+            <h2 className="loading-text">Loading Yāl Office...</h2>
+        </div>
+    );
     if (!currentUser) return <LoginScreen onLogin={handleLogin} onSignup={handleSignup} onForgotPassword={handleForgotPassword} onVerifyOtp={handleVerifyOtp} />;
 
     const PageComponent = currentRoleConfig?.pages[currentPage];

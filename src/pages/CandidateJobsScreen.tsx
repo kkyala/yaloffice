@@ -97,117 +97,219 @@ export default function CandidateJobsScreen({ jobsData = [], candidatesData = []
     }, [currentUser]);
 
     return (
-        <>
-            <header className="page-header">
-                <h1>Find Jobs</h1>
+
+        <div className="candidate-jobs-screen">
+            <header className="page-header" style={{ marginBottom: '1.5rem', paddingTop: '2.5rem' }}>
+                <div>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--slate-800)', letterSpacing: '-0.03em' }}>Find Your Next Role</h1>
+                    <p style={{ color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+                        Browse active job openings matched to your profile.
+                    </p>
+                </div>
             </header>
 
-            <div className="table-controls" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="search-bar glass-panel" style={{ position: 'relative', width: '350px', padding: '0', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden' }}>
+            <div className="jobs-filter-bar" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: '1rem',
+                marginBottom: '2rem',
+                background: 'var(--color-surface)',
+                padding: '1rem',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--color-border)',
+                boxShadow: 'var(--shadow-sm)'
+            }}>
+                <div className="search-input-wrapper" style={{ position: 'relative' }}>
+                    <SearchIcon style={{
+                        position: 'absolute',
+                        left: '1rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--slate-400)',
+                        width: '20px',
+                        height: '20px'
+                    }} />
                     <input
                         type="text"
-                        placeholder="Search jobs, companies, locations..."
+                        placeholder="Search by job title, company, or keywords..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{
-                            paddingLeft: '2.75rem',
+                            paddingLeft: '3rem',
+                            height: '50px',
+                            border: '1px solid var(--slate-200)',
+                            borderRadius: 'var(--radius-md)',
                             width: '100%',
-                            border: 'none',
-                            background: 'transparent',
-                            height: '46px'
+                            fontSize: '1rem',
+                            marginBottom: 0
                         }}
                     />
-                    <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-color)' }}>
-                        <SearchIcon style={{ width: '18px', height: '18px' }} />
-                    </div>
                 </div>
-                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
-                    Showing <strong style={{ color: 'var(--text-primary)' }}>{currentItems.length}</strong> of {processedJobs.length} jobs
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <select
+                        onChange={(e) => handleSort(e.target.value)}
+                        style={{
+                            height: '50px',
+                            width: '180px',
+                            marginBottom: 0
+                        }}
+                    >
+                        <option value="title">Sort by Title</option>
+                        <option value="location">Sort by Location</option>
+                        <option value="salaryMax">Sort by Salary</option>
+                    </select>
                 </div>
             </div>
 
-            <div className="table-container">
-                <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
-                    <thead>
-                        <tr>
-                            <th onClick={() => handleSort('title')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                Job Title {renderSortIcon('title')}
-                            </th>
-                            <th onClick={() => handleSort('location')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                Location {renderSortIcon('location')}
-                            </th>
-                            <th onClick={() => handleSort('salaryMax')} style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                Salary Range {renderSortIcon('salaryMax')}
-                            </th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {currentItems.length > 0 ? currentItems.map(job => (
-                            <tr key={job.id} className="animate-fade-in">
-                                <td>
-                                    <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{job.title}</strong>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0' }}>{job.employer}</p>
-                                </td>
-                                <td>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--light-bg)', padding: '0.2rem 0.6rem', borderRadius: '20px', fontSize: '0.8rem' }}>
-                                        {job.location}
-                                    </span>
-                                </td>
-                                <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{`${formatCurrency(job.salaryMin)} - ${formatCurrency(job.salaryMax)}`}</td>
-                                <td style={{ textAlign: 'right' }}>
-                                    <button
-                                        className={`btn ${appliedJobIds.has(job.id) ? 'btn-secondary' : 'btn-primary'}`}
-                                        onClick={() => {
-                                            if (appliedJobIds.has(job.id)) return;
+            <div className="jobs-grid" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: '1.5rem'
+            }}>
+                {currentItems.length > 0 ? currentItems.map(job => {
+                    const isApplied = appliedJobIds.has(job.id);
+                    return (
+                        <div key={job.id} className="job-card" style={{
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-xl)',
+                            padding: '1.5rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            transition: 'all var(--duration-normal)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                        }}>
+                            <div className="job-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div>
+                                    <h3 style={{
+                                        fontSize: '1.25rem',
+                                        fontWeight: '700',
+                                        color: 'var(--color-text-main)',
+                                        marginBottom: '0.25rem'
+                                    }}>{job.title}</h3>
+                                    <p style={{
+                                        color: 'var(--color-primary)',
+                                        fontWeight: '600',
+                                        fontSize: '0.9rem'
+                                    }}>{job.employer}</p>
+                                </div>
+                                {isApplied && (
+                                    <span style={{
+                                        background: 'var(--primary-50)',
+                                        color: 'var(--color-primary)',
+                                        padding: '0.25rem 0.75rem',
+                                        borderRadius: 'var(--radius-full)',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700'
+                                    }}>Applied</span>
+                                )}
+                            </div>
 
-                                            // Job-specific screening logic
-                                            if (job.screening_enabled || (job.title && job.title.includes('(Demo)'))) {
-                                                const confirmApply = window.confirm(
-                                                    "This job requires an AI Screening Interview. You will need to complete this screening before your application is reviewed by the employer.\n\nDo you want to proceed?"
-                                                );
-                                                if (!confirmApply) return;
-                                            }
+                            <div className="job-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <span style={{
+                                    background: 'var(--slate-50)',
+                                    border: '1px solid var(--slate-200)',
+                                    color: 'var(--slate-600)',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '500'
+                                }}>{job.location}</span>
+                                <span style={{
+                                    background: 'var(--slate-50)',
+                                    border: '1px solid var(--slate-200)',
+                                    color: 'var(--slate-600)',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '500'
+                                }}>Full-time</span>
+                                <span style={{
+                                    background: 'var(--primary-50)',
+                                    color: 'var(--color-primary)',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600'
+                                }}>{formatCurrency(job.salaryMin)} - {formatCurrency(job.salaryMax)}</span>
+                            </div>
 
-                                            onStartApplication(job);
-                                        }}
-                                        disabled={appliedJobIds.has(job.id)}
-                                        style={{ minWidth: '120px' }}
-                                    >
-                                        {appliedJobIds.has(job.id) ? 'Applied' : 'Apply Now'}
-                                    </button>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {searchTerm ? 'No jobs match your search criteria.' : 'There are currently no active job openings.'}
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                            <p style={{
+                                color: 'var(--color-text-muted)',
+                                fontSize: '0.9rem',
+                                lineHeight: '1.5',
+                                display: '-webkit-box',
+                                WebkitLineClamp: '2',
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                            }}>
+                                {job.description || "Join our team to build the future of technology. We are looking for passionate individuals who love to code and design."}
+                            </p>
 
-                {totalPages > 1 && (
-                    <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                        <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                        >
-                            <ChevronLeftIcon style={{ width: '16px', height: '16px' }} /> Previous
-                        </button>
-                        <span style={{ fontSize: '0.9rem' }}>Page {currentPage} of {totalPages}</span>
-                        <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                        >
-                            Next <ChevronRightIcon style={{ width: '16px', height: '16px' }} />
-                        </button>
+                            <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+                                <button
+                                    className={`btn ${isApplied ? 'btn-secondary' : 'btn-primary'}`}
+                                    style={{ width: '100%' }}
+                                    onClick={() => {
+                                        if (isApplied) return;
+                                        if (job.screening_enabled || (job.title && job.title.includes('(Demo)'))) {
+                                            const confirmApply = window.confirm(
+                                                "This job requires an AI Screening Interview. You will need to complete this screening before your application is reviewed by the employer.\n\nDo you want to proceed?"
+                                            );
+                                            if (!confirmApply) return;
+                                        }
+                                        onStartApplication(job);
+                                    }}
+                                    disabled={isApplied}
+                                >
+                                    {isApplied ? 'View Application' : 'Apply Now'}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }) : (
+                    <div style={{
+                        gridColumn: '1 / -1',
+                        padding: '4rem',
+                        textAlign: 'center',
+                        background: 'var(--color-surface)',
+                        borderRadius: 'var(--radius-xl)',
+                        border: '1px dashed var(--color-border)'
+                    }}>
+                        <h3 style={{ color: 'var(--color-text-muted)' }}>No jobs found</h3>
+                        <p style={{ color: 'var(--slate-400)' }}>Try adjusting your search filters.</p>
                     </div>
                 )}
             </div>
-        </>
+
+            {totalPages > 1 && (
+                <div className="pagination-controls" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '1rem',
+                    marginTop: '2rem'
+                }}>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                    >
+                        Previous
+                    </button>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-text-muted)' }}>Page {currentPage} of {totalPages}</span>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
+        </div>
     );
+
 }

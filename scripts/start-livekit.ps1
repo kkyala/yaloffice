@@ -1,7 +1,7 @@
 # PowerShell script to download and run LiveKit server
 
 $LIVEKIT_VERSION = "1.5.3"
-$LIVEKIT_DIR = "$PSScriptRoot\..\livekit-server"
+$LIVEKIT_DIR = "$PSScriptRoot\..\livekit"
 $LIVEKIT_EXE = "$LIVEKIT_DIR\livekit-server.exe"
 $CONFIG_FILE = "$PSScriptRoot\..\livekit.yaml"
 

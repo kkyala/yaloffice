@@ -20,6 +20,8 @@ import resumesRouter from './routes/resumes.js';
 import auditLogsRouter from './routes/auditLogs.js';
 // import { setupGeminiProxyWS } from './services/geminiProxy.js'; // REMOVED: Using Ollama/LiveKit Agent now
 import { roomLifecycleManager } from './services/roomLifecycleManager.js';
+import adminRouter from './routes/admin.js';
+import configRouter from './routes/config.js';
 
 const app = express();
 const server = createServer(app);
@@ -74,6 +76,8 @@ app.use('/api/candidates', candidatesRouter);
 app.use('/api/placements', placementsRouter);
 app.use('/api/resumes', resumesRouter);
 app.use('/api/audit-logs', auditLogsRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/config', configRouter);
 
 // Serve avatar videos
 app.use('/avatar_output', express.static('avatar_output'));

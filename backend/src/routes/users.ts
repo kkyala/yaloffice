@@ -37,9 +37,9 @@ router.put('/:id', requireAuth, async (req, res) => {
     res.json(data);
 });
 
-// POST /api/users (Create profile)
 router.post('/', async (req, res) => {
-    const { data, error } = await supabase.from('users').insert(req.body).select().single();
+    // Use upsert to handle cases where user is already created during signup
+    const { data, error } = await supabase.from('users').upsert(req.body).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
 });

@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
 from livekit import rtc
 from livekit.agents.voice import Agent, AgentSession
-from livekit.plugins import deepgram, silero, google
+from livekit.plugins import deepgram, silero, openai
 from livekit.agents.llm import ChatRole
 
 # Load environment variables (try local .env, then backend .env)
@@ -259,19 +259,25 @@ TIMING:
 Be professional, concise, and natural.
 """
 
-    # Use Google Gemini (natively supported by LiveKit)
-    if not os.getenv("GOOGLE_API_KEY"):
-        logger.error("GOOGLE_API_KEY not found. Agent will fail.")
-        return
+    # Fetch config from backend
+    try:
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get('http://localhost:8000/api/admin/agent-config') as resp:
+                if resp.status == 200:
+                    remote_config = await resp.json()
+                    for k, v in remote_config.items():
+                        if v:
+                            os.environ[k] = str(v)
+                    logger.info("Updated agent config from Backend")
+    except Exception as e:
+        logger.warning(f"Could not fetch backend config: {e}")
 
-    if not os.getenv("DEEPGRAM_API_KEY"):
-        logger.error("DEEPGRAM_API_KEY not found. Agent will fail.")
-        return
-
-    # Initialize Google Gemini LLM with STRICT settings for voice streaming
-    # This prevents hidden concurrency throttling and retry storms
-    llm_provider = google.LLM(
-        model="gemini-2.0-flash",
+    # Initialize Ollama (Local LLM via OpenAI compatible API)
+    # Ensure 'ollama serve' is running and you have pulled the model (e.g. 'ollama pull gemma:2b')
+    llm_provider = openai.LLM(
+        model=os.environ.get("OLLAMA_MODEL", "gemma:2b"), # Allow dynamic model override
+        base_url="http://localhost:11434/v1",
+        api_key="ollama", # Required dummy key
         temperature=0.7,
     )
 

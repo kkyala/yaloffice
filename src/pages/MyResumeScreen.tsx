@@ -644,9 +644,9 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
 
     return (
         <>
-            <header className="page-header" style={{ marginBottom: '1rem' }}>
+            <header className="page-header" style={{ marginBottom: '1.5rem', paddingTop: '2.5rem' }}>
                 <div>
-                    <h1 style={{ marginBottom: '0.25rem' }}>My Resume</h1>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--slate-800)', letterSpacing: '-0.03em', marginBottom: '0.25rem' }}>My Resume</h1>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Manage your professional profile</p>
                 </div>
                 <div className="header-actions">
@@ -684,7 +684,7 @@ export default function MyResumeScreen({ currentUser, onSaveResume, resumeList =
                 </div>
             </header>
 
-            <div className="resume-screen-container" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '2rem' }}>
+            <div className="resume-screen-container" style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '3rem', alignItems: 'start' }}>
 
                 {/* LEFT SIDEBAR - Upload & History */}
                 <div className="resume-sidebar">

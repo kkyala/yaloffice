@@ -184,7 +184,7 @@ class InterviewStore {
 
     if (error || !data) return [];
 
-    return data.map(d => ({
+    return data.map((d: any) => ({
       id: d.id,
       roomName: d.room_name,
       jobTitle: d.job_title,
@@ -210,7 +210,7 @@ class InterviewStore {
 
     if (error || !data) return [];
 
-    return data.map(d => ({
+    return data.map((d: any) => ({
       id: d.id,
       roomName: d.room_name,
       jobTitle: d.job_title,

@@ -193,66 +193,119 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
     };
 
     return (
-        <>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '3rem' }}>
             {/* Header */}
-            <header className="page-header">
-                <h1>My Applications</h1>
+            <header className="page-header" style={{ marginBottom: '1.5rem', paddingTop: '2.5rem' }}>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--slate-800)', letterSpacing: '-0.03em' }}>My Applications</h1>
             </header>
 
-            <div className="table-controls" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="search-bar glass-panel" style={{ position: 'relative', width: '350px', padding: '0', borderRadius: 'var(--border-radius-sm)', overflow: 'hidden' }}>
+            <div className="table-controls" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="search-bar" style={{
+                    position: 'relative',
+                    width: '380px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'white',
+                    boxShadow: 'var(--shadow-sm)',
+                    border: '1px solid var(--slate-200)',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s'
+                }}>
                     <input
                         type="text"
                         placeholder="Search by job, company, or status..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         style={{
-                            paddingLeft: '2.75rem',
+                            padding: '0.875rem 1rem 0.875rem 3rem',
                             width: '100%',
                             border: 'none',
                             background: 'transparent',
-                            height: '46px'
+                            fontSize: '0.95rem',
+                            color: 'var(--slate-700)',
+                            outline: 'none',
+                            margin: 0 // Reset default input margin
                         }}
                     />
-                    <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-color)' }}>
-                        <SearchIcon style={{ width: '18px', height: '18px' }} />
+                    <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-500)', display: 'flex' }}>
+                        <SearchIcon width={20} height={20} />
                     </div>
                 </div>
-                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
-                    Showing <strong style={{ color: 'var(--text-primary)' }}>{currentItems.length}</strong> of {processedApplications.length} applications
+                <div style={{ fontSize: '0.95rem', color: 'var(--slate-500)', fontWeight: '500' }}>
+                    Showing <strong style={{ color: 'var(--slate-900)' }}>{currentItems.length}</strong> of {processedApplications.length} applications
                 </div>
             </div>
 
-            <div className="table-container">
-                <table className="jobs-table" style={{ fontSize: '0.9rem' }}>
+            <div className="table-container" style={{
+                background: 'white',
+                borderRadius: 'var(--radius-xl)',
+                boxShadow: 'var(--shadow-md)',
+                border: '1px solid var(--slate-200)',
+                overflow: 'hidden'
+            }}>
+                <table className="jobs-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
                     <thead>
-                        <tr>
-                            <th onClick={() => handleSort('jobTitle')} style={{ cursor: 'pointer', userSelect: 'none' }}>Job Title {renderSortIcon('jobTitle')}</th>
-                            <th onClick={() => handleSort('company')} style={{ cursor: 'pointer', userSelect: 'none' }}>Company {renderSortIcon('company')}</th>
-                            <th onClick={() => handleSort('status')} style={{ cursor: 'pointer', userSelect: 'none' }}>Status {renderSortIcon('status')}</th>
-                            <th style={{ textAlign: 'right' }}>Actions</th>
+                        <tr style={{ background: 'var(--slate-50)' }}>
+                            <th onClick={() => handleSort('jobTitle')} style={{ padding: '1.25rem 1.75rem', textAlign: 'left', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--slate-600)', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', borderBottom: '1px solid var(--slate-200)' }}>
+                                Job Title {renderSortIcon('jobTitle')}
+                            </th>
+                            <th onClick={() => handleSort('company')} style={{ padding: '1.25rem 1.75rem', textAlign: 'left', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--slate-600)', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', borderBottom: '1px solid var(--slate-200)' }}>
+                                Company {renderSortIcon('company')}
+                            </th>
+                            <th onClick={() => handleSort('status')} style={{ padding: '1.25rem 1.75rem', textAlign: 'left', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--slate-600)', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', borderBottom: '1px solid var(--slate-200)' }}>
+                                Status {renderSortIcon('status')}
+                            </th>
+                            <th style={{ padding: '1.25rem 1.75rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--slate-600)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--slate-200)' }}>
+                                Actions
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
-                        {currentItems.length > 0 ? currentItems.map(app => (
-                            <tr key={app.id} className="animate-fade-in">
-                                <td>
-                                    <strong style={{ fontSize: '0.95rem', color: 'var(--primary-dark-color)' }}>{app.jobTitle}</strong>
+                        {currentItems.length > 0 ? currentItems.map((app, index) => (
+                            <tr key={app.id} style={{ transition: 'background-color 0.2s', backgroundColor: index % 2 === 0 ? 'white' : 'var(--slate-50)' }} className="hover:bg-slate-50">
+                                <td style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--slate-100)', color: 'var(--slate-900)', fontWeight: '600', fontSize: '1rem' }}>
+                                    {app.jobTitle}
                                 </td>
-                                <td>{app.company}</td>
-                                <td>
-                                    <span className={`status-badge status-${app.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}>
+                                <td style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--slate-100)', color: 'var(--slate-600)', fontSize: '0.95rem' }}>{app.company}</td>
+                                <td style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--slate-100)' }}>
+                                    <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '0.25rem 0.75rem',
+                                        borderRadius: '9999px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: '600',
+                                        textTransform: 'capitalize',
+                                        backgroundColor: app.status === 'Hired' ? '#ecfdf5' :
+                                            app.status === 'Interviewing' ? '#fff7ed' :
+                                                app.status === 'Screening' ? '#eef2ff' : '#f1f5f9',
+                                        color: app.status === 'Hired' ? '#059669' :
+                                            app.status === 'Interviewing' ? '#ea580c' :
+                                                app.status === 'Screening' ? '#4f46e5' : '#64748b'
+                                    }}>
+                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', marginRight: '0.5rem' }}></span>
                                         {app.status}
                                     </span>
                                 </td>
-                                <td style={{ textAlign: 'right' }}>
+                                <td style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--slate-100)', textAlign: 'right' }}>
                                     {renderActionButton(app)}
                                 </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {searchTerm ? 'No applications match your search.' : 'You have not applied to any jobs yet.'}
+                                <td colSpan={4} style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--slate-500)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{ background: 'var(--slate-100)', padding: '1rem', borderRadius: '50%' }}>
+                                            <SearchIcon width={32} height={32} style={{ opacity: 0.5 }} />
+                                        </div>
+                                        <p style={{ fontSize: '1.1rem', margin: 0 }}>
+                                            {searchTerm ? 'No applications match your search criteria.' : 'You have not applied to any jobs yet.'}
+                                        </p>
+                                        {!searchTerm && (
+                                            <button className="btn btn-primary" onClick={() => onNavigate('find-jobs', 'find-jobs')}>
+                                                Find Jobs
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         )}
@@ -260,26 +313,28 @@ export default function CandidateDashboardScreen({ candidatesData = [], jobsData
                 </table>
 
                 {totalPages > 1 && (
-                    <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                    <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '1.5rem', background: 'white', borderTop: '1px solid var(--slate-200)' }}>
                         <button
                             className="btn btn-secondary btn-sm"
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
+                            style={{ padding: '0.5rem 1rem' }}
                         >
-                            <ChevronLeftIcon style={{ width: '16px', height: '16px' }} /> Previous
+                            <ChevronLeftIcon width={16} height={16} /> Previous
                         </button>
-                        <span style={{ fontSize: '0.9rem' }}>Page {currentPage} of {totalPages}</span>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--slate-600)', fontWeight: '500' }}>Page {currentPage} of {totalPages}</span>
                         <button
                             className="btn btn-secondary btn-sm"
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages}
+                            style={{ padding: '0.5rem 1rem' }}
                         >
-                            Next <ChevronRightIcon style={{ width: '16px', height: '16px' }} />
+                            Next <ChevronRightIcon width={16} height={16} />
                         </button>
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 }
 

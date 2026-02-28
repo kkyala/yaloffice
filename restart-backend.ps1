@@ -5,22 +5,33 @@ Write-Host "Restarting Backend Server" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Find and stop existing backend processes
-Write-Host "Stopping existing backend server..." -ForegroundColor Yellow
+# Find and stop existing backend processes by Port 8000
+Write-Host "Stopping existing backend server on port 8000..." -ForegroundColor Yellow
+
+# Get PID listening on port 8000
+$tcpConnection = Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
+if ($tcpConnection) {
+    echo "Found process ID $($tcpConnection.OwningProcess) listening on port 8000"
+    Stop-Process -Id $tcpConnection.OwningProcess -Force -ErrorAction SilentlyContinue
+    Write-Host "  Killed process $($tcpConnection.OwningProcess)" -ForegroundColor Green
+}
+else {
+    Write-Host "  No process found listening on port 8000" -ForegroundColor Gray
+}
+
+# Also cleanup any stray node processes with 'backend' in command line as backup
 $backendProcesses = Get-Process node -ErrorAction SilentlyContinue | Where-Object {
     $_.Path -like "*backend*" -or 
     $_.CommandLine -like "*backend*"
 }
-
 if ($backendProcesses) {
     $backendProcesses | ForEach-Object {
-        Write-Host "  Killing process $($_.Id)..." -ForegroundColor Gray
-        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        # Avoid killing self if running via node (unlikely here but safety first)
+        if ($_.Id -ne $PID) {
+            Write-Host "  Killing stray backend node process $($_.Id)..." -ForegroundColor Gray
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        }
     }
-    Write-Host "  Old backend stopped" -ForegroundColor Green
-}
-else {
-    Write-Host "  No existing backend process found" -ForegroundColor Gray
 }
 
 Write-Host ""

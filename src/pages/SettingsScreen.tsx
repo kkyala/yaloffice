@@ -1,314 +1,196 @@
-import React, { useState, useEffect } from 'react';
-import { z } from 'zod';
 
-// Define validation schema
-const settingsSchema = z.object({
-    name: z.string().min(1, "Full Name is required"),
-    mobile: z.string().min(10, "Mobile number must be at least 10 digits").optional().or(z.literal('')),
-    linkedin: z.string().url("Invalid LinkedIn URL").optional().or(z.literal('')),
-    city: z.string().optional(),
-    state: z.string().optional(),
-});
+import React, { useEffect, useState } from 'react';
+import { api } from '../services/api';
 
-type SettingsScreenProps = {
-    currentUser: any;
-    onUpdateUserProfile: (profileData: any) => Promise<{ success: boolean; error?: string }>;
-    onClearAllCandidates: () => Promise<{ success: boolean; error?: string }>;
-};
+const SettingsScreen = ({ currentUser }) => {
+    const isAdmin = currentUser?.role === 'Admin';
+    const [configs, setConfigs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
+    const [activeTab, setActiveTab] = useState('general');
 
-export default function SettingsScreen({ currentUser, onUpdateUserProfile, onClearAllCandidates }: SettingsScreenProps) {
-    // Profile form state
-    const [name, setName] = useState('');
-    const [mobile, setMobile] = useState('');
-    const [linkedin, setLinkedin] = useState('');
-    const [city, setCity] = useState('');
-    const [state, setState] = useState('');
-
-    // UI Feedback state
-    const [isSaving, setIsSaving] = useState(false);
-    const [feedback, setFeedback] = useState({ type: '', message: '' });
-    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-    // Populate form with current user data
-    useEffect(() => {
-        if (currentUser) {
-            setName(currentUser.name || '');
-            setMobile(currentUser.mobile || '');
-            setLinkedin(currentUser.linkedin_url || '');
-            setCity(currentUser.city || '');
-            setState(currentUser.state || '');
+    const fetchConfig = async () => {
+        if (!isAdmin) return;
+        setLoading(true);
+        try {
+            const { data, error } = await api.get('/admin/config');
+            if (error) {
+                console.error("Fetch config error:", error);
+                setMessage('Failed to load configurations.');
+            } else {
+                setConfigs(data || []);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    useEffect(() => {
+        fetchConfig();
     }, [currentUser]);
 
-    // Timer to clear feedback messages
-    useEffect(() => {
-        if (feedback.message) {
-            const timer = setTimeout(() => setFeedback({ type: '', message: '' }), 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [feedback]);
-
-    const validateForm = () => {
-        try {
-            settingsSchema.parse({ name, mobile, linkedin, city, state });
-            setFieldErrors({});
-            return true;
-        } catch (err: any) {
-            if (err instanceof z.ZodError) {
-                const errors: Record<string, string> = {};
-                err.errors.forEach((e) => {
-                    if (e.path[0]) errors[e.path[0] as string] = e.message;
-                });
-                setFieldErrors(errors);
-            }
-            return false;
-        }
-    };
-
-    const handleSaveChanges = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!validateForm()) return;
-
-        setIsSaving(true);
-        setFeedback({ type: '', message: '' });
-
-        const profilePayload = {
-            name,
-            mobile,
-            linkedin_url: linkedin,
-            city,
-            state,
-        };
-
-        const result = await onUpdateUserProfile(profilePayload);
-
-        if (result.success) {
-            setFeedback({ type: 'success', message: 'Profile updated successfully!' });
+    const handleSave = async (key: string, value: string) => {
+        setMessage('');
+        const { error } = await api.post('/admin/config', { key, value });
+        if (error) {
+            setMessage(`Error saving ${key}: ${error.message || error}`);
         } else {
-            setFeedback({ type: 'error', message: result.error || 'Failed to update profile.' });
+            setMessage(`Saved ${key} successfully.`);
+            fetchConfig(); // Refresh
         }
-        setIsSaving(false);
     };
+
+    const groupedConfigs = configs.reduce((acc, config) => {
+        const group = config.group || 'General';
+        if (!acc[group]) acc[group] = [];
+        acc[group].push(config);
+        return acc;
+    }, {} as Record<string, any[]>);
+
+    if (!isAdmin) {
+        return (
+            <div style={{ padding: '2rem', paddingTop: '2.5rem' }}>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '0.5rem', color: 'var(--slate-800)', letterSpacing: '-0.03em' }}>User Settings</h1>
+                <p>Profile settings and preferences would go here.</p>
+                {/* Standard user settings placeholder */}
+            </div>
+        );
+    }
 
     return (
-        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1rem' }}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '2.5rem'
-            }}>
-                <div>
-                    <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Account Settings</h1>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Manage your personal profile and preferences</p>
+        <div style={{ padding: '2rem', paddingTop: '2.5rem' }}>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '0.5rem', color: 'var(--slate-800)', letterSpacing: '-0.03em' }}>System Configuration</h1>
+            <p style={{ color: '#64748b', marginBottom: '2rem' }}>Manage environment variables and API keys.</p>
+
+            {message && (
+                <div style={{
+                    padding: '1rem', marginBottom: '1rem', borderRadius: '8px',
+                    background: message.includes('Error') || message.includes('Failed') ? '#fee2e2' : '#dcfce7',
+                    color: message.includes('Error') || message.includes('Failed') ? '#b91c1c' : '#15803d'
+                }}>
+                    {message}
                 </div>
-                <button
-                    type="submit"
-                    form="settings-form"
-                    className="btn btn-primary"
-                    disabled={isSaving}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        fontSize: '1rem',
-                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
-                        borderRadius: '8px'
-                    }}
-                >
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                </button>
+            )}
+
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+                {Object.keys(groupedConfigs).map(group => (
+                    <button
+                        key={group}
+                        onClick={() => setActiveTab(group)}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            border: 'none',
+                            background: activeTab === group ? '#e0f2fe' : 'transparent',
+                            color: activeTab === group ? '#0284c7' : '#64748b',
+                            borderRadius: '20px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {group}
+                    </button>
+                ))}
             </div>
 
-            <div style={{
-                background: 'var(--bg-surface, #ffffff)', // Fallback to white if variable missing
-                borderRadius: '16px',
-                padding: '2.5rem',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.04)', // Modern soft shadow
-                border: '1px solid rgba(0,0,0,0.05)' // Very subtle border
-            }}>
-                <form id="settings-form" onSubmit={handleSaveChanges}>
-                    <div style={{ marginBottom: '2rem' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ width: '4px', height: '24px', background: 'var(--primary-color)', borderRadius: '2px', display: 'inline-block' }}></span>
-                            Personal Information
-                        </h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginLeft: '1rem' }}>
-                            Update your public profile details.
-                        </p>
-                    </div>
-
-                    {feedback.message && (
-                        <div style={{
-                            marginBottom: '2rem',
-                            padding: '1rem 1.25rem',
-                            borderRadius: '8px',
-                            background: feedback.type === 'error' ? '#fef2f2' : '#f0fdf4',
-                            color: feedback.type === 'error' ? '#ef4444' : '#16a34a',
-                            border: `1px solid ${feedback.type === 'error' ? '#fecaca' : '#bbf7d0'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            fontWeight: '500'
-                        }}>
-                            {feedback.type === 'success' && <span>✓</span>}
-                            {feedback.type === 'error' && <span>⚠</span>}
-                            {feedback.message}
-                        </div>
+            {loading ? <p>Loading...</p> : (
+                <div style={{ display: 'grid', gap: '1.5rem', maxWidth: '800px' }}>
+                    {groupedConfigs[activeTab]?.map((config) => (
+                        <ConfigItem key={config.key} config={config} onSave={handleSave} />
+                    ))}
+                    {(!groupedConfigs[activeTab] || groupedConfigs[activeTab].length === 0) && (
+                        <p>No configurations in this group.</p>
                     )}
-
-                    <fieldset disabled={isSaving} style={{ border: 'none', padding: 0, margin: 0 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-
-                            {/* Left Column */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Full Name</label>
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={e => setName(e.target.value)}
-                                        className={fieldErrors.name ? 'input-error' : ''}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem 1rem',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border-color)',
-                                            background: 'var(--bg-secondary)',
-                                            fontSize: '0.95rem',
-                                            transition: 'border-color 0.2s',
-                                        }}
-                                        placeholder="John Doe"
-                                    />
-                                    {fieldErrors.name && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.25rem', display: 'block' }}>{fieldErrors.name}</span>}
-                                </div>
-
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Email Address</label>
-                                    <input
-                                        type="email"
-                                        value={currentUser?.email || ''}
-                                        readOnly disabled
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem 1rem',
-                                            borderRadius: '8px',
-                                            border: '1px solid transparent',
-                                            background: 'var(--bg-secondary)',
-                                            color: 'var(--text-disabled)',
-                                            cursor: 'not-allowed',
-                                            opacity: 0.7
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Mobile Number</label>
-                                    <input
-                                        type="tel"
-                                        value={mobile}
-                                        onChange={e => setMobile(e.target.value)}
-                                        placeholder="+1 (555) 000-0000"
-                                        className={fieldErrors.mobile ? 'input-error' : ''}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem 1rem',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border-color)',
-                                            background: 'var(--bg-secondary)',
-                                            fontSize: '0.95rem',
-                                        }}
-                                    />
-                                    {fieldErrors.mobile && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.25rem', display: 'block' }}>{fieldErrors.mobile}</span>}
-                                </div>
-                            </div>
-
-                            {/* Right Column */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Role</label>
-                                    <input
-                                        type="text"
-                                        value={currentUser?.role || ''}
-                                        readOnly disabled
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem 1rem',
-                                            borderRadius: '8px',
-                                            border: '1px solid transparent',
-                                            background: 'var(--bg-secondary)',
-                                            color: 'var(--text-disabled)',
-                                            cursor: 'not-allowed',
-                                            opacity: 0.7
-                                        }}
-                                    />
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>City</label>
-                                        <input
-                                            type="text"
-                                            value={city}
-                                            onChange={e => setCity(e.target.value)}
-                                            placeholder="New York"
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.875rem 1rem',
-                                                borderRadius: '8px',
-                                                border: '1px solid var(--border-color)',
-                                                background: 'var(--bg-secondary)',
-                                                fontSize: '0.95rem',
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>State</label>
-                                        <input
-                                            type="text"
-                                            value={state}
-                                            onChange={e => setState(e.target.value)}
-                                            placeholder="NY"
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.875rem 1rem',
-                                                borderRadius: '8px',
-                                                border: '1px solid var(--border-color)',
-                                                background: 'var(--bg-secondary)',
-                                                fontSize: '0.95rem',
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>LinkedIn URL</label>
-                                    <input
-                                        type="url"
-                                        value={linkedin}
-                                        onChange={e => setLinkedin(e.target.value)}
-                                        placeholder="https://linkedin.com/in/username"
-                                        className={fieldErrors.linkedin ? 'input-error' : ''}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.875rem 1rem',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border-color)',
-                                            background: 'var(--bg-secondary)',
-                                            fontSize: '0.95rem',
-                                        }}
-                                    />
-                                    {fieldErrors.linkedin && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.25rem', display: 'block' }}>{fieldErrors.linkedin}</span>}
-                                </div>
-                            </div>
-                        </div>
-                    </fieldset>
-                </form>
-
-                <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border-color)' }}>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textAlign: 'center' }}>
-                        Need to change your password? <a href="#" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500' }}>Update it here</a> or click your profile icon.
-                    </p>
                 </div>
+            )}
+
+            <div style={{ marginTop: '3rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', fontSize: '0.9rem', color: '#64748b' }}>
+                <p><strong>Note:</strong> Sensitive values are masked. Updating a value will overwrite the existing one immediately. Backend services may auto-refresh, or require a restart.</p>
             </div>
         </div>
     );
-}
+};
+
+const ConfigItem = ({ config, onSave }) => {
+    const [value, setValue] = useState(config.value || '');
+    const [isDirty, setIsDirty] = useState(false);
+    const [showSecret, setShowSecret] = useState(false);
+
+    const handleChange = (e) => {
+        setValue(e.target.value);
+        setIsDirty(true);
+    };
+
+    const handleSaveClick = async () => {
+        await onSave(config.key, value);
+        setIsDirty(false);
+    };
+
+    return (
+        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <label style={{ fontWeight: '600', color: '#334155' }}>{config.key}</label>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Last updated: {new Date(config.updated_at).toLocaleDateString()}</span>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>{config.description}</p>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                    <input
+                        type={config.is_secret && !showSecret ? "password" : "text"}
+                        value={value}
+                        onChange={handleChange}
+                        className="config-input"
+                        placeholder="Not set"
+                        style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem'
+                        }}
+                    />
+                    {config.is_secret && (
+                        <button
+                            type="button"
+                            onClick={() => setShowSecret(!showSecret)}
+                            style={{
+                                position: 'absolute',
+                                right: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '1.2rem',
+                                opacity: 0.5
+                            }}
+                        >
+                            {showSecret ? '👁️' : '🔒'}
+                        </button>
+                    )}
+                </div>
+                <button
+                    onClick={handleSaveClick}
+                    disabled={!isDirty}
+                    style={{
+                        background: isDirty ? '#0f172a' : '#e2e8f0',
+                        color: isDirty ? 'white' : '#94a3b8',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0 1.5rem',
+                        fontWeight: '600',
+                        cursor: isDirty ? 'pointer' : 'default',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    Save
+                </button>
+            </div>
+        </div>
+    );
+};
+
+export default SettingsScreen;

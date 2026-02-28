@@ -23,8 +23,13 @@ type ProfileModalProps = {
     initialTab?: string;
 };
 
-export default function ProfileModal({ user, onClose, onChangePassword, onUpdateProfile, initialTab = 'profile' }: ProfileModalProps) {
-    const resolveTab = (tab: string) => (tab === 'profile' || tab === 'password' ? tab : 'profile');
+export default function ProfileModal({ user, onClose, onChangePassword, onUpdateProfile, initialTab = 'basic' }: ProfileModalProps) {
+    // Map 'profile' to 'basic' for backward compatibility
+    const resolveTab = (tab: string) => {
+        if (tab === 'profile') return 'basic';
+        return ['basic', 'professional', 'password'].includes(tab) ? tab : 'basic';
+    };
+
     const [activeTab, setActiveTab] = useState(resolveTab(initialTab));
 
     // Form States
@@ -94,7 +99,26 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
 
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateForm(profileSchema, formData)) return;
+        // Validate all data even if on specific tab
+        if (!validateForm(profileSchema, formData)) {
+            // Check where the error is and switch tab
+            // Note: We can't easily access the errors from validateForm because it updates state.
+            // But we can re-run check or check fieldErrors in setTimeout? 
+            // Better: re-run parse here to determine tab.
+            try {
+                profileSchema.parse(formData);
+            } catch (err: any) {
+                if (err instanceof z.ZodError) {
+                    const firstErrorPath = err.errors[0]?.path[0] as string;
+                    if (['name', 'email', 'mobile', 'role'].includes(firstErrorPath)) {
+                        setActiveTab('basic');
+                    } else {
+                        setActiveTab('professional');
+                    }
+                }
+            }
+            return;
+        }
 
         setIsLoading(true);
         setError('');
@@ -145,14 +169,16 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
-                maxWidth: '800px', width: '95%',
+                maxWidth: '700px', width: '95%',
                 background: 'var(--bg-surface, #ffffff)',
                 borderRadius: '16px',
                 boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
                 padding: '2.5rem',
                 maxHeight: '90vh', overflowY: 'auto',
                 position: 'relative',
-                border: 'none'
+                border: 'none',
+                display: 'flex',
+                flexDirection: 'column'
             }}>
                 <button
                     onClick={onClose}
@@ -166,7 +192,7 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
                     <XIcon style={{ width: 24, height: 24 }} />
                 </button>
 
-                <div style={{ marginBottom: '2rem' }}>
+                <div style={{ marginBottom: '1.5rem' }}>
                     <h2 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>My Profile</h2>
                     <p style={{ color: 'var(--text-secondary)' }}>Manage your account details and security.</p>
                 </div>
@@ -176,19 +202,30 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
                     marginBottom: '2rem'
                 }}>
                     <button
-                        className={activeTab === 'profile' ? 'active' : ''}
-                        onClick={() => handleTabClick('profile')}
+                        className={activeTab === 'basic' ? 'active' : ''}
+                        onClick={() => handleTabClick('basic')}
                         style={{
                             background: 'none', border: 'none',
-                            borderBottom: activeTab === 'profile' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                            padding: '0.75rem 0',
-                            fontWeight: '600',
-                            color: activeTab === 'profile' ? 'var(--primary-color)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            borderBottom: activeTab === 'basic' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                            padding: '0.75rem 0', fontWeight: '600',
+                            color: activeTab === 'basic' ? 'var(--primary-color)' : 'var(--text-secondary)',
+                            cursor: 'pointer', transition: 'all 0.2s'
                         }}
                     >
-                        Profile Details
+                        Basic Info
+                    </button>
+                    <button
+                        className={activeTab === 'professional' ? 'active' : ''}
+                        onClick={() => handleTabClick('professional')}
+                        style={{
+                            background: 'none', border: 'none',
+                            borderBottom: activeTab === 'professional' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                            padding: '0.75rem 0', fontWeight: '600',
+                            color: activeTab === 'professional' ? 'var(--primary-color)' : 'var(--text-secondary)',
+                            cursor: 'pointer', transition: 'all 0.2s'
+                        }}
+                    >
+                        Professional Info
                     </button>
                     <button
                         className={activeTab === 'password' ? 'active' : ''}
@@ -196,22 +233,19 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
                         style={{
                             background: 'none', border: 'none',
                             borderBottom: activeTab === 'password' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                            padding: '0.75rem 0',
-                            fontWeight: '600',
+                            padding: '0.75rem 0', fontWeight: '600',
                             color: activeTab === 'password' ? 'var(--primary-color)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            cursor: 'pointer', transition: 'all 0.2s'
                         }}
                     >
                         Password
                     </button>
                 </div>
 
-                <div className="modal-body" style={{ padding: 0 }}>
+                <div className="modal-body" style={{ padding: 0, flex: 1 }}>
                     {(error || successMessage) && (
                         <div style={{
-                            marginBottom: '2rem',
-                            padding: '1rem 1.25rem',
+                            marginBottom: '1.5rem', padding: '1rem 1.25rem',
                             borderRadius: '8px',
                             background: error ? '#fef2f2' : '#f0fdf4',
                             color: error ? '#ef4444' : '#16a34a',
@@ -224,134 +258,138 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
                         </div>
                     )}
 
-                    {activeTab === 'profile' && (
+                    {/* BASIC INFO TAB */}
+                    {activeTab === 'basic' && (
                         <form id="profile-form" onSubmit={handleProfileUpdate}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                                {/* Left Column */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Full Name</label>
-                                        <input
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className={fieldErrors.name ? 'input-error' : ''}
-                                            style={{
-                                                width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                                border: fieldErrors.name ? '1px solid #ef4444' : '1px solid var(--border-color)',
-                                                background: 'var(--bg-secondary)'
-                                            }}
-                                        />
-                                        {fieldErrors.name && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem' }}>{fieldErrors.name}</span>}
-                                    </div>
-
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Email Address</label>
-                                        <input
-                                            type="email"
-                                            value={formData.email}
-                                            disabled
-                                            style={{
-                                                width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                                border: '1px solid transparent', background: 'var(--bg-secondary)',
-                                                color: 'var(--text-disabled)', cursor: 'not-allowed', opacity: 0.7
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Mobile Number</label>
-                                        <input
-                                            type="tel"
-                                            value={formData.mobile}
-                                            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                                            className={fieldErrors.mobile ? 'input-error' : ''}
-                                            style={{
-                                                width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                                border: fieldErrors.mobile ? '1px solid #ef4444' : '1px solid var(--border-color)',
-                                                background: 'var(--bg-secondary)'
-                                            }}
-                                        />
-                                        {fieldErrors.mobile && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem' }}>{fieldErrors.mobile}</span>}
-                                    </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className={fieldErrors.name ? 'input-error' : ''}
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: fieldErrors.name ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                                            background: 'var(--bg-secondary)'
+                                        }}
+                                    />
+                                    {fieldErrors.name && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem' }}>{fieldErrors.name}</span>}
                                 </div>
 
-                                {/* Right Column */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Role</label>
-                                        <input
-                                            type="text"
-                                            value={formData.role}
-                                            disabled
-                                            style={{
-                                                width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                                border: '1px solid transparent', background: 'var(--bg-secondary)',
-                                                color: 'var(--text-disabled)', cursor: 'not-allowed', opacity: 0.7
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>City</label>
-                                            <input
-                                                type="text"
-                                                value={formData.city || ''}
-                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                                style={{
-                                                    width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                                    border: '1px solid var(--border-color)', background: 'var(--bg-secondary)'
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>State</label>
-                                            <input
-                                                type="text"
-                                                value={formData.state || ''}
-                                                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                                                style={{
-                                                    width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                                    border: '1px solid var(--border-color)', background: 'var(--bg-secondary)'
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>LinkedIn URL</label>
-                                        <input
-                                            type="url"
-                                            value={formData.linkedin_url || ''}
-                                            onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
-                                            placeholder="https://linkedin.com/in/username"
-                                            style={{
-                                                width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                                border: '1px solid var(--border-color)', background: 'var(--bg-secondary)'
-                                            }}
-                                        />
-                                    </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Role</label>
+                                    <input
+                                        type="text"
+                                        value={formData.role}
+                                        disabled
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: '1px solid transparent', background: 'var(--bg-secondary)',
+                                            color: 'var(--text-disabled)', cursor: 'not-allowed', opacity: 0.7
+                                        }}
+                                    />
                                 </div>
-                            </div>
 
-                            <div className="form-group" style={{ marginTop: '1.5rem', marginBottom: 0 }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Bio</label>
-                                <textarea
-                                    value={formData.bio}
-                                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                    rows={3}
-                                    style={{
-                                        width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
-                                        border: fieldErrors.bio ? '1px solid #ef4444' : '1px solid var(--border-color)',
-                                        background: 'var(--bg-secondary)', resize: 'vertical'
-                                    }}
-                                />
-                                {fieldErrors.bio && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem' }}>{fieldErrors.bio}</span>}
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={formData.email}
+                                        disabled
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: '1px solid transparent', background: 'var(--bg-secondary)',
+                                            color: 'var(--text-disabled)', cursor: 'not-allowed', opacity: 0.7
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Mobile Number</label>
+                                    <input
+                                        type="tel"
+                                        value={formData.mobile}
+                                        onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                                        className={fieldErrors.mobile ? 'input-error' : ''}
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: fieldErrors.mobile ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                                            background: 'var(--bg-secondary)'
+                                        }}
+                                    />
+                                    {fieldErrors.mobile && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem' }}>{fieldErrors.mobile}</span>}
+                                </div>
                             </div>
                         </form>
                     )}
 
+                    {/* PROFESSIONAL INFO TAB */}
+                    {activeTab === 'professional' && (
+                        <form id="profile-form" onSubmit={handleProfileUpdate}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>City</label>
+                                    <input
+                                        type="text"
+                                        value={formData.city || ''}
+                                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: '1px solid var(--border-color)', background: 'var(--bg-secondary)'
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>State</label>
+                                    <input
+                                        type="text"
+                                        value={formData.state || ''}
+                                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: '1px solid var(--border-color)', background: 'var(--bg-secondary)'
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>LinkedIn URL</label>
+                                    <input
+                                        type="url"
+                                        value={formData.linkedin_url || ''}
+                                        onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
+                                        placeholder="https://linkedin.com/in/username"
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: '1px solid var(--border-color)', background: 'var(--bg-secondary)'
+                                        }}
+                                    />
+                                </div>
+                                {/* Empty cell or spacer */}
+                                <div></div>
+
+                                <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Bio</label>
+                                    <textarea
+                                        value={formData.bio}
+                                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                                        rows={3}
+                                        style={{
+                                            width: '100%', padding: '0.875rem 1rem', borderRadius: '8px',
+                                            border: fieldErrors.bio ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                                            background: 'var(--bg-secondary)', resize: 'vertical'
+                                        }}
+                                    />
+                                    {fieldErrors.bio && <span className="error-text" style={{ color: '#ef4444', fontSize: '0.85rem' }}>{fieldErrors.bio}</span>}
+                                </div>
+                            </div>
+                        </form>
+                    )}
+
+                    {/* PASSWORD TAB */}
                     {activeTab === 'password' && (
                         <form id="password-form" onSubmit={handlePasswordSubmit}>
                             <div className="form-group" style={{ marginBottom: '1.5rem' }}>
@@ -405,7 +443,7 @@ export default function ProfileModal({ user, onClose, onChangePassword, onUpdate
                     </button>
                     <button
                         type="submit"
-                        form={activeTab === 'profile' ? 'profile-form' : 'password-form'}
+                        form={activeTab === 'password' ? 'password-form' : 'profile-form'}
                         className="btn btn-primary"
                         disabled={isLoading}
                         style={{

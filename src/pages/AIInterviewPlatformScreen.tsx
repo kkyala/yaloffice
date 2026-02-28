@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { ChatIcon, SparklesIcon, MicOnIcon, AudioWaveIcon, VideoOnIcon, UploadCloudIcon, SendIcon } from '../components/Icons';
+import { ChatIcon, SparklesIcon, MicOnIcon, AudioWaveIcon, VideoOnIcon, UploadCloudIcon, SendIcon, RobotIcon } from '../components/Icons';
 import { aiService, type VoiceName, AVAILABLE_VOICES } from '../services/aiService';
 
 type Job = {
@@ -26,21 +27,66 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 
 const AIInterviewPlatformScreen = ({ jobsData = [] }: { jobsData: Job[] }) => {
     return (
-        <>
-            <header className="page-header">
-                <h1>AI Toolkit</h1>
+        <div className="page-container" style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
+            <header className="page-header" style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-text-main)', marginBottom: '0.5rem' }}>AI Toolkit</h1>
+                <p style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', maxWidth: '600px', margin: '0 auto' }}>
+                    Explore our suite of AI-powered tools for recruitment and analysis.
+                </p>
             </header>
-            <div className="ai-platform-grid">
+
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+                gap: '2rem'
+            }}>
                 <ChatbotWidget />
                 <TranscriptionWidget />
                 <TextToSpeechWidget />
                 <VideoAnalysisWidget />
             </div>
-        </>
+        </div>
     );
 };
 
 // --- WIDGETS ---
+
+const WidgetContainer = ({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) => (
+    <div style={{
+        background: 'var(--color-surface)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-md)',
+        border: '1px solid var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '500px', // Fixed height for uniformity
+        overflow: 'hidden'
+    }}>
+        <div style={{
+            padding: '1.25rem 1.5rem',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            background: 'var(--slate-50)'
+        }}>
+            <div style={{
+                width: '36px', height: '36px',
+                borderRadius: '8px',
+                background: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: 'var(--shadow-sm)',
+                color: 'var(--color-primary)'
+            }}>
+                {icon}
+            </div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-main)', margin: 0 }}>{title}</h3>
+        </div>
+        <div style={{ flex: 1, padding: '1.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {children}
+        </div>
+    </div>
+);
 
 const ChatbotWidget = () => {
     const [messages, setMessages] = useState<{ sender: 'user' | 'ai', text: string }[]>([]);
@@ -53,8 +99,7 @@ const ChatbotWidget = () => {
         if (!input.trim() || isLoading) return;
         const userText = input.trim();
         const userMessage = { sender: 'user' as const, text: userText };
-        
-        // Add user message and an empty AI message placeholder
+
         setMessages(prev => [...prev, userMessage, { sender: 'ai', text: '' }]);
         setInput('');
         setIsLoading(true);
@@ -87,27 +132,94 @@ const ChatbotWidget = () => {
     }, [messages]);
 
     return (
-        <div className="ai-widget chat-widget">
-            <h3><ChatIcon /> AI Chatbot</h3>
-            <div className="chat-history" ref={historyRef}>
-                {messages.map((msg, i) => (
-                    <div key={i} className={`chat-message ${msg.sender}`}>
-                        <div className={`chat-bubble ${msg.sender}`}>{msg.text}</div>
+        <WidgetContainer title="AI Assistant" icon={<RobotIcon style={{ width: '24px' }} />}>
+            <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                paddingRight: '0.5rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+            }} ref={historyRef}>
+                {messages.length === 0 ? (
+                    <div style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--color-text-muted)', opacity: 0.7 }}>
+                        <SparklesIcon style={{ width: '48px', height: '48px', marginBottom: '0.5rem' }} />
+                        <p>Ask me anything regarding recruitment.</p>
                     </div>
-                ))}
+                ) : (
+                    messages.map((msg, i) => (
+                        <div key={i} style={{
+                            alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+                            maxWidth: '85%'
+                        }}>
+                            <div style={{
+                                padding: '0.75rem 1rem',
+                                borderRadius: '1rem',
+                                background: msg.sender === 'user' ? 'var(--color-primary)' : 'var(--slate-100)',
+                                color: msg.sender === 'user' ? 'white' : 'var(--color-text-main)',
+                                fontSize: '0.95rem',
+                                lineHeight: '1.5',
+                                boxShadow: 'var(--shadow-sm)',
+                                borderTopRightRadius: msg.sender === 'user' ? '4px' : '1rem',
+                                borderTopLeftRadius: msg.sender === 'user' ? '1rem' : '4px'
+                            }}>
+                                {msg.text}
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
-            <div className="chat-input-area">
-                <input type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Ask me anything..." disabled={isLoading} />
-                <button className="btn btn-primary" onClick={handleSend} disabled={isLoading}><SendIcon /></button>
+
+            <div style={{ padding: '0.5rem 0 0' }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginBottom: '0.75rem',
+                    fontSize: '0.85rem',
+                    color: 'var(--color-text-muted)'
+                }}>
+                    <input
+                        type="checkbox"
+                        id="thinkingMode"
+                        checked={useThinkingMode}
+                        onChange={e => setUseThinkingMode(e.target.checked)}
+                        disabled={isLoading}
+                    />
+                    <label htmlFor="thinkingMode" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                        <SparklesIcon style={{ width: 14, height: 14, color: 'var(--color-secondary)' }} />
+                        Enable Deep Thinking (Gemini 2.5)
+                    </label>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                        type="text"
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSend()}
+                        placeholder="Type your message..."
+                        disabled={isLoading}
+                        style={{
+                            flex: 1,
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: '0.75rem 1rem',
+                            outline: 'none',
+                            transition: 'border-color 0.2s'
+                        }}
+                    />
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleSend}
+                        disabled={isLoading}
+                        style={{ padding: '0 1rem', borderRadius: 'var(--radius-lg)' }}
+                    >
+                        <SendIcon style={{ width: '20px' }} />
+                    </button>
+                </div>
             </div>
-            <div className="thinking-mode-toggle">
-                <SparklesIcon style={{width: 16, height: 16}} />
-                <label>
-                    <input type="checkbox" checked={useThinkingMode} onChange={e => setUseThinkingMode(e.target.checked)} disabled={isLoading} />
-                    Enable Thinking Mode (gemini-2.5-pro for complex queries)
-                </label>
-            </div>
-        </div>
+        </WidgetContainer>
     );
 };
 
@@ -133,18 +245,14 @@ const TranscriptionWidget = () => {
                         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                         try {
                             const base64Audio = await blobToBase64(audioBlob);
-                            // NOTE: Using a simple text prompt with generateText for transcription
-                            // as a workaround since a dedicated transcription model wasn't specified for this task.
                             const result = await aiService.generateText(`Transcribe the following audio exactly:`, false);
-                            // This is a placeholder. A real implementation would send the audio data.
-                            // For now, we simulate a transcription of what might have been said.
-                             setTranscript('This is a simulated transcription. The Gemini API for direct audio file transcription is not used in this demo widget, but the live interview uses real-time transcription.');
+                            setTranscript('This is a simulated transcription. The Gemini API for direct audio file transcription is not used in this demo widget, but the live interview uses real-time transcription.');
                         } catch (error) {
                             console.error(error);
                             setStatus('Transcription failed.');
                         } finally {
                             audioChunksRef.current = [];
-                             setStatus('Ready to transcribe');
+                            setStatus('Ready to transcribe');
                         }
                     };
                     mediaRecorderRef.current.start();
@@ -157,7 +265,7 @@ const TranscriptionWidget = () => {
                 });
         }
     };
-    
+
     // This effect handles the stop logic
     useEffect(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording' && !isRecording) {
@@ -167,14 +275,37 @@ const TranscriptionWidget = () => {
 
 
     return (
-        <div className="ai-widget transcription-widget">
-            <h3><MicOnIcon /> Audio Transcription</h3>
-            <textarea className="transcription-output" readOnly value={transcript} placeholder="Transcription will appear here..."></textarea>
-            <p className="transcription-status">{status}</p>
-            <button className={`btn ${isRecording ? 'btn-secondary' : 'btn-primary'} btn-full`} onClick={() => setIsRecording(!isRecording)}>
-                {isRecording ? 'Stop Recording' : 'Start Recording'}
-            </button>
-        </div>
+        <WidgetContainer title="Speech-to-Text" icon={<MicOnIcon style={{ width: '24px' }} />}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{
+                    flex: 1,
+                    background: 'var(--slate-50)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '1rem',
+                    border: '1px solid var(--color-border)',
+                    overflowY: 'auto'
+                }}>
+                    {transcript ? (
+                        <p style={{ margin: 0, lineHeight: '1.6' }}>{transcript}</p>
+                    ) : (
+                        <p style={{ margin: 0, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Transcription will appear here...</p>
+                    )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', color: isRecording ? 'var(--status-error)' : 'var(--color-text-muted)', fontWeight: 600 }}>
+                        {status}
+                    </span>
+                    <button
+                        className={`btn ${isRecording ? 'btn-danger' : 'btn-primary'}`}
+                        onClick={() => setIsRecording(!isRecording)}
+                        style={{ minWidth: '150px' }}
+                    >
+                        {isRecording ? 'Stop Recording' : 'Start Recording'}
+                    </button>
+                </div>
+            </div>
+        </WidgetContainer>
     );
 };
 
@@ -203,19 +334,37 @@ const TextToSpeechWidget = () => {
     };
 
     return (
-        <div className="ai-widget tts-widget">
-            <h3><AudioWaveIcon /> Text-to-Speech</h3>
-            <textarea className="tts-input" value={text} onChange={e => setText(e.target.value)}></textarea>
-            <div className="tts-controls">
-                <select value={voice} onChange={e => setVoice(e.target.value as VoiceName)}>
-                    {AVAILABLE_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
-                </select>
-                <button className="btn btn-primary" onClick={handleSpeak} disabled={isLoading}>
-                    {isLoading ? 'Generating...' : 'Speak'}
-                </button>
+        <WidgetContainer title="Text-to-Speech" icon={<AudioWaveIcon style={{ width: '24px' }} />}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <textarea
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    style={{
+                        flex: 1,
+                        resize: 'none',
+                        padding: '1rem',
+                        borderRadius: 'var(--radius-lg)',
+                        border: '1px solid var(--color-border)',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.6'
+                    }}
+                ></textarea>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                    <select
+                        value={voice}
+                        onChange={e => setVoice(e.target.value as VoiceName)}
+                        style={{ width: '100%' }}
+                    >
+                        {AVAILABLE_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                    <button className="btn btn-primary" onClick={handleSpeak} disabled={isLoading}>
+                        {isLoading ? 'Generating...' : 'Speak'}
+                    </button>
+                </div>
                 <audio ref={audioRef} style={{ display: 'none' }} />
             </div>
-        </div>
+        </WidgetContainer>
     );
 };
 
@@ -234,7 +383,7 @@ const VideoAnalysisWidget = () => {
             setVideoSrc(URL.createObjectURL(file));
         }
     };
-    
+
     const handleAnalyze = async () => {
         if (!videoFile || !prompt.trim() || isLoading) return;
         setIsLoading(true);
@@ -260,28 +409,65 @@ const VideoAnalysisWidget = () => {
 
 
     return (
-        <div className="ai-widget video-analysis-widget">
-            <h3><VideoOnIcon /> Video Analysis</h3>
-            {videoSrc ? (
-                 <video controls src={videoSrc} className="video-player" />
-            ) : (
-                <div className="video-dropzone" onClick={() => inputRef.current?.click()}>
-                    <UploadCloudIcon />
-                    <h4>Upload Video</h4>
-                    <p>Click to select a video file</p>
-                    <input type="file" accept="video/*" ref={inputRef} onChange={handleFileChange} style={{ display: 'none' }} />
+        <WidgetContainer title="Video Analysis" icon={<VideoOnIcon style={{ width: '24px' }} />}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', overflow: 'hidden' }}>
+                <div style={{
+                    flex: 1,
+                    background: 'black',
+                    borderRadius: 'var(--radius-lg)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative'
+                }}>
+                    {videoSrc ? (
+                        <video controls src={videoSrc} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    ) : (
+                        <div
+                            onClick={() => inputRef.current?.click()}
+                            style={{
+                                cursor: 'pointer',
+                                textAlign: 'center',
+                                padding: '2rem',
+                                color: 'rgba(255,255,255,0.7)'
+                            }}
+                        >
+                            <UploadCloudIcon style={{ width: '40px', height: '40px', marginBottom: '1rem', opacity: 0.8 }} />
+                            <p style={{ margin: 0, fontWeight: 600 }}>Click to Upload Video</p>
+                            <input type="file" accept="video/*" ref={inputRef} onChange={handleFileChange} style={{ display: 'none' }} />
+                        </div>
+                    )}
                 </div>
-            )}
-             <div className="video-prompt">
-                <input type="text" value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="What should I look for in the video?"/>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                        type="text"
+                        value={prompt}
+                        onChange={e => setPrompt(e.target.value)}
+                        placeholder="What should I look for?"
+                        style={{ flex: 1 }}
+                    />
+                    <button className="btn btn-primary" onClick={handleAnalyze} disabled={!videoFile || isLoading}>
+                        {isLoading ? '...' : 'Analyze'}
+                    </button>
+                </div>
+
+                {result && (
+                    <div style={{
+                        background: 'var(--slate-50)',
+                        padding: '1rem',
+                        borderRadius: 'var(--radius-lg)',
+                        fontSize: '0.9rem',
+                        maxHeight: '100px',
+                        overflowY: 'auto',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        {result}
+                    </div>
+                )}
             </div>
-            <button className="btn btn-primary btn-full" onClick={handleAnalyze} disabled={!videoFile || isLoading}>
-                {isLoading ? 'Analyzing...' : 'Analyze with Gemini 2.5 Pro'}
-            </button>
-             <div className="video-result-display">
-                {isLoading ? <div className="spinner" /> : result || 'Analysis results will appear here.'}
-            </div>
-        </div>
+        </WidgetContainer>
     );
 };
 

@@ -144,7 +144,7 @@ class RoomRegistry {
 
     if (error || !data) return [];
 
-    return data.map(d => ({
+    return data.map((d: any) => ({
       roomName: d.room_name,
       createdAt: d.created_at,
       lastActiveAt: d.last_active_at,

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ChevronLeftIcon } from '../components/Icons';
 
 export default function JobApplicationScreen({ selectedJob: job, currentUser: user, onApplyForJob, onNavigate }) {
     // Basic Info
@@ -10,7 +11,7 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
     const [auth, setAuth] = useState(user.work_authorization || '');
     const [source, setSource] = useState('');
     const [noticePeriod, setNoticePeriod] = useState(user.notice_period || 'Immediate');
-    const [dob, setDob] = useState(''); // NEW: Date of Birth to match schema
+    const [dob, setDob] = useState('');
 
     // Application-specific
     const [summary, setSummary] = useState('');
@@ -19,10 +20,10 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
 
     if (!job) {
         return (
-            <div className="page-content">
+            <div className="page-content" style={{ textAlign: 'center', paddingTop: '4rem' }}>
                 <h2>Job not found</h2>
-                <p>The job you are trying to apply for could not be found. It may have been closed.</p>
-                <button className="btn btn-secondary" onClick={() => onNavigate('find-jobs', 'find-jobs')}>Back to Jobs</button>
+                <p style={{ color: 'var(--color-text-muted)' }}>The job you are trying to apply for could not be found. It may have been closed.</p>
+                <button className="btn btn-secondary" style={{ marginTop: '1rem' }} onClick={() => onNavigate('find-jobs', 'find-jobs')}>Back to Jobs</button>
             </div>
         );
     }
@@ -67,14 +68,11 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
 
         const result = await onApplyForJob(job, profileData);
         if (result && result.success) {
-            if (job.screening_enabled || job.title.includes('(Demo)')) {
-                // Redirect to screening if required
-                // Assuming result.applicationId or result.data.id is available
+            if (job.screening_enabled || (job.title && job.title.includes('(Demo)'))) {
                 const applicationId = result.applicationId || result.data?.id;
                 if (applicationId) {
                     onNavigate('pre-interview-assessment', 'dashboard', { candidateId: applicationId, applicationId: applicationId });
                 } else {
-                    // Fallback if ID missing
                     onNavigate('dashboard', 'dashboard');
                 }
             } else {
@@ -86,132 +84,86 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
         }
     };
 
-    const compactInputStyle: React.CSSProperties = {
-        width: '100%',
-        padding: '0.5rem 0.75rem',
-        borderRadius: '6px',
-        border: '1px solid #e2e8f0',
-        background: '#f8fafc',
-        fontSize: '0.85rem',
-        transition: 'border-color 0.2s',
-        outline: 'none',
-    };
-
     return (
-        <div style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', maxWidth: '1400px', margin: '0 auto' }}>
-            <header style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1rem',
-                paddingBottom: '0.5rem',
-                borderBottom: '1px solid #f1f5f9',
-                flexShrink: 0
-            }}>
-                <div>
-                    <h1 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.2rem', lineHeight: '1.2' }}>Apply for {job.title}</h1>
-                    <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                        Position at <strong style={{ color: '#334155' }}>{job.employer}</strong> &bull; Complete your profile
-                    </p>
-                </div>
-                <div className="header-actions" style={{ display: 'flex', gap: '0.75rem' }}>
-                    <button
-                        type="button"
-                        className="btn"
-                        onClick={handleCancel}
-                        disabled={isLoading}
-                        style={{
-                            background: 'white',
-                            border: '1px solid #cbd5e1',
-                            color: '#475569',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '6px',
-                            fontWeight: '600',
-                            fontSize: '0.85rem',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        className="btn"
-                        onClick={handleSubmit}
-                        disabled={isLoading}
-                        style={{
-                            background: 'var(--primary-color)',
-                            border: 'none',
-                            color: 'white',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '6px',
-                            fontWeight: '600',
-                            fontSize: '0.85rem',
-                            boxShadow: '0 2px 4px rgba(231, 76, 60, 0.2)',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {isLoading ? 'Submitting...' : 'Submit'}
-                    </button>
-                </div>
+        <div className="page-container" style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem 1rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+                <button
+                    className="btn btn-ghost"
+                    onClick={handleCancel}
+                    style={{ paddingLeft: 0, color: 'var(--color-text-muted)' }}
+                >
+                    <ChevronLeftIcon style={{ width: '16px', marginRight: '0.5rem' }} /> Back to Jobs
+                </button>
+            </div>
+
+            <header style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                <h1 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Apply for {job.title}</h1>
+                <p style={{ fontSize: '1.1rem', color: 'var(--color-text-muted)' }}>
+                    at <strong style={{ color: 'var(--color-primary)' }}>{job.employer}</strong>
+                </p>
             </header>
 
-            <form onSubmit={handleSubmit} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-                {submitError && (
-                    <div style={{
-                        marginBottom: '0.5rem',
-                        padding: '0.5rem 1rem',
-                        background: '#fef2f2',
-                        borderLeft: '3px solid #ef4444',
-                        color: '#b91c1c',
-                        borderRadius: '4px',
-                        fontWeight: '500',
-                        fontSize: '0.85rem'
-                    }}>
-                        {submitError}
-                    </div>
-                )}
-
+            {submitError && (
                 <div style={{
-                    background: 'white',
-                    borderRadius: '12px',
-                    padding: '1.5rem',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                    border: '1px solid #f1f5f9',
+                    marginBottom: '1.5rem',
+                    padding: '1rem',
+                    background: '#fef2f2',
+                    border: '1px solid #fee2e2',
+                    color: '#b91c1c',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: '500',
                     display: 'flex',
-                    flexDirection: 'column',
-                    flex: 1,
-                    overflowY: 'auto',
-                    gap: '1rem'
+                    alignItems: 'center',
+                    gap: '0.5rem'
                 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                        {/* Row 1 */}
-                        <div className="form-group">
-                            <label htmlFor="applicant-name" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Full Name*</label>
-                            <input id="applicant-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required style={compactInputStyle} />
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="applicant-mobile" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Mobile Number*</label>
-                            <input id="applicant-mobile" type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} required style={compactInputStyle} />
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="applicant-city" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>City*</label>
-                            <input id="applicant-city" type="text" value={city} onChange={(e) => setCity(e.target.value)} required style={compactInputStyle} />
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="applicant-state" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>State*</label>
-                            <input id="applicant-state" type="text" value={state} onChange={(e) => setState(e.target.value)} required style={compactInputStyle} />
-                        </div>
+                    ⚠️ {submitError}
+                </div>
+            )}
 
-                        {/* Row 2 */}
+            <form onSubmit={handleSubmit} style={{
+                background: 'var(--color-surface)',
+                borderRadius: 'var(--radius-xl)',
+                boxShadow: 'var(--shadow-lg)',
+                padding: '2.5rem',
+                border: '1px solid var(--color-border)'
+            }}>
+                <div style={{ marginBottom: '2.5rem' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', color: 'var(--color-text-main)' }}>Personal Information</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
                         <div className="form-group">
-                            <label htmlFor="applicant-dob" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Date of Birth*</label>
-                            <input id="applicant-dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} required style={compactInputStyle} />
+                            <label className="form-label">Full Name*</label>
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ex. John Doe" />
                         </div>
                         <div className="form-group">
-                            <label htmlFor="applicant-auth" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Work Authorization*</label>
-                            <select id="applicant-auth" value={auth} onChange={(e) => setAuth(e.target.value)} required style={compactInputStyle}>
-                                <option value="" disabled>Select...</option>
+                            <label className="form-label">Date of Birth*</label>
+                            <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} required />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Mobile Number*</label>
+                            <input type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} required placeholder="+1 (555) 000-0000" />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Email</label>
+                            <input type="email" value={user.email || ''} disabled style={{ background: 'var(--slate-100)', color: 'var(--slate-500)', cursor: 'not-allowed' }} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">City*</label>
+                            <input type="text" value={city} onChange={(e) => setCity(e.target.value)} required />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">State*</label>
+                            <input type="text" value={state} onChange={(e) => setState(e.target.value)} required />
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ marginBottom: '2.5rem' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', color: 'var(--color-text-main)' }}>Professional Details</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                        <div className="form-group">
+                            <label className="form-label">Work Authorization*</label>
+                            <select value={auth} onChange={(e) => setAuth(e.target.value)} required>
+                                <option value="" disabled>Select Status...</option>
                                 <option>US Citizen</option>
                                 <option>Green Card Holder</option>
                                 <option>Have H1 Visa</option>
@@ -220,9 +172,19 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
                             </select>
                         </div>
                         <div className="form-group">
-                            <label htmlFor="applicant-source" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Source*</label>
-                            <select id="applicant-source" value={source} onChange={(e) => setSource(e.target.value)} required style={compactInputStyle}>
-                                <option value="" disabled>Source?</option>
+                            <label className="form-label">Notice Period*</label>
+                            <select value={noticePeriod} onChange={(e) => setNoticePeriod(e.target.value)} required>
+                                <option value="Immediate">Immediate</option>
+                                <option value="15 Days">15 Days</option>
+                                <option value="30 Days">30 Days</option>
+                                <option value="60 Days">60 Days</option>
+                                <option value="90 Days">90 Days</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Source*</label>
+                            <select value={source} onChange={(e) => setSource(e.target.value)} required>
+                                <option value="" disabled>How did you hear about us?</option>
                                 <option>LinkedIn</option>
                                 <option>Dice</option>
                                 <option>Indeed</option>
@@ -232,34 +194,43 @@ export default function JobApplicationScreen({ selectedJob: job, currentUser: us
                             </select>
                         </div>
                         <div className="form-group">
-                            <label htmlFor="applicant-notice-period" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Notice Period*</label>
-                            <select id="applicant-notice-period" value={noticePeriod} onChange={(e) => setNoticePeriod(e.target.value)} required style={compactInputStyle}>
-                                <option value="Immediate">Immediate</option>
-                                <option value="15 Days">15 Days</option>
-                                <option value="30 Days">30 Days</option>
-                                <option value="60 Days">60 Days</option>
-                                <option value="90 Days">90 Days</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="applicant-linkedin" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>LinkedIn Profile URL</label>
-                            <input id="applicant-linkedin" type="url" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/..." style={compactInputStyle} />
+                            <label className="form-label">LinkedIn Profile URL</label>
+                            <input type="url" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/in/username" />
                         </div>
                     </div>
+                </div>
 
-                    {/* Resume Summary - Fills remaining space */}
-                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '100px' }}>
-                        <label htmlFor="applicant-summary" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#475569', marginBottom: '0.25rem' }}>Resume Summary / Cover Letter</label>
+                <div style={{ marginBottom: '2.5rem' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', color: 'var(--color-text-main)' }}>Summary & Cover Letter</h3>
+                    <div className="form-group">
                         <textarea
-                            id="applicant-summary"
                             value={summary}
                             onChange={(e) => setSummary(e.target.value)}
-                            placeholder="Briefly describe why you're a good fit for this role..."
-                            style={{ ...compactInputStyle, height: '100%', resize: 'none' }}
+                            placeholder="Briefly describe why you're a good fit for this role. Mention key projects or skills relevant to the job description."
+                            style={{ minHeight: '150px', resize: 'vertical' }}
                         />
                     </div>
                 </div>
-            </form >
-        </div >
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
+                    <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={handleCancel}
+                        disabled={isLoading}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={isLoading}
+                        style={{ minWidth: '150px' }}
+                    >
+                        {isLoading ? 'Submitting Application...' : 'Submit Application'}
+                    </button>
+                </div>
+            </form>
+        </div>
     );
 }

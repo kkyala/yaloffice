@@ -65,7 +65,7 @@ router.post('/', async (req, res) => {
 
         if (screenings && screenings.length > 0) {
             // Find best match: same job_id or no job_id
-            const match = screenings.find(s => s.job_id === jobId) || screenings.find(s => !s.job_id);
+            const match = screenings.find((s: any) => s.job_id === jobId) || screenings.find((s: any) => !s.job_id);
 
             if (match) {
                 // Update candidate with screening report

@@ -28,7 +28,7 @@ import '@livekit/components-styles';
 import { livekitService } from '../services/livekitService';
 import { interviewService, TranscriptEntry } from '../services/interviewService';
 import { api } from '../services/api';
-import { MicOnIcon, MicOffIcon, PhoneOffIcon, CheckCircleIcon } from '../components/Icons';
+import { MicOnIcon, MicOffIcon, PhoneOffIcon, CheckCircleIcon, VideoOnIcon } from '../components/Icons';
 
 type Candidate = {
     id: number;
@@ -87,17 +87,19 @@ const SessionTimer = ({ maxSeconds = 900 }: { maxSeconds?: number }) => {
     return (
         <div style={{
             position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            background: isUrgent ? '#ef4444' : 'rgba(0,0,0,0.6)',
-            color: 'white',
+            top: '1.5rem',
+            right: '1.5rem',
+            background: isUrgent ? 'var(--status-error)' : 'rgba(255, 255, 255, 0.8)',
+            color: isUrgent ? 'white' : 'var(--color-text-main)',
             padding: '0.5rem 1rem',
-            borderRadius: '20px',
-            fontWeight: 'bold',
-            fontSize: '1.2rem',
-            backdropFilter: 'blur(4px)',
+            borderRadius: 'var(--radius-full)',
+            fontWeight: '700',
+            fontSize: '1rem',
+            backdropFilter: 'blur(8px)',
             zIndex: 10,
-            transition: 'background 0.3s'
+            transition: 'background var(--duration-normal)',
+            border: isUrgent ? 'none' : '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)'
         }}>
             Time Remaining: {formatTime(secondsLeft)}
         </div>
@@ -143,32 +145,103 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
     const isReady = checks.mic && checks.permissions;
 
     return (
-        <div className="interview-welcome-container">
-            <h1>AI Avatar Interview</h1>
-            <p style={{ fontSize: '1.2rem', marginBottom: '3rem', color: 'var(--text-secondary)' }}>
-                Welcome to your AI-powered conversational interview for <strong style={{ color: 'var(--primary-color)' }}>{jobTitle}</strong>
-            </p>
+        <div className="page-container" style={{
+            maxWidth: '800px',
+            margin: '0 auto',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '2rem'
+        }}>
+            <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-text-main)', marginBottom: '1rem' }}>AI Avatar Interview</h1>
+                <p style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', lineHeight: '1.6' }}>
+                    Welcome to your AI-powered conversational interview for <strong style={{ color: 'var(--color-primary)' }}>{jobTitle}</strong>
+                </p>
+            </div>
 
-            <div className="device-check-panel glass-panel">
-                <h2 style={{ marginBottom: '2rem', fontSize: '1.5rem' }}>System Check</h2>
-                <div className="device-check-item">
-                    {checks.mic ? <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} /> : <span style={{ color: 'var(--error-color)', fontSize: '1.5rem' }}>❌</span>}
-                    <span style={{ fontSize: '1.1rem' }}>Microphone {checks.mic ? 'Detected' : 'Not Found'}</span>
-                </div>
-                <div className="device-check-item" style={{ margin: '1rem 0' }}>
-                    {checks.cam ? <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} /> : <span style={{ color: checks.cam ? 'var(--success-color)' : 'var(--warning-color)', fontSize: '1.5rem' }}>{checks.cam ? '✓' : '⚠️'}</span>}
-                    <span style={{ fontSize: '1.1rem' }}>Camera {checks.cam ? 'Detected' : 'Not Found (Audio Only)'}</span>
-                </div>
-                <div className="device-check-item">
-                    {checks.permissions ? <CheckCircleIcon style={{ color: 'var(--success-color)', width: '28px', height: '28px' }} /> : <span style={{ color: 'var(--error-color)', fontSize: '1.5rem' }}>❌</span>}
-                    <span style={{ fontSize: '1.1rem' }}>Permissions {checks.permissions ? 'Granted' : 'Needed'}</span>
+            <div style={{
+                background: 'var(--color-surface)',
+                borderRadius: 'var(--radius-xl)',
+                padding: '2.5rem',
+                boxShadow: 'var(--shadow-lg)',
+                border: '1px solid var(--color-border)',
+                marginBottom: '2rem'
+            }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '2rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>System Check</h2>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{
+                                width: '48px', height: '48px',
+                                borderRadius: '50%',
+                                background: checks.mic ? 'var(--success-50)' : 'var(--error-50)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: checks.mic ? 'var(--status-success)' : 'var(--status-error)'
+                            }}>
+                                <MicOnIcon style={{ width: '24px' }} />
+                            </div>
+                            <div>
+                                <h4 style={{ margin: 0, fontWeight: 600 }}>Microphone</h4>
+                                <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{checks.mic ? 'Detected' : 'Not Found'}</p>
+                            </div>
+                        </div>
+                        {checks.mic ? <CheckCircleIcon style={{ color: 'var(--status-success)', width: '24px' }} /> : <span style={{ color: 'var(--status-error)', fontSize: '1.5rem' }}>❌</span>}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{
+                                width: '48px', height: '48px',
+                                borderRadius: '50%',
+                                background: checks.cam ? 'var(--success-50)' : 'var(--warning-50)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: checks.cam ? 'var(--status-success)' : 'var(--status-warning)'
+                            }}>
+                                <VideoOnIcon style={{ width: '24px' }} />
+                            </div>
+                            <div>
+                                <h4 style={{ margin: 0, fontWeight: 600 }}>Camera</h4>
+                                <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{checks.cam ? 'Detected' : 'Not Found (Audio Only)'}</p>
+                            </div>
+                        </div>
+                        {checks.cam ? <CheckCircleIcon style={{ color: 'var(--status-success)', width: '24px' }} /> : <span style={{ color: 'var(--status-warning)', fontSize: '1.5rem' }}>⚠️</span>}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{
+                                width: '48px', height: '48px',
+                                borderRadius: '50%',
+                                background: checks.permissions ? 'var(--success-50)' : 'var(--error-50)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: checks.permissions ? 'var(--status-success)' : 'var(--status-error)'
+                            }}>
+                                <CheckCircleIcon style={{ width: '24px' }} />
+                            </div>
+                            <div>
+                                <h4 style={{ margin: 0, fontWeight: 600 }}>Permissions</h4>
+                                <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{checks.permissions ? 'Granted' : 'Needed'}</p>
+                            </div>
+                        </div>
+                        {checks.permissions ? <CheckCircleIcon style={{ color: 'var(--status-success)', width: '24px' }} /> : <span style={{ color: 'var(--status-error)', fontSize: '1.5rem' }}>❌</span>}
+                    </div>
                 </div>
             </div>
 
             {(error || deviceError || !checks.permissions) && (
-                <div className="error-banner" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error-color)', color: 'var(--error-color)', padding: '1rem', borderRadius: 'var(--border-radius)', marginBottom: '2rem', textAlign: 'left' }}>
+                <div style={{
+                    backgroundColor: 'var(--error-50)',
+                    border: '1px solid var(--error-200)',
+                    color: 'var(--status-error)',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-lg)',
+                    marginBottom: '2rem'
+                }}>
                     <p style={{ margin: 0, fontWeight: 'bold' }}>Issues Detected:</p>
-                    <ul style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
+                    <ul style={{ margin: '0.5rem 0 0 1.5rem', padding: 0 }}>
                         {error && <li>{error}</li>}
                         {deviceError && <li>{deviceError}</li>}
                         {!checks.permissions && <li>Please allow microphone access in your browser settings.</li>}
@@ -177,8 +250,22 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
                 </div>
             )}
 
-            <button className="btn btn-primary btn-lg" onClick={() => onStart(checks.cam)} disabled={isLoading || !isReady} style={{ width: '100%', maxWidth: '300px', padding: '1rem', fontSize: '1.2rem' }}>
-                {isLoading ? 'Connecting...' : 'Start Interview Session'}
+            <button
+                className="btn btn-primary"
+                onClick={() => onStart(checks.cam)}
+                disabled={isLoading || !isReady}
+                style={{
+                    width: '100%',
+                    maxWidth: '400px',
+                    padding: '1rem',
+                    fontSize: '1.1rem',
+                    margin: '0 auto',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    boxShadow: 'var(--shadow-md)'
+                }}
+            >
+                {isLoading ? 'Connecting to Secure Room...' : 'Start Interview Session'}
             </button>
         </div>
     );
@@ -187,18 +274,41 @@ const SetupScreen = ({ candidate, jobTitle, onStart, isLoading, error }: any) =>
 // Custom minimal controls
 const CustomControls = () => {
     return (
-        <div className="livekit-control-bar" style={{ padding: '1rem', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-            <DisconnectButton style={{ backgroundColor: '#ef4444', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-                End Interview
+        <div style={{
+            padding: '1rem',
+            background: 'white',
+            borderTop: '1px solid var(--border-color)',
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '1rem',
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 20
+        }}>
+            <DisconnectButton style={{
+                backgroundColor: 'var(--status-error)',
+                color: 'white',
+                padding: '0.75rem 2rem',
+                borderRadius: 'var(--radius-full)',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: 'var(--shadow-md)'
+            }}>
+                <PhoneOffIcon style={{ width: '18px' }} /> End Interview
             </DisconnectButton>
         </div>
     );
 };
 
 // Room Component
-// Room Component
 const RoomContent = ({ jobTitle }: { jobTitle: string }) => {
-    // Render the room layout with participants
     const tracks = useTracks(
         [
             { source: Track.Source.Camera, withPlaceholder: true },
@@ -207,79 +317,92 @@ const RoomContent = ({ jobTitle }: { jobTitle: string }) => {
         { onlySubscribed: false },
     );
 
-    console.log("RoomContent Rendered. Tracks:", tracks.length);
-    tracks.forEach(track => {
-        console.log(`Track: ${track.participant.identity} | Source: ${track.source} | Muted: ${track.publication?.isMuted} | Substribed: ${track.publication?.isSubscribed}`);
-        if (track.source === Track.Source.Microphone) {
-            console.log(`🎤 Audio Track found for ${track.participant.identity}`);
-        }
-    });
-
     return (
-        <div className="room-layout" style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div className="room-layout" style={{ height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', background: 'var(--slate-900)' }}>
             {/* Header Overlay */}
             <div style={{
                 position: 'absolute',
-                top: '1rem',
-                left: '50%',
-                transform: 'translateX(-50%)',
+                top: '1.5rem',
+                left: '2rem',
                 background: 'rgba(255, 255, 255, 0.9)',
-                padding: '0.5rem 1.5rem',
-                borderRadius: '20px',
+                padding: '0.75rem 1.5rem',
+                borderRadius: 'var(--radius-lg)',
                 zIndex: 10,
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                backdropFilter: 'blur(5px)'
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                backdropFilter: 'blur(8px)'
             }}>
-                <span style={{ fontSize: '0.9rem', color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Interviewing For</span>
-                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>{jobTitle}</span>
+                <div style={{ fontSize: '0.85rem', color: 'var(--slate-500)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Interviewing For</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-primary)' }}>{jobTitle}</div>
             </div>
 
-            <SessionTimer maxSeconds={900} /> {/* 15 Minutes */}
+            <SessionTimer maxSeconds={900} />
 
-            <div className="participant-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem', padding: '1rem', marginTop: '4rem' }}>
+            <div className="participant-grid" style={{
+                flex: 1,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+                gap: '1.5rem',
+                padding: '6rem 2rem 6rem',
+                alignContent: 'center'
+            }}>
                 {tracks.map((track) => {
                     const isAgent = !track.participant.isLocal;
-                    // Check if this is a Camera track and if it is muted or unpublished
                     const isVideoOff = !track.publication || track.publication.isMuted;
+
+                    // Specific styling for Agent
                     const AGENT_IMG = "/ai-avatar.png";
-                    // Using a professional business portrait instead of a 3D avatar
-                    const CANDIDATE_IMG = "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=800&q=80";
 
                     return (
                         <ParticipantTile
                             key={track.participant.identity}
                             trackRef={track}
-                            style={{ borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', position: 'relative' }}
+                            style={{
+                                borderRadius: '1.5rem',
+                                overflow: 'hidden',
+                                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+                                position: 'relative',
+                                aspectRatio: '16/9',
+                                background: '#1a1a1a',
+                                border: isAgent ? '2px solid var(--color-primary)' : '1px solid rgba(255,255,255,0.1)'
+                            }}
                         >
                             {isVideoOff ? (
-                                <div style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a' }}>
+                                <div style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
                                     {isAgent ? (
-                                        <img
-                                            src={AGENT_IMG}
-                                            alt="AI Interviewer"
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 1 }}
-                                        />
+                                        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                            <img
+                                                src={AGENT_IMG}
+                                                alt="AI Interviewer"
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                onError={(e) => {
+                                                    // Fallback if image fails
+                                                    e.currentTarget.style.display = 'none';
+                                                }}
+                                            />
+                                            {/* Fallback overlay if image missing/hidden */}
+                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--primary-900), #0f172a)' }}>
+                                                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🤖</div>
+                                                <h3 style={{ color: 'white', fontWeight: 700 }}>AI Recruiter</h3>
+                                            </div>
+                                        </div>
                                     ) : (
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
                                             <div style={{
-                                                width: '100px',
-                                                height: '100px',
+                                                width: '120px',
+                                                height: '120px',
                                                 borderRadius: '50%',
-                                                background: 'var(--primary-color)',
+                                                background: 'linear-gradient(135deg, var(--color-primary), var(--secondary-500))',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                fontSize: '2.5rem',
-                                                fontWeight: 'bold',
+                                                fontSize: '3.5rem',
+                                                fontWeight: '800',
                                                 color: 'white',
-                                                boxShadow: '0 4px 6px rgba(0,0,0,0.2)'
+                                                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)'
                                             }}>
                                                 {track.participant.name ? track.participant.name.charAt(0).toUpperCase() : 'C'}
                                             </div>
-                                            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: '600' }}>
+                                            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: '600', letterSpacing: '0.025em' }}>
                                                 {track.participant.name || 'Candidate'}
                                             </span>
                                         </div>
@@ -292,15 +415,15 @@ const RoomContent = ({ jobTitle }: { jobTitle: string }) => {
                                 />
                             )}
 
-                            {/* Always Overlay Participant Name */}
-                            <div style={{ position: 'absolute', bottom: '10px', left: '10px', zIndex: 10 }}>
+                            <div style={{ position: 'absolute', bottom: '1.5rem', left: '1.5rem', zIndex: 10 }}>
                                 <ParticipantName style={{
                                     color: 'white',
-                                    backgroundColor: 'rgba(0,0,0,0.5)',
-                                    padding: '4px 8px',
-                                    borderRadius: '6px',
-                                    fontWeight: '500',
-                                    fontSize: '0.9rem'
+                                    backgroundColor: 'rgba(0,0,0,0.6)',
+                                    padding: '0.5rem 1rem',
+                                    borderRadius: '0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '1rem',
+                                    backdropFilter: 'blur(4px)'
                                 }} />
                             </div>
                         </ParticipantTile>
@@ -333,17 +456,14 @@ export default function AvatarInterviewScreen({
         setState('connecting');
         setError('');
 
-        // Disable video if not available or strictly audio-only mode
         const isAudioOnlyConfig = interviewingCandidate?.interview_config?.mode === 'audio';
         const shouldUseVideo = camAvailable && !isAudioOnlyConfig;
         setEnableVideo(shouldUseVideo);
 
         try {
-            // 1. Signal backend to start interview (initializes DB record)
             const startResult = await onStartInterviewSession(currentApplicationId);
             if (!startResult.success) throw new Error('Failed to initialize interview session');
 
-            // 2. Get Connection Token from Backend (LiveKit)
             const connectionDetails = await livekitService.connectToRoom(
                 currentApplicationId.toString(),
                 currentUser.name
@@ -365,33 +485,14 @@ export default function AvatarInterviewScreen({
 
         if (currentApplicationId) {
             let attempts = 0;
-            const maxAttempts = 20; // 40 seconds max (2s interval)
+            const maxAttempts = 20;
 
-            // Poll for the Agent to update the DB
             while (attempts < maxAttempts) {
                 try {
-                    // Fetch directly to bypass stale props
                     const { data: latestCandidate } = await api.get(`/candidates/${currentApplicationId}`);
 
                     if (latestCandidate?.interview_config?.interviewStatus === 'finished') {
-                        // Found the results!
-                        // We must trigger a refresh in App.tsx so the "View Report" button
-                        // will lead to a configured report.
-                        // We can use a dummy call to onSaveInterviewResults to trigger refetch,
-                        // or better yet, we should add a refresh callback. 
-                        // But since we don't have one, we can call onSaveInterviewResults with nulls
-                        // to just trigger the refetch logic if possible, or assume onNavigate handles it?
-                        // No, onNavigate doesn't refetch.
-                        // Let's rely on the fact that if we just wait, the user clicking "View" 
-                        // will navigate, but the data in App state is STALE.
-
-                        // HACK: Re-triggering a "save" identical to what's there is safe,
-                        // but inefficient. 
-                        // A better way: The App receives candidatesData.
-                        // We really need App.tsx's refetchCandidates to run.
-
                         const config = latestCandidate.interview_config;
-                        // Save local state update just in case, but navigating away
                         await onSaveInterviewResults(
                             currentApplicationId,
                             config.aiScore || 0,
@@ -400,9 +501,8 @@ export default function AvatarInterviewScreen({
                             config.audioRecordingUrl
                         );
 
-                        // Auto-navigate to report
                         onNavigate('interview-report', 'dashboard', { applicationId: currentApplicationId });
-                        return; // Exit function
+                        return;
                     }
                 } catch (e) {
                     console.warn("Polling error:", e);
@@ -413,7 +513,6 @@ export default function AvatarInterviewScreen({
             }
         }
 
-        // If time out, fallback to finished screen
         setState('finished');
     }, [currentApplicationId, onSaveInterviewResults]);
 
@@ -423,12 +522,9 @@ export default function AvatarInterviewScreen({
         setState('setup');
     };
 
-    if (!interviewingCandidate) return <div className="loading-screen">Loading...</div>;
+    if (!interviewingCandidate) return <div className="page-content center-content">Loading...</div>;
 
     const jobTitle = jobsData?.find(j => j.id === interviewingCandidate.jobId)?.title || interviewingCandidate.role;
-
-    // Determine video prop for LiveKitRoom: true (on), false (off), or constraints
-    // We rely on enableVideo state calculated during setup
 
     if (state === 'active' && token) {
         return (
@@ -441,7 +537,7 @@ export default function AvatarInterviewScreen({
                 onDisconnected={handleLeave}
                 onError={handleError}
                 data-lk-theme="default"
-                style={{ height: '100vh', backgroundColor: 'var(--bg-primary)' }}
+                style={{ height: '100vh', backgroundColor: 'var(--slate-900)' }}
                 connectOptions={{
                     rtcConfig: {
                         iceServers: [
@@ -457,15 +553,35 @@ export default function AvatarInterviewScreen({
 
     if (state === 'finished') {
         return (
-            <div className="finished-screen">
-                <h2>Interview Completed</h2>
-                <p>Thank you for completing the interview. Your results are being processed.</p>
+            <div className="page-container" style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                padding: '2rem'
+            }}>
+                <div style={{
+                    width: '80px', height: '80px',
+                    background: 'var(--success-50)',
+                    borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: '2rem',
+                    boxShadow: '0 0 0 8px var(--success-50)'
+                }}>
+                    <CheckCircleIcon style={{ width: '40px', height: '40px', color: 'var(--status-success)' }} />
+                </div>
+                <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-text-main)', marginBottom: '1rem' }}>Interview Completed</h2>
+                <p style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', marginBottom: '3rem' }}>
+                    Thank you for completing the interview. Your results are being processed.
+                </p>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                    <button className="btn btn-primary" onClick={() => onNavigate('interview-report', 'dashboard', { applicationId: currentApplicationId })}>
-                        View Report
-                    </button>
                     <button className="btn btn-secondary" onClick={() => onNavigate('dashboard', 'dashboard')}>
                         Exit to Dashboard
+                    </button>
+                    <button className="btn btn-primary" onClick={() => onNavigate('interview-report', 'dashboard', { applicationId: currentApplicationId })}>
+                        View Report
                     </button>
                 </div>
             </div>
@@ -473,7 +589,15 @@ export default function AvatarInterviewScreen({
     }
 
     if (state === 'analyzing') {
-        return <div className="loading-screen"><h2>Analyzing Interview...</h2><p>Please wait while we process your results.</p></div>;
+        return (
+            <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2rem' }}>
+                <div style={{ width: '60px', height: '60px', borderRadius: '50%', border: '4px solid var(--primary-100)', borderTopColor: 'var(--color-primary)', animation: 'spin 1s linear infinite' }}></div>
+                <div style={{ textAlign: 'center' }}>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '0.5rem' }}>Analyzing Results...</h2>
+                    <p style={{ color: 'var(--color-text-muted)' }}>Please wait while we finalize your interview report.</p>
+                </div>
+            </div>
+        );
     }
 
     return (

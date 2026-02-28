@@ -72,33 +72,87 @@ const SetupInterviewModal = ({ candidateName, application, onSave, onCancel }) =
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content" style={{ maxWidth: '500px' }}>
-                <div className="modal-header"><h2>{title}</h2></div>
-                <div className="modal-body">
-                    <div className="form-group"><label>Number of Questions</label><input type="number" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))} /></div>
-                    <div className="form-group"><label>Difficulty</label><select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
-                    <div className="form-group"><label>Duration (minutes)</label><input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value, 10))} /></div>
+        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
+            <div className="modal-content" style={{
+                maxWidth: '500px',
+                background: 'var(--color-surface)',
+                borderRadius: 'var(--radius-xl)',
+                boxShadow: 'var(--shadow-xl)',
+                border: '1px solid var(--color-border)'
+            }}>
+                <div className="modal-header" style={{ borderBottom: '1px solid var(--color-border)', padding: '1.5rem' }}>
+                    <h2 style={{ fontSize: '1.25rem', color: 'var(--color-text-main)' }}>{title}</h2>
+                </div>
+                <div className="modal-body" style={{ padding: '1.5rem' }}>
+                    <div className="form-group">
+                        <label className="form-label">Number of Questions</label>
+                        <input
+                            type="number"
+                            value={questionCount}
+                            onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))}
+                            style={{ background: 'var(--slate-50)' }}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Difficulty</label>
+                        <select
+                            value={difficulty}
+                            onChange={(e) => setDifficulty(e.target.value)}
+                            style={{ background: 'var(--slate-50)' }}
+                        >
+                            <option>Easy</option>
+                            <option>Medium</option>
+                            <option>Hard</option>
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Duration (minutes)</label>
+                        <input
+                            type="number"
+                            value={duration}
+                            onChange={(e) => setDuration(parseInt(e.target.value, 10))}
+                            style={{ background: 'var(--slate-50)' }}
+                        />
+                    </div>
 
                     {/* Fixed Interview Type Display */}
                     <div className="form-group">
-                        <label>Interview Mode</label>
+                        <label className="form-label">Interview Mode</label>
                         <div style={{
-                            padding: '0.75rem',
-                            background: 'var(--light-bg)',
-                            borderRadius: 'var(--border-radius-sm)',
-                            border: '1px solid var(--border-color)',
-                            color: 'var(--text-primary)',
-                            fontWeight: '500'
+                            padding: '1rem',
+                            background: 'var(--primary-50)',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--primary-200)',
+                            color: 'var(--primary-700)',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem'
                         }}>
-                            AI Voice Agent (LiveKit)
+                            <div style={{
+                                width: '32px', height: '32px',
+                                background: 'white',
+                                borderRadius: '50%',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '1.2rem'
+                            }}>🎙️</div>
+                            <div>
+                                <div>AI Voice Agent (LiveKit)</div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: '400', opacity: 0.8 }}>Real-time voice conversation</div>
+                            </div>
                         </div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                            The AI agent will conducting the interview via voice.
-                        </p>
                     </div>
                 </div>
-                <div className="modal-footer"><button className="btn btn-secondary" onClick={onCancel}>Cancel</button><button className="btn btn-primary" onClick={handleSave}>Save & Schedule</button></div>
+                <div className="modal-footer" style={{
+                    padding: '1.5rem',
+                    borderTop: '1px solid var(--color-border)',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '1rem'
+                }}>
+                    <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave}>Save & Schedule</button>
+                </div>
             </div>
         </div>
     );
@@ -111,24 +165,18 @@ const InterviewReportModal = ({ application, onClose }) => {
     const interviewType = interview_config?.interviewType || 'audio';
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>Interview Report: {candidateName}</h2>
-                    <button className="modal-close-btn" onClick={onClose} style={{
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '1.5rem',
-                        cursor: 'pointer',
-                        color: 'var(--text-secondary)'
-                    }}>×</button>
+        <div className="modal-overlay" onClick={onClose} style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
+            <div className="modal-content" style={{ maxWidth: '700px', background: 'var(--color-surface)', borderRadius: 'var(--radius-xl)' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header" style={{ borderBottom: '1px solid var(--color-border)', padding: '1.5rem' }}>
+                    <h2 style={{ fontSize: '1.25rem' }}>Interview Report: {candidateName}</h2>
+                    <button className="modal-close-btn" onClick={onClose}>×</button>
                 </div>
-                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', padding: '1.5rem' }}>
                     <div style={{ marginBottom: '1.5rem' }}>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                        <p style={{ color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
                             <strong>Position:</strong> {jobTitle}
                         </p>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                        <p style={{ color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
                             <strong>Interview Type:</strong> {
                                 interviewType === 'livekit' ? 'AI Avatar (Tavus)' :
                                     interviewType === 'video' ? 'Video (Gemini)' : 'Audio (Gemini)'
@@ -137,36 +185,38 @@ const InterviewReportModal = ({ application, onClose }) => {
                         {aiScore !== null && (
                             <div style={{
                                 display: 'inline-block',
-                                background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))',
+                                background: 'linear-gradient(135deg, var(--primary-600), var(--primary-400))',
                                 color: 'white',
-                                padding: '0.75rem 1.5rem',
-                                borderRadius: '12px',
-                                fontSize: '1.25rem',
+                                padding: '0.5rem 1rem',
+                                borderRadius: 'var(--radius-lg)',
+                                fontSize: '1.1rem',
                                 fontWeight: '700',
-                                marginTop: '0.5rem'
+                                marginTop: '0.5rem',
+                                boxShadow: 'var(--shadow-md)'
                             }}>
                                 AI Score: {aiScore.toFixed(1)}/10
                             </div>
                         )}
                     </div>
                     <div>
-                        <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Interview Transcript</h3>
+                        <h3 style={{ marginBottom: '1rem', color: 'var(--color-text-main)', fontSize: '1rem' }}>Interview Transcript</h3>
                         <div style={{
-                            background: 'var(--light-bg)',
-                            padding: '1rem',
-                            borderRadius: 'var(--border-radius-sm)',
+                            background: 'var(--slate-50)',
+                            padding: '1.25rem',
+                            borderRadius: 'var(--radius-lg)',
                             whiteSpace: 'pre-wrap',
                             fontSize: '0.9rem',
                             lineHeight: '1.6',
-                            color: 'var(--text-primary)'
+                            color: 'var(--color-text-main)',
+                            border: '1px solid var(--slate-200)'
                         }}>
                             {transcript}
                         </div>
                     </div>
                 </div>
-                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div className="modal-footer" style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between' }}>
                     <a href={`${config.apiBaseUrl}/candidates/${application.id}/report/interview`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
-                    <button className="btn btn-secondary" onClick={onClose}>Close</button>
+                    <button className="btn btn-ghost" onClick={onClose}>Close</button>
                 </div>
             </div>
         </div>
@@ -179,37 +229,37 @@ const ScreeningReportModal = ({ application, onClose }) => {
     const report = interview_config?.screeningReport || {};
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>Screening Report: {candidateName}</h2>
-                    <button className="modal-close-btn" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+        <div className="modal-overlay" onClick={onClose} style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
+            <div className="modal-content" style={{ maxWidth: '600px', background: 'var(--color-surface)', borderRadius: 'var(--radius-xl)' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header" style={{ borderBottom: '1px solid var(--color-border)', padding: '1.5rem' }}>
+                    <h2 style={{ fontSize: '1.25rem' }}>Screening Report: {candidateName}</h2>
+                    <button className="modal-close-btn" onClick={onClose}>×</button>
                 </div>
-                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', padding: '1.5rem' }}>
                     <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <strong>Score:</strong>
-                        <span style={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--primary-color)' }}>{report.score}/100</span>
+                        <span style={{ fontWeight: 'bold', fontSize: '1.25rem', color: 'var(--color-primary)' }}>{report.score}/100</span>
                     </div>
                     <div style={{ marginBottom: '1rem' }}>
-                        <strong>Summary:</strong>
-                        <p style={{ marginTop: '0.5rem', lineHeight: '1.5' }}>{report.summary}</p>
+                        <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Summary:</strong>
+                        <p style={{ lineHeight: '1.6', color: 'var(--color-text-muted)' }}>{report.summary}</p>
                     </div>
                     <div style={{ marginBottom: '1rem' }}>
-                        <strong>Recommendation:</strong>
-                        <p style={{ marginTop: '0.5rem', fontWeight: '500' }}>{report.recommendation}</p>
+                        <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Recommendation:</strong>
+                        <p style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{report.recommendation}</p>
                     </div>
                     {report.keyStrengths && (
                         <div style={{ marginBottom: '1rem' }}>
-                            <strong>Key Strengths:</strong>
-                            <ul style={{ paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
-                                {report.keyStrengths.map((s, i) => <li key={i}>{s}</li>)}
+                            <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Key Strengths:</strong>
+                            <ul style={{ paddingLeft: '1.5rem', marginTop: '0.5rem', color: 'var(--color-text-muted)' }}>
+                                {report.keyStrengths.map((s, i) => <li key={i} style={{ marginBottom: '0.25rem' }}>{s}</li>)}
                             </ul>
                         </div>
                     )}
                 </div>
-                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div className="modal-footer" style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between' }}>
                     <a href={`${config.apiBaseUrl}/candidates/${application.id}/report/screening`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Download PDF</a>
-                    <button className="btn btn-secondary" onClick={onClose}>Close</button>
+                    <button className="btn btn-ghost" onClick={onClose}>Close</button>
                 </div>
             </div>
         </div>
@@ -219,60 +269,60 @@ const ScreeningReportModal = ({ application, onClose }) => {
 // Candidate Profile Modal (with Screening Results)
 const CandidateProfileModal = ({ application, screeningData, isLoading, onClose }) => {
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>Candidate Profile: {application.candidateName}</h2>
-                    <button className="modal-close-btn" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+        <div className="modal-overlay" onClick={onClose} style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
+            <div className="modal-content" style={{ maxWidth: '600px', background: 'var(--color-surface)', borderRadius: 'var(--radius-xl)' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header" style={{ borderBottom: '1px solid var(--color-border)', padding: '1.5rem' }}>
+                    <h2 style={{ fontSize: '1.25rem' }}>Candidate Profile: {application.candidateName}</h2>
+                    <button className="modal-close-btn" onClick={onClose}>×</button>
                 </div>
-                <div className="modal-body">
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <p><strong>Job:</strong> {application.jobTitle}</p>
-                        <p><strong>Job:</strong> {application.jobTitle}</p>
-                        <p><strong>Status:</strong> {application.status}</p>
+                <div className="modal-body" style={{ padding: '1.5rem' }}>
+                    <div style={{ marginBottom: '2rem', background: 'var(--slate-50)', padding: '1rem', borderRadius: 'var(--radius-lg)' }}>
+                        <p style={{ marginBottom: '0.5rem' }}><strong>Job:</strong> {application.jobTitle}</p>
+                        <p style={{ marginBottom: '0.5rem' }}><strong>Status:</strong> {application.status}</p>
                         {application.linkedin_url && (
-                            <p><strong>LinkedIn:</strong> <a href={application.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>{application.linkedin_url}</a></p>
+                            <p><strong>LinkedIn:</strong> <a href={application.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{application.linkedin_url}</a></p>
                         )}
                     </div>
 
-                    <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Initial Screening Results</h3>
+                    <h3 style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', marginBottom: '1rem', fontSize: '1rem' }}>Initial Screening Results</h3>
 
                     {isLoading ? (
-                        <p>Loading screening data...</p>
+                        <p style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Loading screening data...</p>
                     ) : screeningData && screeningData.completed ? (
                         <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
                                 <div style={{
-                                    width: '60px', height: '60px', borderRadius: '50%',
-                                    background: screeningData.score >= 70 ? '#dcfce7' : '#fef3c7',
-                                    color: screeningData.score >= 70 ? '#166534' : '#92400e',
+                                    width: '64px', height: '64px', borderRadius: '50%',
+                                    background: screeningData.score >= 70 ? 'var(--status-success)' : 'var(--status-warning)',
+                                    color: 'white',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontWeight: 'bold', fontSize: '1.2rem'
+                                    fontWeight: 'bold', fontSize: '1.5rem',
+                                    boxShadow: 'var(--shadow-md)'
                                 }}>
                                     {screeningData.score}
                                 </div>
                                 <div>
-                                    <strong>Screening Score</strong>
-                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Completed on {new Date(screeningData.date).toLocaleDateString()}</p>
+                                    <strong style={{ fontSize: '1.1rem' }}>Screening Score</strong>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Completed on {new Date(screeningData.date).toLocaleDateString()}</p>
                                 </div>
                             </div>
 
 
                             {screeningData.summary && (
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <strong>Summary</strong>
-                                    <p style={{ marginTop: '0.25rem', color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Summary</strong>
+                                    <p style={{ color: 'var(--color-text-main)', lineHeight: '1.6' }}>
                                         {screeningData.summary}
                                     </p>
                                 </div>
                             )}
 
                             {screeningData.strengths && screeningData.strengths.length > 0 && (
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <strong>Key Strengths</strong>
-                                    <ul style={{ paddingLeft: '1.5rem', marginTop: '0.25rem', color: 'var(--text-primary)' }}>
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Key Strengths</strong>
+                                    <ul style={{ paddingLeft: '1.5rem', color: 'var(--color-text-muted)' }}>
                                         {screeningData.strengths.map((str: string, i: number) => (
-                                            <li key={i}>{str}</li>
+                                            <li key={i} style={{ marginBottom: '0.25rem' }}>{str}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -280,21 +330,21 @@ const CandidateProfileModal = ({ application, screeningData, isLoading, onClose 
 
                             {screeningData.weaknesses && screeningData.weaknesses.length > 0 && (
                                 <div style={{ marginBottom: '1rem' }}>
-                                    <strong>Areas for Improvement</strong>
-                                    <ul style={{ paddingLeft: '1.5rem', marginTop: '0.25rem', color: 'var(--text-primary)' }}>
+                                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Areas for Improvement</strong>
+                                    <ul style={{ paddingLeft: '1.5rem', color: 'var(--color-text-muted)' }}>
                                         {screeningData.weaknesses.map((weak: string, i: number) => (
-                                            <li key={i}>{weak}</li>
+                                            <li key={i} style={{ marginBottom: '0.25rem' }}>{weak}</li>
                                         ))}
                                     </ul>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <p>No screening data available for this candidate.</p>
+                        <p style={{ color: 'var(--color-text-muted)' }}>No screening data available for this candidate.</p>
                     )}
                 </div>
-                <div className="modal-footer">
-                    <button className="btn btn-secondary" onClick={onClose}>Close</button>
+                <div className="modal-footer" style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button className="btn btn-ghost" onClick={onClose}>Close</button>
                 </div>
             </div>
         </div >
@@ -321,44 +371,54 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
     const renderActionButton = () => {
         if (status === 'Sourced') {
             return (
-                <button className="btn btn-secondary btn-sm" onClick={() => onViewProfile(application)}>View Profile</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => onViewProfile(application)} style={{ width: '100%' }}>View Profile</button>
             );
         }
         if (status === 'Screening') {
             if (screeningStatus === 'completed') {
                 return (
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => onViewScreeningReport(application)}>Report</button>
-                        <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Schedule Interview</button>
+                    <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                        <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => onViewScreeningReport(application)}>Report</button>
+                        <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onScheduleInterview(application)}>Schedule</button>
                     </div>
                 );
             } else {
-                // Show Setup Interview button if not completed
                 return (
-                    <button className="btn btn-primary btn-sm" onClick={() => onScheduleInterview(application)}>Setup Screening</button>
+                    <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => onScheduleInterview(application)}>Setup Screening</button>
                 );
             }
         }
         if (status === 'Interviewing' && !interviewStatus) {
             return (
-                <button className="btn btn-secondary btn-sm" onClick={() => onScheduleInterview(application)}>Setup Interview</button>
+                <button className="btn btn-secondary btn-sm" style={{ width: '100%' }} onClick={() => onScheduleInterview(application)}>Setup Interview</button>
             );
         }
         if (interviewStatus === 'assessment_pending' || interviewStatus === 'pending') {
             return (
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Assessment Pending</span>
+                <div style={{
+                    padding: '0.5rem',
+                    background: 'var(--slate-50)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--slate-500)',
+                    fontSize: '0.8rem',
+                    textAlign: 'center',
+                    width: '100%',
+                    border: '1px dashed var(--slate-300)'
+                }}>
+                    Assessment Pending
+                </div>
             );
         }
         if (interviewStatus === 'assessment_completed' || interviewStatus === 'started') {
             return (
-                <button className="btn btn-primary btn-sm" onClick={() => onStartInterview(application)}>
+                <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => onStartInterview(application)}>
                     {interviewStatus === 'started' ? 'Continue Interview' : 'Start Interview'}
                 </button>
             );
         }
         if (interviewStatus === 'finished') {
             return (
-                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column', width: '100%' }}>
                     <button className="btn btn-secondary btn-sm" onClick={() => onViewResults(application)}>View Report</button>
                     {status === 'Interviewing' && (
                         <button className="btn btn-primary btn-sm" onClick={() => onUpdateStatus(id, 'Offer')}>Move to Offer</button>
@@ -368,23 +428,71 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onDragSt
         }
         if (status === 'Offer') {
             return (
-                <button className="btn btn-primary btn-sm" style={{ backgroundColor: '#10b981', borderColor: '#10b981' }} onClick={() => onUpdateStatus(id, 'Hired')}>Mark as Hired</button>
+                <button className="btn btn-primary btn-sm" style={{ backgroundColor: 'var(--accent-teal)', borderColor: 'var(--accent-teal)', width: '100%' }} onClick={() => onUpdateStatus(id, 'Hired')}>Mark as Hired</button>
             );
         }
-        return null;
+        return null; // For 'Applied' or other stages with no specific action
     };
 
 
     return (
-        <div className="candidate-card" draggable={true} onDragStart={(e) => onDragStart(e, id)}>
-            {aiScore !== null && (<div className="candidate-card-score">{aiScore.toFixed(1)}/10</div>)}
-            <h4>{candidateName}</h4>
-            <p>{jobTitle}</p>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                {interviewType === 'livekit' ? 'AI Avatar Interview (Tavus)' :
-                    interviewType === 'video' ? 'Video Interview (Gemini)' : 'Audio Interview (Gemini)'}
-            </p>
-            <div className="candidate-card-footer">
+        <div
+            className="candidate-card"
+            draggable={true}
+            onDragStart={(e) => onDragStart(e, id)}
+            style={{
+                background: 'var(--color-surface)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '1.25rem',
+                boxShadow: 'var(--shadow-sm)',
+                border: '1px solid var(--color-border)',
+                marginBottom: '1rem'
+            }}
+        >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: 'var(--color-text-main)' }}>{candidateName}</h4>
+                {aiScore !== null && (
+                    <div style={{
+                        background: aiScore >= 7 ? 'var(--status-success)' : 'var(--status-warning)',
+                        color: 'white',
+                        padding: '0.1rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.75rem',
+                        fontWeight: '700'
+                    }}>
+                        {aiScore.toFixed(1)}
+                    </div>
+                )}
+            </div>
+
+            <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{jobTitle}</p>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <span style={{
+                    fontSize: '0.7rem',
+                    background: 'var(--slate-50)',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--slate-600)',
+                    border: '1px solid var(--slate-200)'
+                }}>
+                    {interviewType === 'livekit' ? '🎙️ Voice AI' : interviewType === 'video' ? '📹 Video' : '🔊 Audio'}
+                </span>
+                {application.linkedin_url && (
+                    <span style={{
+                        fontSize: '0.7rem',
+                        background: '#eff6ff',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        color: '#2563eb',
+                        border: '1px solid #dbeafe'
+                    }}>
+                        LinkedIn
+                    </span>
+                )}
+            </div>
+
+            <div className="candidate-card-footer" style={{ borderTop: '1px solid var(--slate-100)', paddingTop: '1rem', marginTop: '0.5rem' }}>
                 {renderActionButton()}
             </div>
         </div>
@@ -487,7 +595,7 @@ export default function CandidatesScreen({
         const jobsMap = new Map(jobsData.map(j => [j.id, j]));
         const employerJobIds = currentUser?.role === 'Employer' ? new Set(jobsForFilter.map(job => job.id)) : null;
 
-        return candidatesData.map(candidateApp => {
+        return candidatesData.map((candidateApp): EnrichedApplication | null => {
             if (employerJobIds && !employerJobIds.has(candidateApp.jobId)) return null;
             if (pipelineJobFilter !== 'all' && candidateApp.jobId !== parseInt(pipelineJobFilter as string, 10)) return null;
 
