@@ -45,7 +45,7 @@ start "Agent (Local - Web)" cmd /k "cd /d %~dp0agent && python main.py dev"
 echo   - Cloud Agent (Phone Screens via SIP)...
 start "Agent (Cloud - Phone)" cmd /k "cd /d %~dp0agent && call run_cloud_agent.bat"
 
-echo [7/7] Starting Cloudflare Tunnel for demo.yalhire.ai...
+echo [7/7] Starting Cloudflare Tunnel for demo2.yalhire.ai...
 start "Cloudflare Tunnel" cmd /k "cd /d %~dp0cloudflared && cloudflared.exe --config config_local.yml tunnel run"
 
 echo.
@@ -63,16 +63,16 @@ echo [INFO] Backend:  http://localhost:8000)
 echo   [Local]  Frontend (http://127.0.0.1:443)
 echo   [Local]  Agent - Web Interviews
 echo   [Cloud]  Agent - Phone Screening
-echo   [Tunnel] Cloudflare Tunnel (demo.yalhire.ai)
+echo   [Tunnel] Cloudflare Tunnel (demo2.yalhire.ai)
 echo.
 echo Architecture:
 echo   - Web Interviews: Browser -> Local LiveKit -> Gemini
 echo   - Phone Screens: Phone -> SIP -> Cloud LiveKit -> Gemini
-echo   - Public Access: demo.yalhire.ai -> Cloudflare -> Local Services
+echo   - Public Access: demo2.yalhire.ai -> Cloudflare -> Local Services
 echo.
 echo NEXT STEPS:
 echo   1. Local: http://127.0.0.1:443
-echo   2. Public: https://demo.yalhire.ai
+echo   2. Public: https://demo2.yalhire.ai
 echo   3. For phone screening, ensure LiveKit SIP trunk has SRTP enabled
 echo.
 pause

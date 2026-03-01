@@ -16,6 +16,6 @@ docker-compose ps
 
 echo.
 echo [SUCCESS] Components are starting. Frontend will be at http://localhost:3001
-echo    Tunnel: https://demo.yalhire.ai (via Cloudflare)
+echo    Tunnel: https://demo2.yalhire.ai (via Cloudflare)
 echo.
 pause

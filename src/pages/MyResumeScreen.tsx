@@ -37,10 +37,10 @@ const resumeSchema = z.object({
     personalInfo: z.object({
         name: z.string().min(1, "Full Name is required"),
         email: z.string().email("Invalid email address"),
-        phone: z.string().min(10, "Phone number must be at least 10 digits"),
+        phone: z.string().optional().or(z.literal('')),
         linkedin: z.string().url("Invalid LinkedIn URL").optional().or(z.literal('')),
-        city: z.string().min(1, "City is required"),
-        state: z.string().min(1, "State is required"),
+        city: z.string().optional().or(z.literal('')),
+        state: z.string().optional().or(z.literal('')),
     }),
     summary: z.string().optional(),
     experience: z.array(z.object({

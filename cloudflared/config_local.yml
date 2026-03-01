@@ -6,10 +6,10 @@ ingress:
   - hostname: livekit.yalhire.ai
     service: http://127.0.0.1:7880
   # Route API requests to the backend (MUST start with /api/)
-  - hostname: demo.yalhire.ai
+  - hostname: demo2.yalhire.ai
     path: ^/api/.*
     service: http://127.0.0.1:8000
   # Route everything else to the frontend
-  - hostname: demo.yalhire.ai
+  - hostname: demo2.yalhire.ai
     service: http://localhost:3001
   - service: http_status:404

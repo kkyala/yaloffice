@@ -212,10 +212,15 @@ const ResumeScreeningPhoneScreen: React.FC<ResumeScreeningPhoneScreenProps> = ({
                 )}
 
                 {error && (
-                    <div className="alert alert-danger" style={{ marginTop: '1rem' }}>
-                        {error}
-                        <div style={{ marginTop: '1rem' }}>
-                            <button className="btn btn-sm btn-outline-secondary" onClick={() => setStatus('idle')}>Try Again</button>
+                    <div className="alert alert-danger" style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '8px', color: '#991b1b' }}>
+                        <p style={{ marginBottom: '1rem', fontWeight: 500 }}>{error}</p>
+                        <hr style={{ borderColor: '#fca5a5', margin: '1rem 0', opacity: 0.5 }} />
+                        <p style={{ fontSize: '0.9rem', marginBottom: '1rem', color: '#7f1d1d' }}>
+                            The AI calling service seems to be unavailable or the number is invalid. You can try again or skip this step to proceed.
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                            <button className="btn btn-sm btn-outline-secondary" onClick={() => { setStatus('idle'); setError(''); }} style={{ backgroundColor: 'white' }}>Try Again</button>
+                            <button className="btn btn-sm btn-primary" onClick={onComplete}>Skip & Proceed</button>
                         </div>
                     </div>
                 )}

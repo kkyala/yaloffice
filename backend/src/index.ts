@@ -31,7 +31,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 
 // Middleware
 app.use(cors({
-  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001', 'https://localhost:3001', 'http://127.0.0.1:3001', 'https://127.0.0.1:3001', 'https://stasia-mediastinal-fathomlessly.ngrok-free.dev', 'https://demo.yalhire.ai'],
+  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001', 'https://localhost:3001', 'http://127.0.0.1:3001', 'https://127.0.0.1:3001', 'https://stasia-mediastinal-fathomlessly.ngrok-free.dev', 'https://demo.yalhire.ai', 'https://demo2.yalhire.ai'],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' })); // Increased for audio/video data
