@@ -272,12 +272,10 @@ Be professional, concise, and natural.
     except Exception as e:
         logger.warning(f"Could not fetch backend config: {e}")
 
-    # Initialize Ollama (Local LLM via OpenAI compatible API)
-    # Ensure 'ollama serve' is running and you have pulled the model (e.g. 'ollama pull gemma:2b')
-    llm_provider = openai.LLM(
-        model=os.environ.get("OLLAMA_MODEL", "gemma:2b"), # Allow dynamic model override
-        base_url="http://localhost:11434/v1",
-        api_key="ollama", # Required dummy key
+    from livekit.plugins import google
+    # Initialize Google Gemini
+    llm_provider = google.LLM(
+        model="models/gemini-2.5-flash",
         temperature=0.7,
     )
 
