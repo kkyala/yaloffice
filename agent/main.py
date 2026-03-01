@@ -275,7 +275,8 @@ Be professional, concise, and natural.
     from livekit.plugins import google
     # Initialize Google Gemini
     llm_provider = google.LLM(
-        model="models/gemini-2.5-flash",
+        api_key=os.environ.get("GOOGLE_API_KEY"),
+        model="gemini-2.0-flash-exp",
         temperature=0.7,
     )
 
