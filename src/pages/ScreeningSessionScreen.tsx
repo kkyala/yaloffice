@@ -356,9 +356,9 @@ export default function ScreeningSessionScreen({ currentUser, onNavigate, interv
             });
 
             setToken(data.token);
-            // Connect to LiveKit WebSocket on the same hostname
+            // Connect to LiveKit WebSocket Nginx Proxy (/livekit)
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const livekitUrl = `${protocol}//${window.location.hostname}:7880`;
+            const livekitUrl = `${protocol}//${window.location.host}/livekit`;
             console.log("Connecting to LiveKit URL:", livekitUrl);
             setLiveKitUrl(livekitUrl);
 
