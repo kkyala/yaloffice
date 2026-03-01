@@ -11,5 +11,5 @@ ingress:
     service: http://127.0.0.1:8000
   # Route everything else to the frontend
   - hostname: demo.yalhire.ai
-    service: http://127.0.0.1:3001
+    service: http://localhost:3001
   - service: http_status:404

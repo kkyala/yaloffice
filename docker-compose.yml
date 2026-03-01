@@ -13,7 +13,7 @@ services:
       - ./backend/.env
     environment:
       - PORT=3000
-      - FRONTEND_URL=http://localhost:3001
+      - FRONTEND_URL=http://localhost:443
       - LIVEKIT_URL=ws://livekit:7880
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
@@ -39,7 +39,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "3006:3001"
+      - "3001:3001"
     environment:
       - VITE_API_URL=http://backend:3000
       - VITE_WS_URL=ws://backend:3000
@@ -59,7 +59,7 @@ services:
         VITE_WS_URL: /ws
         VITE_LIVEKIT_URL: /livekit
     ports:
-      - "3005:3001"
+      - "3001:3001"
     restart: unless-stopped
 
   # AI Agent (Python)

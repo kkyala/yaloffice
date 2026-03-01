@@ -34,8 +34,8 @@ echo [4/7] Starting Backend Server (Port 8000)...
 start "YalOffice Backend" cmd /k "cd /d %~dp0backend && npm run build && npm start"
 timeout /t 5 /nobreak >nul
 
-echo [5/7] Starting Frontend (Port 3001)...
-start "YalOffice Frontend" cmd /k "cd /d %~dp0 && npm run build && npm run preview -- --port 3001 --host"
+echo [INFO] Starting Frontend on http://localhost:3001....
+start "YalOffice Frontend" cmd /k "cd /d %~dp0 && npm run build && npm run preview -- --port 443 --host"
 timeout /t 3 /nobreak >nul
 
 echo [6/7] Starting Python Agents with Gemini 2.0 Flash...
@@ -58,8 +58,9 @@ echo   [Cloud]  Google Gemini 2.0 Flash (LLM)
 echo   [Cloud]  Deepgram STT/TTS
 echo   [Local]  LiveKit Server (ws://127.0.0.1:7880)
 echo   [Cloud]  LiveKit Cloud (wss://yal-wqwibw1y.livekit.cloud)
-echo   [Local]  Backend API (http://localhost:8000)
-echo   [Local]  Frontend (http://127.0.0.1:3001)
+echo [INFO] Frontend: http://localhost:3001
+echo [INFO] Backend:  http://localhost:8000)
+echo   [Local]  Frontend (http://127.0.0.1:443)
 echo   [Local]  Agent - Web Interviews
 echo   [Cloud]  Agent - Phone Screening
 echo   [Tunnel] Cloudflare Tunnel (demo.yalhire.ai)
@@ -70,7 +71,7 @@ echo   - Phone Screens: Phone -> SIP -> Cloud LiveKit -> Gemini
 echo   - Public Access: demo.yalhire.ai -> Cloudflare -> Local Services
 echo.
 echo NEXT STEPS:
-echo   1. Local: http://127.0.0.1:3001
+echo   1. Local: http://127.0.0.1:443
 echo   2. Public: https://demo.yalhire.ai
 echo   3. For phone screening, ensure LiveKit SIP trunk has SRTP enabled
 echo.

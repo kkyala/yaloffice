@@ -244,7 +244,7 @@ const authShim = {
             // But if it is:
             return { data: { user: { id: 'local-id', ...params } }, error: null };
         },
-        generateLink: async () => ({ data: { user: {}, properties: { action_link: 'http://localhost:3001/verify-mock' } }, error: null }),
+        generateLink: async () => ({ data: { user: {}, properties: { action_link: 'http://localhost:443/verify-mock' } }, error: null }),
         deleteUser: async () => ({ data: {}, error: null })
     },
     signInWithPassword: async (credentials: any) => {
