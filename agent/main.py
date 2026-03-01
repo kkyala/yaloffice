@@ -310,8 +310,8 @@ Be professional, concise, and natural.
     
     logger.info("Triggering LLM to speak first...")
     try:
-        # Instead of manual TTS, we append an initial context and let the LLM generate the greeting natively
-        agent.chat_ctx.append(role=ChatRole.SYSTEM, text="Please begin the interview by greeting the candidate.")
+        # Instead of manual TTS, we instruct the agent via a system message directly to the LLM manager
+        session.chat_ctx.append(role=ChatRole.SYSTEM, text="Please begin the interview by greeting the candidate right now.")
     except Exception as e:
         logger.warning(f"Could not prepare immediate greeting: {e}")
     
