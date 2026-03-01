@@ -519,7 +519,22 @@ export default function App() {
         if (appCheckError) return { success: false, error: getErrorMessage(appCheckError) };
         if (existingApps && existingApps.length > 0) return { success: false, error: 'You have already applied for this job.' };
 
-        const applicationPayload = { jobId: job.id, name: profileData.name, dob: profileData.dob, role: job.title, status: 'Applied', resumeSummary: profileData.summary, source: profileData.source, user_id: currentUser.id, notice_period: profileData.notice_period };
+        const isLiveKitAuto = import.meta.env.VITE_AUTO_ALLOCATE_LIVEKIT_INTERVIEW === 'true';
+        const initialStatus = isLiveKitAuto ? 'Interviewing' : (job.screening_enabled ? 'Screening' : 'Applied');
+
+        const applicationPayload = { jobId: job.id, name: profileData.name, dob: profileData.dob, role: job.title, status: initialStatus, resumeSummary: profileData.summary, source: profileData.source, user_id: currentUser.id, notice_period: profileData.notice_period };
+
+        if (isLiveKitAuto) {
+            applicationPayload.interview_config = {
+                interviewType: 'livekit',
+                interviewStatus: 'assessment_pending',
+                questionCount: 5,
+                difficulty: 'Medium',
+                duration: 15,
+                scheduledAt: new Date().toISOString()
+            };
+        }
+
         const { data: newApp, error: appError } = await api.post('/candidates', applicationPayload);
         if (appError) return { success: false, error: getErrorMessage(appError) };
 
@@ -555,28 +570,7 @@ export default function App() {
             // Continue anyway
         }
 
-        // Auto-Allocate LiveKit Interview if configured
-        if (import.meta.env.VITE_AUTO_ALLOCATE_LIVEKIT_INTERVIEW === 'true' && newApp?.id) {
-            try {
-                const autoConfig = {
-                    interviewType: 'livekit',
-                    interviewStatus: 'assessment_pending',
-                    questionCount: 5,
-                    difficulty: 'Medium',
-                    duration: 15,
-                    scheduledAt: new Date().toISOString()
-                };
-
-                await api.put(`/candidates/${newApp.id}`, {
-                    interview_config: autoConfig,
-                    status: 'Interviewing'
-                });
-                console.log(`[Auto-Allocate] Candidate ${newApp.id} moved to Interviewing/LiveKit`);
-            } catch (autoErr) {
-                console.error("Auto-allocation failed:", autoErr);
-            }
-        }
-
+        // the logic was merged into the post payload above.
         await refetchCandidates();
         return { success: true, applicationId: newApp?.id, data: newApp };
     };
