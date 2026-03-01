@@ -276,7 +276,7 @@ Be professional, concise, and natural.
     # Initialize Google Gemini
     llm_provider = google.LLM(
         api_key=os.environ.get("GOOGLE_API_KEY"),
-        model="gemini-2.0-flash-exp",
+        model="gemini-2.0-flash",
         temperature=0.7,
     )
 
@@ -308,24 +308,12 @@ Be professional, concise, and natural.
     # Wait briefly for audio channels to initialize
     await asyncio.sleep(1.5)
     
-    logger.info("Playing immediate greeting before LLM session...")
-    
-    # FORCE IMMEDIATE GREETING using TTS directly (bypasses LLM wait-for-user pattern)
+    logger.info("Triggering LLM to speak first...")
     try:
-        greeting_text = f"Hello {context['candidate_name']}, I am Yal, your AI recruiter from YalOffice. Thank you for taking this call. Are you ready to begin the interview?"
-        
-        # Synthesize and play greeting immediately
-        greeting_stream = tts.synthesize(greeting_text)
-        async for audio_chunk in greeting_stream:
-            # Publish audio directly to room
-            await ctx.room.local_participant.publish_data(
-                audio_chunk.frame.data,
-                kind="audio",
-            )
-        
-        logger.info("Immediate greeting played successfully")
+        # Instead of manual TTS, we append an initial context and let the LLM generate the greeting natively
+        agent.chat_ctx.append(role=ChatRole.SYSTEM, text="Please begin the interview by greeting the candidate.")
     except Exception as e:
-        logger.warning(f"Could not play immediate greeting: {e}")
+        logger.warning(f"Could not prepare immediate greeting: {e}")
     
     # Now wait for the reactive session to continue
     logger.info("Agent session started successfully.")
