@@ -1,6 +1,6 @@
 import { Client } from 'pg';
 
-const connectionString = 'postgresql://postgres:postgres@localhost:5432/postgres';
+const connectionString = 'postgresql://postgres:postgres@localhost:5432/yaloffice';
 
 const fixResumesTable = async () => {
     const client = new Client({ connectionString });
